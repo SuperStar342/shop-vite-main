@@ -327,7 +327,7 @@
               :debounce="300"
               :fetch-suggestions="fetchEmpSuggestions"
               clearable
-              placeholder="搜索姓名 / 工号 / 部门"
+              placeholder="搜索姓名 / 工号 / 部门 / 拼音"
               value-key="value"
               @clear="onEmpSearchClear"
               @keyup.enter="loadEmployees"
@@ -429,6 +429,7 @@ import {
   getQuickDispatchProcesses,
   submitQuickDispatch,
 } from '/@/api/procurement/quickDispatch'
+import { filterDeptsByKeyword, filterEmpsByKeyword, isPinyinLikeKeyword } from '/@/utils/empMatch'
 
 defineOptions({ name: 'QuickDispatch' })
 
@@ -1077,11 +1078,18 @@ const fetchEmpSuggestions = async (query: string, cb: (results: any[]) => void) 
   const kw = String(query || '').trim()
   if (!kw) return cb([])
   try {
-    const [depts, emps] = await Promise.all([
-      getQuickDispatchDeptSuggest({ keyword: kw }),
-      getQuickDispatchEmployees({ keyword: kw }),
+    const pinyinKw = isPinyinLikeKeyword(kw)
+    const [deptsRaw, empsRaw] = await Promise.all([
+      // 拼音时也拉部门列表，再用全拼严格过滤（避免无 keyword 时刷出一堆无关部门）
+      getQuickDispatchDeptSuggest({ keyword: pinyinKw ? undefined : kw }),
+      getQuickDispatchEmployees({
+        deptId: resolveEmpDeptId(),
+        keyword: pinyinKw ? undefined : kw,
+      }),
     ])
-    const deptItems = (depts || []).slice(0, 6).map((r: any) => ({
+    const depts = filterDeptsByKeyword(deptsRaw || [], kw)
+    const emps = filterEmpsByKeyword(empsRaw || [], kw)
+    const deptItems = depts.slice(0, 6).map((r: any) => ({
       type: 'dept',
       value: r.deptName || r.deptCode || String(r.deptId || ''),
       sub: r.deptCode || String(r.deptId || ''),
@@ -1089,7 +1097,7 @@ const fetchEmpSuggestions = async (query: string, cb: (results: any[]) => void) 
       deptCode: r.deptCode,
       deptName: r.deptName,
     }))
-    const empItems = (emps || []).slice(0, 8).map((r: any) => ({
+    const empItems = emps.slice(0, 8).map((r: any) => ({
       type: 'emp',
       value: r.empName || r.empNo,
       sub: `${r.empNo || ''} · ${r.deptName || '-'}`,
@@ -1172,10 +1180,14 @@ const loadEmpDepts = async () => {
 const loadEmployees = async () => {
   empLoading.value = true
   try {
-    employees.value = await getQuickDispatchEmployees({
+    const kw = String(empKeyword.value || '').trim()
+    const pinyinKw = isPinyinLikeKeyword(kw)
+    const rows = await getQuickDispatchEmployees({
       deptId: resolveEmpDeptId(),
-      keyword: empKeyword.value,
+      // 纯拼音：不传 keyword，避免库端中文名匹配失败
+      keyword: pinyinKw ? undefined : kw || undefined,
     })
+    employees.value = kw ? filterEmpsByKeyword(rows || [], kw) : rows || []
     const maxPage = Math.max(1, Math.ceil(employees.value.length / empPageSize.value) || 1)
     if (empPageNo.value > maxPage) empPageNo.value = maxPage
     await syncEmpTableSelection()
