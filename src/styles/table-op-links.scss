@@ -1,0 +1,50 @@
+/* 表格操作列：链接样式，避免 text 按钮过于拥挤 */
+.table-op-links {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0;
+  max-width: 100%;
+
+  .el-button.is-link {
+    margin: 0;
+    padding: 2px 8px;
+    height: auto;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: 4px;
+
+    &+.el-button.is-link {
+      position: relative;
+      margin-left: 2px;
+
+      &::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 0;
+        width: 1px;
+        height: 12px;
+        background: var(--el-border-color-lighter);
+        transform: translateY(-50%);
+      }
+    }
+
+    &:hover {
+      background: var(--el-fill-color-light);
+    }
+
+    &.el-button--danger:hover {
+      background: var(--el-color-danger-light-9);
+    }
+
+    &.el-button--warning:hover {
+      background: var(--el-color-warning-light-9);
+    }
+
+    &.el-button--success:hover {
+      background: var(--el-color-success-light-9);
+    }
+  }
+}
