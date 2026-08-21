@@ -73,7 +73,14 @@
           <el-checkbox v-model="mergeSameProcess" size="small">同工序合并预览</el-checkbox>
         </header>
         <div class="qd-panel__toolbar">
-          <el-input v-model.trim="treeKeyword" clearable placeholder="搜索工单 / 工序" size="small" />
+          <el-input
+            v-model.trim="treeKeyword"
+            clearable
+            placeholder="树内筛选；工单号回车可全库查询"
+            size="small"
+            @clear="onTreeKeywordClear"
+            @keyup.enter="searchFromTree"
+          />
         </div>
         <div v-loading="loading" class="qd-panel__body">
           <el-tree
@@ -185,9 +192,10 @@
         </div>
 
         <footer class="qd-panel__foot qd-alloc-foot">
-          <span>比例合计 <b :class="{ 'is-bad': ratioSum !== 100 && pickedWorkers.length > 0 }">{{ ratioSum }}%</b></span>
-          <span>可派上限 {{ fmtNum(allocCap) }}</span>
-          <span>已分配 {{ fmtNum(pickedSum) }}</span>
+          <span>比例合计 <b :class="{ 'is-bad': ratioSum > 100.5 && pickedWorkers.length > 0 }">{{ ratioSum }}%</b></span>
+          <span>基准上限 {{ fmtNum(allocCap) }}</span>
+          <span>基准已分 {{ fmtNum(pickedSum) }}</span>
+          <span>预计派量 {{ fmtNum(assignedTotalQty) }}</span>
         </footer>
       </section>
 
@@ -596,29 +604,119 @@ const allocCap = computed(() => {
   return Math.min(...selectedLines.value.map((l) => num(l.remainQty)))
 })
 
+const totalRemainQty = computed(() =>
+  selectedLines.value.reduce((s, l) => s + num(l.remainQty), 0)
+)
+
 const pickedSum = computed(() => pickedWorkers.value.reduce((s, w) => s + num(w.planQty), 0))
 const ratioSum = computed(() => pickedWorkers.value.reduce((s, w) => s + num(w.ratio), 0))
 
+/** 按当前基准已分数量，把某工序剩余量缩放到应派合计，再按工人 planQty 占比拆分 */
+const workersForRemain = (remain: number) => {
+  const lineRemain = num(remain)
+  const list = pickedWorkers.value
+  const baseSum = pickedSum.value
+  const cap = allocCap.value
+  if (!list.length || lineRemain <= 0 || baseSum <= 0) {
+    return [] as { empNo: string; empName: string; ratio: number; planQty: number }[]
+  }
+
+  const scale = cap > 0 ? baseSum / cap : 1
+  const target = Math.min(lineRemain, Math.max(0, lineRemain * scale))
+  if (target <= 0) return []
+
+  const weights = list.map((w) => num(w.planQty))
+  const weightSum = weights.reduce((s, n) => s + n, 0) || 1
+
+  const preferInteger = Math.abs(target - Math.round(target)) < 0.000001
+  if (preferInteger) {
+    const intTotal = Math.round(target)
+    const parts = list.map((w, i) => {
+      const exact = (intTotal * weights[i]) / weightSum
+      const floor = Math.floor(exact)
+      return { w, floor, frac: exact - floor }
+    })
+    let left = intTotal - parts.reduce((s, p) => s + p.floor, 0)
+    parts
+      .slice()
+      .sort((a, b) => b.frac - a.frac)
+      .forEach((p) => {
+        if (left > 0) {
+          p.floor += 1
+          left -= 1
+        }
+      })
+    return parts
+      .filter((p) => p.floor > 0)
+      .map((p) => ({
+        empNo: p.w.empNo,
+        empName: p.w.empName,
+        ratio: num(p.w.ratio),
+        planQty: p.floor,
+      }))
+  }
+
+  let assigned = 0
+  return list
+    .map((w, i) => {
+      let planQty = 0
+      if (i === list.length - 1) planQty = Number((target - assigned).toFixed(2))
+      else {
+        planQty = Number(((target * weights[i]) / weightSum).toFixed(2))
+        assigned += planQty
+      }
+      return { empNo: w.empNo, empName: w.empName, ratio: num(w.ratio), planQty }
+    })
+    .filter((w) => num(w.planQty) > 0)
+}
+
+const assignedTotalQty = computed(() =>
+  selectedLines.value.reduce((s, line) => {
+    return s + workersForRemain(num(line.remainQty)).reduce((a, w) => a + num(w.planQty), 0)
+  }, 0)
+)
+
+const buildSubmitItems = () =>
+  selectedLines.value
+    .map((row) => {
+      const workers = workersForRemain(num(row.remainQty)).map((w) => ({
+        empNo: w.empNo,
+        planQty: num(w.planQty),
+      }))
+      return {
+        woNo: row.woNo,
+        moNo: row.moNo,
+        mrCode: row.mrCode,
+        prcCode: row.prcCode,
+        goodsId: row.goodsId,
+        woBorSno: row.woBorSno,
+        workers,
+      }
+    })
+    .filter((item) => item.workers.length > 0)
+
 const activeTaskHint = computed(() => {
   if (!selectedLeaves.value.length) return null
+  const multi = selectedLeaves.value.length > 1
+  const uneven = multi && Math.abs(totalRemainQty.value - allocCap.value * selectedLeaves.value.length) > 0.000001
   if (assignScope.value === 'unified' && mergeSameProcess.value) {
     const first = selectedLeaves.value[0]
     return {
       title: `${first.line.prcCode || ''} ${first.line.prcName || ''}`.trim() || '已选工序',
-      desc: `统一分配 · 覆盖 ${selectedWoCount.value} 张工单 · 上限 ${fmtNum(allocCap.value)}`,
+      desc: uneven
+        ? `统一比例 · ${selectedLeaves.value.length} 道工序按各自剩余量拆分（合计 ${fmtNum(totalRemainQty.value)}）`
+        : `统一分配 · 覆盖 ${selectedWoCount.value} 张工单 · 单工序 ${fmtNum(allocCap.value)}`,
     }
   }
   return {
     title: `已选 ${selectedLeaves.value.length} 道工序`,
-    desc: `工人数量将写入每道已选工序（受最小剩余 ${fmtNum(allocCap.value)} 约束）`,
+    desc: uneven
+      ? `相同比例写入各工序，数量=各工序剩余可派量（合计 ${fmtNum(totalRemainQty.value)}）`
+      : `工人数量按相同比例写入每道工序（单工序 ${fmtNum(allocCap.value)}）`,
   }
 })
 
 const previewCards = computed(() => {
-  const workers = pickedWorkers.value
-    .filter((w) => num(w.planQty) > 0)
-    .map((w) => ({ empNo: w.empNo, empName: w.empName, ratio: w.ratio, planQty: w.planQty }))
-
   if (previewTab.value === 'wo') {
     const byWo = new Map<string, any[]>()
     for (const leaf of selectedLeaves.value) {
@@ -626,14 +724,26 @@ const previewCards = computed(() => {
       list.push(leaf)
       byWo.set(leaf.line.woNo, list)
     }
-    return [...byWo.entries()].map(([woNo, leaves]) => ({
-      key: woNo,
-      code: woNo,
-      name: leaves[0]?.line?.goodsName || '工单',
-      qty: leaves.length * num(pickedSum.value || allocCap.value),
-      woText: `${leaves.length} 道工序`,
-      workers,
-    }))
+    return [...byWo.entries()].map(([woNo, leaves]) => {
+      const workerMap = new Map<string, any>()
+      let qty = 0
+      for (const leaf of leaves) {
+        for (const w of workersForRemain(num(leaf.line.remainQty))) {
+          qty += num(w.planQty)
+          const prev = workerMap.get(w.empNo)
+          if (prev) prev.planQty = num(prev.planQty) + num(w.planQty)
+          else workerMap.set(w.empNo, { ...w })
+        }
+      }
+      return {
+        key: woNo,
+        code: woNo,
+        name: leaves[0]?.line?.goodsName || '工单',
+        qty,
+        woText: `${leaves.length} 道工序`,
+        workers: [...workerMap.values()],
+      }
+    })
   }
 
   if (mergeSameProcess.value) {
@@ -647,25 +757,40 @@ const previewCards = computed(() => {
     return [...grouped.entries()].map(([key, leaves], idx) => {
       const sample = leaves[0].line
       const woNos = [...new Set(leaves.map((l) => l.line.woNo))]
+      const workerMap = new Map<string, any>()
+      let qty = 0
+      for (const leaf of leaves) {
+        for (const w of workersForRemain(num(leaf.line.remainQty))) {
+          qty += num(w.planQty)
+          const prev = workerMap.get(w.empNo)
+          if (prev) prev.planQty = num(prev.planQty) + num(w.planQty)
+          else workerMap.set(w.empNo, { ...w })
+        }
+      }
       return {
         key: key || `g-${idx}`,
         code: sample.prcCode || `TASK-${idx + 1}`,
         name: sample.prcName || sample.prcCode,
-        qty: leaves.length * num(pickedSum.value || allocCap.value),
+        qty,
         woText: `关联工单 ${woNos.join('、')}`,
-        workers,
+        workers: [...workerMap.values()],
       }
     })
   }
 
-  return selectedLeaves.value.map((leaf, idx) => ({
-    key: leaf.id,
-    code: leaf.line.prcCode || `TASK-${idx + 1}`,
-    name: leaf.line.prcName || leaf.line.prcCode,
-    qty: pickedSum.value || allocCap.value,
-    woText: `工单 ${leaf.line.woNo}`,
-    workers,
-  }))
+  return selectedLeaves.value.map((leaf, idx) => {
+    const remain = num(leaf.line.remainQty)
+    const workers = workersForRemain(remain)
+    const qty = workers.reduce((s, w) => s + num(w.planQty), 0)
+    return {
+      key: leaf.id,
+      code: leaf.line.prcCode || `TASK-${idx + 1}`,
+      name: leaf.line.prcName || leaf.line.prcCode,
+      qty,
+      woText: `工单 ${leaf.line.woNo}`,
+      workers,
+    }
+  })
 })
 
 const dispatchSummary = computed(() => ({
@@ -673,7 +798,7 @@ const dispatchSummary = computed(() => ({
   woCount: selectedWoCount.value,
   prcCount: selectedLeaves.value.length,
   workerCount: pickedWorkers.value.length,
-  totalQty: selectedLeaves.value.length * num(pickedSum.value),
+  totalQty: assignedTotalQty.value,
 }))
 
 const canSubmit = computed(() => {
@@ -681,7 +806,9 @@ const canSubmit = computed(() => {
   if (allocCap.value <= 0) return false
   if (pickedSum.value <= 0) return false
   if (pickedSum.value - allocCap.value > 0.000001) return false
-  if (allocMode.value === 'ratio' && Math.abs(ratioSum.value - 100) > 0.5) return false
+  // 比例模式：允许合计 ≤100（单人可只派一部分）；超过 100 不可提交
+  if (allocMode.value === 'ratio' && ratioSum.value - 100 > 0.5) return false
+  if (allocMode.value === 'ratio' && ratioSum.value <= 0) return false
   return pickedWorkers.value.every((w) => num(w.planQty) > 0)
 })
 
@@ -717,6 +844,31 @@ const filterTreeNode = (value: string, data: any) => {
   return `${data.label || ''}${data.subLabel || ''}`.toLowerCase().includes(kw)
 }
 
+/** 树内回车：像工单号则走服务端查询（默认列表只有 TOP200，历史工单不在其中） */
+const searchFromTree = () => {
+  const kw = treeKeyword.value.trim()
+  if (!kw) return
+  const looksLikeWo = /^W\d+/i.test(kw) || /W\d{6,}/i.test(kw)
+  const looksLikeMo = !looksLikeWo && kw.length >= 6
+  if (looksLikeWo) {
+    queryForm.woNo = kw
+    queryForm.moNo = ''
+    loadPreview()
+    return
+  }
+  if (looksLikeMo) {
+    queryForm.moNo = kw
+    queryForm.woNo = ''
+    loadPreview()
+    return
+  }
+  treeRef.value?.filter(kw)
+}
+
+const onTreeKeywordClear = () => {
+  treeRef.value?.filter('')
+}
+
 const onTreeCheck = (_data: any, ctx: any) => {
   const keys: string[] = ctx?.checkedKeys || []
   checkedLeafIds.value = keys.filter((k) => !String(k).startsWith('wo:'))
@@ -732,18 +884,19 @@ const redistributeByRatio = () => {
   const total = num(allocCap.value)
   const list = pickedWorkers.value
   if (!list.length || total <= 0) return
-  const sumRatio = list.reduce((s, w) => s + num(w.ratio), 0) || 100
 
-  // 总量为整数时：先按比例向下取整，余数按小数部分从大到小补给工人，保证合计精确等于总量
+  // 比例按「占基准上限的百分比」：单人拉到 50% = 派上限的一半（不能用 ratio/sumRatio，否则单人永远 100%）
   const preferInteger = Math.abs(total - Math.round(total)) < 0.000001
   if (preferInteger) {
     const intTotal = Math.round(total)
     const parts = list.map((w) => {
-      const exact = (intTotal * num(w.ratio)) / sumRatio
+      const exact = (intTotal * num(w.ratio)) / 100
       const floor = Math.floor(exact)
       return { w, floor, frac: exact - floor }
     })
-    let remain = intTotal - parts.reduce((s, p) => s + p.floor, 0)
+    const ratioTotal = list.reduce((s, w) => s + num(w.ratio), 0)
+    const targetSum = Math.min(intTotal, Math.round((intTotal * ratioTotal) / 100))
+    let remain = targetSum - parts.reduce((s, p) => s + p.floor, 0)
     parts
       .slice()
       .sort((a, b) => b.frac - a.frac)
@@ -759,24 +912,26 @@ const redistributeByRatio = () => {
     return
   }
 
-  // 非整数总量：保留 2 位小数，最后一人吃掉尾差，保证合计等于总量
-  let assigned = 0
-  list.forEach((w, i) => {
-    if (i === list.length - 1) {
-      w.planQty = Number((total - assigned).toFixed(2))
-    } else {
-      const qty = Number(((total * num(w.ratio)) / sumRatio).toFixed(2))
-      w.planQty = qty
-      assigned += qty
-    }
+  list.forEach((w) => {
+    w.planQty = Number(((total * num(w.ratio)) / 100).toFixed(2))
   })
 }
 
-const workerShare = (w: any) => Math.min(100, Math.max(0, Math.round(num(w.ratio))))
+const workerShare = (w: any) => {
+  const cap = allocCap.value
+  if (cap <= 0) return 0
+  return Math.min(100, Math.max(0, Math.round((num(w.planQty) / cap) * 100)))
+}
 
 const syncRatioFromQty = () => {
   const list = pickedWorkers.value
   if (!list.length) return
+  const cap = allocCap.value
+  // 单人：比例 = 数量占基准上限的百分比，便于切换到「比例」模式继续调
+  if (list.length === 1 && cap > 0) {
+    list[0].ratio = Math.min(100, Math.max(0, Math.round((num(list[0].planQty) / cap) * 100)))
+    return
+  }
   const sum = list.reduce((s, w) => s + num(w.planQty), 0)
   if (sum <= 0) {
     list.forEach((w) => {
@@ -1119,16 +1274,23 @@ const submit = async () => {
   saving.value = true
   try {
     const woNos = [...new Set(selectedLines.value.map((l) => l.woNo))]
+    const items = buildSubmitItems()
+    if (!items.length) {
+      $baseMessage('没有可提交的工序分配', 'warning', 'hey')
+      return
+    }
     const result = await submitQuickDispatch({
       moNo: mo,
       woNos,
       processes: selectedLines.value.map((row) => ({
+        woNo: row.woNo,
         mrCode: row.mrCode,
         prcCode: row.prcCode,
         goodsId: row.goodsId,
         woBorSno: row.woBorSno,
       })),
       workers: pickedWorkers.value.map((w) => ({ empNo: w.empNo, planQty: num(w.planQty) })),
+      items,
     })
     $baseMessage(`已生成派工单 ${result?.wtNo || ''}`, 'success', 'hey')
     clearAll()

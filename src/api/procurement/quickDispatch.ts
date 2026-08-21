@@ -66,8 +66,17 @@ export async function getQuickDispatchDeptSuggest(params?: { keyword?: string })
 export async function submitQuickDispatch(payload: {
   moNo: string
   woNos: string[]
-  processes: { mrCode: string; prcCode: string; goodsId?: number; woBorSno?: string }[]
+  processes: { woNo?: string; mrCode: string; prcCode: string; goodsId?: number; woBorSno?: string }[]
   workers: { empNo: string; planQty: number }[]
+  items?: {
+    woNo: string
+    moNo?: string
+    mrCode: string
+    prcCode: string
+    goodsId?: number
+    woBorSno?: string
+    workers: { empNo: string; planQty: number }[]
+  }[]
   remark?: string
 }) {
   const res: any = await request({
