@@ -9,7 +9,13 @@ import axios from 'axios'
 import type { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 import router from '/@/router/'
 import { serialize } from '/@/utils/util'
-import { getToken, getRefreshToken, removeToken, removeRefreshToken } from '/@/utils/auth'
+import {
+  getToken,
+  getRefreshToken,
+  removeToken,
+  removeRefreshToken,
+  isTokenNearExpiry,
+} from '/@/utils/auth'
 import { isURL, validatenull } from '/@/utils/validate'
 import { ElMessage } from 'element-plus'
 import { tokenHeader, clientId, clientSecret, statusWhiteList, tenantId as defaultTenantId } from '/@/config'
@@ -94,6 +100,32 @@ const applyToken = (config: AxiosRequestConfig): void => {
   }
 }
 
+/** 临近过期时静默刷新，避免业务请求撞上过期 JWT 被踢登录 */
+const ensureAccessTokenFresh = async (config: AxiosRequestConfig) => {
+  if (isLoginRequest(config) || isRefreshTokenRequest(config)) return
+  const meta = (config as any).meta || {}
+  if (meta.isToken === false) return
+  if (!getToken() || validatenull(getRefreshToken() ?? '') || !isTokenNearExpiry()) return
+
+  if (!isRefreshing) {
+    isRefreshing = true
+    const userStore = useUserStore()
+    refreshTokenPromise = userStore
+      .RefreshToken()
+      .catch(async (err) => {
+        await redirectToLogin('登录已过期，请重新登录')
+        return Promise.reject(err)
+      })
+      .finally(() => {
+        isRefreshing = false
+        refreshTokenPromise = null
+      })
+  }
+  if (refreshTokenPromise) {
+    await refreshTokenPromise
+  }
+}
+
 const redirectToLogin = async (tip?: string) => {
   if (isSessionExpired) return
   isSessionExpired = true
@@ -122,7 +154,7 @@ NProgress.configure({
 })
 
 service.interceptors.request.use(
-  (config: AxiosRequestConfig) => {
+  async (config: AxiosRequestConfig) => {
     const settingsStore = useSettingsStore()
     const { language } = settingsStore
     NProgress.start()
@@ -154,6 +186,8 @@ service.interceptors.request.use(
     if (isLoginRequest(config)) {
       isSessionExpired = false
     }
+
+    await ensureAccessTokenFresh(config)
     applyToken(config)
 
     const cryptoData = (config as any).cryptoData === true
