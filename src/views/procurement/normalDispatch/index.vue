@@ -90,8 +90,20 @@
               <el-table-column label="工序编号/名称" min-width="160">
                 <template #default="{ row }">{{ row.prcCode }} {{ row.prcName }}</template>
               </el-table-column>
-              <el-table-column label="工序类型" min-width="120" prop="mrName" show-overflow-tooltip />
-              <el-table-column label="未派工/计划" width="140" align="right">
+              <el-table-column label="工序类型" min-width="110" prop="mrName" show-overflow-tooltip />
+              <el-table-column label="计薪" width="72" align="center">
+                <template #default="{ row }">{{ wageTypeLabel(row.pWageType) }}</template>
+              </el-table-column>
+              <el-table-column label="加工单价" width="96" align="right">
+                <template #default="{ row }">{{ fmtNum(row.machiningUp) }}</template>
+              </el-table-column>
+              <el-table-column label="加工工时" width="100" align="right">
+                <template #default="{ row }">{{ fmtTime(row.machiningTime, row.timeUnit) }}</template>
+              </el-table-column>
+              <el-table-column label="加工次数" width="80" align="right">
+                <template #default="{ row }">{{ fmtNum(row.machiningTimes) }}</template>
+              </el-table-column>
+              <el-table-column label="未派工/计划" width="130" align="right">
                 <template #default="{ row }">{{ fmtNum(row.remainQty) }} / {{ fmtNum(row.woQty) }}</template>
               </el-table-column>
             </el-table>
@@ -102,14 +114,25 @@
               <el-table-column type="expand">
                 <template #default="{ row }">
                   <div class="nd-expand">
-                    <el-checkbox
+                    <div
                       v-for="line in row.lines"
                       :key="lineKey(line)"
-                      :model-value="checkedLeafIds.includes(lineKey(line))"
-                      @change="(v: any) => setLineChecked(line, !!v)"
+                      class="nd-expand__row"
                     >
-                      {{ line.woNo }} · {{ fmtNum(line.remainQty) }} / {{ fmtNum(line.woQty) }}
-                    </el-checkbox>
+                      <el-checkbox
+                        :model-value="checkedLeafIds.includes(lineKey(line))"
+                        @change="(v: any) => setLineChecked(line, !!v)"
+                      >
+                        {{ line.woNo }}
+                      </el-checkbox>
+                      <span class="nd-expand__meta">
+                        未派 {{ fmtNum(line.remainQty) }}/{{ fmtNum(line.woQty) }}
+                        · {{ wageTypeLabel(line.pWageType) }}
+                        · 单价 {{ fmtNum(line.machiningUp) }}
+                        · 工时 {{ fmtTime(line.machiningTime, line.timeUnit) }}
+                        · 次数 {{ fmtNum(line.machiningTimes) }}
+                      </span>
+                    </div>
                   </div>
                 </template>
               </el-table-column>
@@ -135,11 +158,23 @@
                   </el-tag>
                 </template>
               </el-table-column>
-              <el-table-column label="工序类型" min-width="120" prop="mrName" show-overflow-tooltip />
-              <el-table-column label="包含工单数" width="110" align="center">
+              <el-table-column label="工序类型" min-width="110" prop="mrName" show-overflow-tooltip />
+              <el-table-column label="计薪" width="72" align="center">
+                <template #default="{ row }">{{ row.wageTypeText }}</template>
+              </el-table-column>
+              <el-table-column label="加工单价" width="110" align="right">
+                <template #default="{ row }">
+                  <span>{{ row.upText }}</span>
+                  <small v-if="row.upMixed" class="nd-mixed">各工单不同</small>
+                </template>
+              </el-table-column>
+              <el-table-column label="加工工时" width="110" align="right">
+                <template #default="{ row }">{{ row.timeText }}</template>
+              </el-table-column>
+              <el-table-column label="包含工单数" width="100" align="center">
                 <template #default="{ row }">{{ row.lines.length }}</template>
               </el-table-column>
-              <el-table-column label="未派工/计划" width="150" align="right">
+              <el-table-column label="未派工/计划" width="140" align="right">
                 <template #default="{ row }">{{ fmtNum(row.remainSum) }} / {{ fmtNum(row.planSum) }}</template>
               </el-table-column>
             </el-table>
@@ -151,14 +186,26 @@
 
           <template v-else>
             <el-table :data="selectedLines" border height="100%">
-              <el-table-column label="工单" width="140" prop="woNo" />
-              <el-table-column label="工序" min-width="160">
+              <el-table-column label="工单" width="130" prop="woNo" />
+              <el-table-column label="工序" min-width="150">
                 <template #default="{ row }">{{ row.prcCode }} {{ row.prcName }}</template>
               </el-table-column>
-              <el-table-column label="未派工" width="100" align="right">
+              <el-table-column label="计薪" width="72" align="center">
+                <template #default="{ row }">{{ wageTypeLabel(row.pWageType) }}</template>
+              </el-table-column>
+              <el-table-column label="加工单价" width="96" align="right">
+                <template #default="{ row }">{{ fmtNum(row.machiningUp) }}</template>
+              </el-table-column>
+              <el-table-column label="加工工时" width="100" align="right">
+                <template #default="{ row }">{{ fmtTime(row.machiningTime, row.timeUnit) }}</template>
+              </el-table-column>
+              <el-table-column label="未派工" width="90" align="right">
                 <template #default="{ row }">{{ fmtNum(row.remainQty) }}</template>
               </el-table-column>
-              <el-table-column label="操作" width="90">
+              <el-table-column label="预估工费" width="100" align="right">
+                <template #default="{ row }">{{ fmtNum(num(row.machiningUp) * num(row.remainQty)) }}</template>
+              </el-table-column>
+              <el-table-column label="操作" width="80">
                 <template #default="{ row }">
                   <el-button link type="danger" @click="setLineChecked(row, false)">移除</el-button>
                 </template>
@@ -192,7 +239,7 @@
           <div><dt>工单</dt><dd>{{ selectedWoNos.length }}</dd></div>
           <div><dt>工序</dt><dd>{{ selectedLines.length }}</dd></div>
           <div><dt>总量</dt><dd>{{ fmtNum(totalRemainQty) }}</dd></div>
-          <div><dt>任务</dt><dd>{{ assignRows.length }}</dd></div>
+          <div><dt>预估工费</dt><dd>{{ fmtNum(estimatedWageTotal) }}</dd></div>
         </dl>
       </aside>
 
@@ -231,12 +278,32 @@
             </template>
           </el-table-column>
           <el-table-column label="工序类型" min-width="100" prop="mrName" show-overflow-tooltip />
-          <el-table-column label="未派数量" width="96" align="right">
+          <el-table-column label="计薪" width="72" align="center">
+            <template #default="{ row }">
+              <template v-if="row.kind !== 'wo-head'">{{ row.wageTypeText }}</template>
+            </template>
+          </el-table-column>
+          <el-table-column label="加工单价" width="100" align="right">
+            <template #default="{ row }">
+              <template v-if="row.kind !== 'wo-head'">
+                <div class="nd-up-cell">
+                  <span>{{ row.upText }}</span>
+                  <small v-if="row.upMixed">各工单不同，按行计费</small>
+                </div>
+              </template>
+            </template>
+          </el-table-column>
+          <el-table-column label="加工工时" width="100" align="right">
+            <template #default="{ row }">
+              <template v-if="row.kind !== 'wo-head'">{{ row.timeText }}</template>
+            </template>
+          </el-table-column>
+          <el-table-column label="未派数量" width="90" align="right">
             <template #default="{ row }">
               <template v-if="row.kind !== 'wo-head'">{{ fmtNum(row.remainQty) }}</template>
             </template>
           </el-table-column>
-          <el-table-column label="精细化指派（人员 / 比例 / 数量）" min-width="420">
+          <el-table-column label="精细化指派（人员 / 比例 / 数量）" min-width="380">
             <template #default="{ row }">
               <div v-if="row.kind !== 'wo-head'" class="nd-fine">
                 <article v-for="w in row.workers" :key="w.empNo" class="nd-fine__card">
@@ -294,11 +361,18 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="已分/未派" width="130" align="right">
+          <el-table-column label="已分/未派" width="120" align="right">
             <template #default="{ row }">
               <template v-if="row.kind !== 'wo-head'">
                 <b :class="{ 'is-ok': num(row.assignedQty) > 0, 'is-bad': row.overAssign }">{{ fmtNum(row.assignedQty) }}</b>
                 / {{ fmtNum(row.remainQty) }}
+              </template>
+            </template>
+          </el-table-column>
+          <el-table-column label="预估工费" width="100" align="right">
+            <template #default="{ row }">
+              <template v-if="row.kind !== 'wo-head'">
+                <b class="is-ok">{{ fmtNum(row.estWage) }}</b>
               </template>
             </template>
           </el-table-column>
@@ -308,6 +382,7 @@
           <span>
             已分配任务 {{ assignedTaskCount }}/{{ assignRows.length }} · 数量
             {{ fmtNum(assignedTotalQty) }}/{{ fmtNum(totalRemainQty) }}
+            · 预估工费 {{ fmtNum(estimatedWageTotal) }}
             <em v-if="hasOverAssign" class="is-bad"> · 存在超量分配</em>
           </span>
           <div>
@@ -330,21 +405,30 @@
           <div><em>工序行</em><b>{{ selectedLines.length }}</b></div>
           <div><em>人员</em><b>{{ uniqueWorkerCount }}</b></div>
           <div><em>派量</em><b>{{ fmtNum(assignedTotalQty) }}</b></div>
+          <div><em>预估工费</em><b>{{ fmtNum(estimatedWageTotal) }}</b></div>
         </div>
         <el-table :data="confirmItems" border max-height="420">
-          <el-table-column label="工单" width="130" prop="woNo" />
-          <el-table-column label="工序" min-width="160">
+          <el-table-column label="工单" width="120" prop="woNo" />
+          <el-table-column label="工序" min-width="140">
             <template #default="{ row }">{{ row.prcCode }} {{ row.prcName }}</template>
           </el-table-column>
-          <el-table-column label="人员分配" min-width="220">
+          <el-table-column label="计薪" width="72" align="center" prop="wageTypeText" />
+          <el-table-column label="加工单价" width="90" align="right">
+            <template #default="{ row }">{{ fmtNum(row.machiningUp) }}</template>
+          </el-table-column>
+          <el-table-column label="加工工时" width="100" align="right" prop="timeText" />
+          <el-table-column label="人员分配" min-width="200">
             <template #default="{ row }">
               <span v-for="w in row.workers" :key="w.empNo" class="nd-chip nd-chip--sm">
                 {{ w.empName || w.empNo }} {{ fmtNum(w.planQty) }}
               </span>
             </template>
           </el-table-column>
-          <el-table-column label="合计" width="100" align="right">
+          <el-table-column label="派量" width="90" align="right">
             <template #default="{ row }">{{ fmtNum(row.qty) }}</template>
+          </el-table-column>
+          <el-table-column label="预估工费" width="100" align="right">
+            <template #default="{ row }">{{ fmtNum(row.estWage) }}</template>
           </el-table-column>
         </el-table>
         <footer>
@@ -416,6 +500,45 @@ const processKey = (row: any) => `${row.mrCode || ''}|${row.prcCode || ''}`
 
 const taskKeyOf = (line: any) => (mergeSameProcess.value ? processKey(line) : lineKey(line))
 
+/** SF 常见：1 计时 / 2 计件 */
+const wageTypeLabel = (v: any) => {
+  const t = String(v ?? '').trim()
+  if (t === '1') return '计时'
+  if (t === '2') return '计件'
+  return t || '-'
+}
+
+const fmtTime = (time: any, unit?: any) => {
+  const t = num(time)
+  if (t <= 0) return '-'
+  const u = String(unit || '').trim()
+  return u ? `${fmtNum(t)}${u}` : fmtNum(t)
+}
+
+const uniqueTexts = (values: string[]) => [...new Set(values.filter(Boolean))]
+
+const summarizeWageFields = (lines: any[]) => {
+  const ups = uniqueTexts(lines.map((l) => fmtNum(l.machiningUp)))
+  const types = uniqueTexts(lines.map((l) => wageTypeLabel(l.pWageType)))
+  const times = uniqueTexts(lines.map((l) => fmtTime(l.machiningTime, l.timeUnit)))
+  const upMixed = ups.length > 1
+  return {
+    wageTypeText: types.length <= 1 ? types[0] || '-' : types.join('/'),
+    upText: upMixed ? `${ups[0]}~${ups[ups.length - 1]}` : ups[0] || '0',
+    upMixed,
+    timeText: times.length <= 1 ? times[0] || '-' : '多项',
+    /** 按各工单行各自单价×数量汇总，避免合并均价失真 */
+    estWageByQty: (qtyByLineKey: Map<string, number> | null, fallbackQty: number) => {
+      if (qtyByLineKey) {
+        return lines.reduce((s, l) => s + num(l.machiningUp) * num(qtyByLineKey.get(lineKey(l)) || 0), 0)
+      }
+      // 未分配时按未派量估算
+      if (lines.length === 1) return num(lines[0].machiningUp) * fallbackQty
+      return lines.reduce((s, l) => s + num(l.machiningUp) * num(l.remainQty), 0)
+    },
+  }
+}
+
 const selectedWoNos = computed(() => [...selectedWoSet.value])
 
 const filteredWorkOrders = computed(() => {
@@ -483,6 +606,7 @@ const batchProcessGroups = computed(() => {
   }
   for (const g of groups.values()) {
     g.coverCount = g.lines.filter((l: any) => checkedLeafIds.value.includes(lineKey(l))).length
+    Object.assign(g, summarizeWageFields(g.lines))
   }
   return [...groups.values()].sort((a, b) => String(a.prcCode).localeCompare(String(b.prcCode)))
 })
@@ -503,6 +627,10 @@ const assignRows = computed(() => {
       const planQty = lines.reduce((s, l) => s + num(l.woQty), 0)
       const workers = assignMap.value[key] || []
       const assignedQty = workers.reduce((s, w) => s + num(w.planQty), 0)
+      const wage = summarizeWageFields(lines)
+      const split = splitWorkersByRemain(workers, lines)
+      const qtyMap = new Map(split.map(({ line, workers: ws }) => [lineKey(line), ws.reduce((s, w) => s + num(w.planQty), 0)]))
+      const estWage = assignedQty > 0 ? wage.estWageByQty(qtyMap, assignedQty) : wage.estWageByQty(null, remainQty)
       return {
         kind: 'task',
         rowKey: key,
@@ -518,6 +646,8 @@ const assignRows = computed(() => {
         overAssign: assignedQty - remainQty > 0.000001,
         workers,
         lines,
+        ...wage,
+        estWage,
       }
     })
   }
@@ -526,6 +656,8 @@ const assignRows = computed(() => {
     const workers = assignMap.value[key] || []
     const remainQty = num(line.remainQty)
     const assignedQty = workers.reduce((s, w) => s + num(w.planQty), 0)
+    const wage = summarizeWageFields([line])
+    const qty = assignedQty > 0 ? assignedQty : remainQty
     return {
       kind: 'task',
       rowKey: key,
@@ -541,6 +673,8 @@ const assignRows = computed(() => {
       overAssign: assignedQty - remainQty > 0.000001,
       workers,
       lines: [line],
+      ...wage,
+      estWage: num(line.machiningUp) * qty,
     }
   })
 })
@@ -576,6 +710,8 @@ const assignTableRows = computed(() => {
       const assignedQty = workers.reduce((s, w) => s + num(w.planQty), 0)
       remain += num(line.remainQty)
       assigned += assignedQty
+      const wage = summarizeWageFields([line])
+      const qty = assignedQty > 0 ? assignedQty : num(line.remainQty)
       return {
         kind: 'line',
         rowKey: lineKey(line),
@@ -591,6 +727,8 @@ const assignTableRows = computed(() => {
         overAssign: assignedQty - num(line.remainQty) > 0.000001,
         workers,
         lines: [line],
+        ...wage,
+        estWage: num(line.machiningUp) * qty,
       }
     })
     rows.push({
@@ -607,7 +745,7 @@ const assignTableRows = computed(() => {
 
 const assignSpanMethod = ({ row, columnIndex }: any) => {
   if (row.kind === 'wo-head') {
-    if (columnIndex === 0) return [1, 5]
+    if (columnIndex === 0) return [1, 9]
     return [0, 0]
   }
   return [1, 1]
@@ -629,16 +767,32 @@ const uniqueWorkerCount = computed(() => {
   return set.size
 })
 
+const estimatedWageTotal = computed(() => {
+  // 有已分数量时按已分量×各行单价；否则按未派量估算
+  let total = 0
+  for (const line of selectedLines.value) {
+    const workers = lineSplitMap.value.get(lineKey(line)) || []
+    const qty = workers.reduce((s, w) => s + num(w.planQty), 0)
+    total += num(line.machiningUp) * (qty > 0 ? qty : num(line.remainQty))
+  }
+  return total
+})
+
 const confirmItems = computed(() =>
   selectedLines.value
     .map((line) => {
       const workers = lineSplitMap.value.get(lineKey(line)) || []
+      const qty = workers.reduce((s, w) => s + num(w.planQty), 0)
       return {
         woNo: line.woNo,
         prcCode: line.prcCode,
         prcName: line.prcName,
+        wageTypeText: wageTypeLabel(line.pWageType),
+        machiningUp: num(line.machiningUp),
+        timeText: fmtTime(line.machiningTime, line.timeUnit),
         workers,
-        qty: workers.reduce((s, w) => s + num(w.planQty), 0),
+        qty,
+        estWage: num(line.machiningUp) * qty,
       }
     })
     .filter((r) => r.workers.length)
@@ -1234,8 +1388,34 @@ onMounted(() => {
 .nd-expand {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   padding: 4px 12px 8px 48px;
+
+  &__row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+  }
+
+  &__meta {
+    font-size: 12px;
+    color: var(--nd-muted);
+  }
+}
+
+.nd-mixed,
+.nd-up-cell small {
+  display: block;
+  font-size: 11px;
+  color: #ea580c;
+}
+
+.nd-up-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
 }
 
 .nd-cover-tag {
@@ -1505,7 +1685,7 @@ onMounted(() => {
 
 .nd-kpi {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 8px;
 
   div {
