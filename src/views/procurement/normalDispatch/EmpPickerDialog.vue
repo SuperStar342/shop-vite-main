@@ -118,6 +118,7 @@
           <strong>已选 {{ empDraft.length }} 人</strong>
           <el-button link type="primary" :disabled="!empDraft.length" @click="clearEmpDraft">清空</el-button>
         </header>
+        <p v-if="oneClickable" class="emp-picker__tray-tip">一键派工：将已选人员应用到全部已选工序（各工序平均分配）</p>
         <el-scrollbar class="emp-picker__tray-scroll">
           <article v-for="row in empDraft" :key="row.empNo" class="emp-tray-card">
             <span class="emp-avatar">{{ empInitial(row.empName || row.empNo) }}</span>
@@ -209,6 +210,9 @@
 
     <template #footer>
       <el-button @click="emit('update:modelValue', false)">取消</el-button>
+      <el-button v-if="oneClickable" :disabled="!empDraft.length" type="success" plain @click="oneClickApply">
+        一键派工
+      </el-button>
       <el-button type="primary" @click="confirm">确定</el-button>
     </template>
   </el-dialog>
@@ -246,12 +250,14 @@ const props = defineProps<{
   allocLines?: EmpAllocLine[]
   lineWorkers?: Record<string, AllocWorker[]>
   dialogTitle?: string
+  oneClickable?: boolean
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [boolean]
   confirm: [{ empNo: string; empName?: string; deptName?: string }[]]
   confirmAlloc: [{ key: string; workers: AllocWorker[] }[]]
+  oneClick: [{ empNo: string; empName?: string; deptName?: string }[]]
 }>()
 
 const empTableRef = ref<any>(null)
@@ -586,6 +592,21 @@ const onOpen = async () => {
   await loadEmployees()
 }
 
+const oneClickApply = () => {
+  if (!empDraft.value.length) {
+    $baseMessage('请先勾选人员', 'warning', 'hey')
+    return
+  }
+  emit(
+    'oneClick',
+    empDraft.value.map((r) => ({
+      empNo: r.empNo,
+      empName: r.empName,
+      deptName: r.deptName,
+    }))
+  )
+}
+
 const confirm = () => {
   if (isAllocMode.value) {
     if (!empDraft.value.length) {
@@ -810,6 +831,13 @@ watch(
     strong {
       font-size: 13px;
     }
+  }
+
+  &__tray-tip {
+    margin: 0 14px 6px;
+    font-size: 11px;
+    line-height: 1.4;
+    color: #8a9b90;
   }
 
   &__tray-scroll {
