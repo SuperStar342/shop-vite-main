@@ -15,6 +15,7 @@ export const ROUTE_TO_BLADE_CODE: Record<string, string> = {
   TenantManagement: 'tenant',
   DispatchManagement: 'dispatch',
   QuickDispatch: 'quickDispatch',
+  NormalDispatch: 'normalDispatch',
   // 资源：路由 name 与 PreAuth code 一致
   oss: 'oss',
   attach: 'attach',
