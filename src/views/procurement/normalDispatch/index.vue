@@ -69,7 +69,12 @@
             <b>{{ selectedLines.length }}</b> 个工序
             共 <b>{{ selectedTaskCount }}</b> 个派工任务
           </div>
-          <el-checkbox v-model="mergeSameProcess">同工序合并派工</el-checkbox>
+          <el-checkbox v-model="mergeSameProcess">
+            同工序合并派工
+            <el-tooltip content="勾选后按工序汇总分配，无法按每张工单单独指定数量；精细派工请取消勾选" placement="top">
+              <el-icon class="nd-merge-tip"><QuestionFilled /></el-icon>
+            </el-tooltip>
+          </el-checkbox>
         </header>
 
         <el-tabs v-model="pickTab">
@@ -284,6 +289,22 @@
               <el-radio-button value="process">按工序汇总查看</el-radio-button>
             </el-radio-group>
             <span class="nd-hint">比例与数量联动：改比例自动算数量，改数量自动回写比例</span>
+          </div>
+          <div v-if="mergeSameProcess" class="nd-mode-alert">
+            <el-alert
+              show-icon
+              :closable="false"
+              title="当前为合并模式：无法按每张工单单独指定数量。精细派工请返回上一步取消「同工序合并派工」。"
+              type="warning"
+            />
+          </div>
+          <div v-else-if="assignView !== 'process'" class="nd-mode-alert">
+            <el-alert
+              show-icon
+              :closable="false"
+              title="精细派工请使用「按工序汇总查看」：工序下会展示各工单，可分别选人、填数量。"
+              type="info"
+            />
           </div>
           <div class="nd-assign-pane__head-right">
             <span class="nd-hint">
@@ -571,7 +592,7 @@
 </template>
 
 <script lang="ts" setup>
-import { Plus, Refresh } from '@element-plus/icons-vue'
+import { Plus, QuestionFilled, Refresh } from '@element-plus/icons-vue'
 import {
   getQuickDispatchEmployees,
   getQuickDispatchPreview,
@@ -621,7 +642,7 @@ const smartLimit = ref(2)
 const smartDays = ref(30)
 const smartPreview = ref<any[]>([])
 const smartPreviewTried = ref(false)
-const mergeSameProcess = ref(true)
+const mergeSameProcess = ref(false)
 const pickTab = ref<'current' | 'batch' | 'picked'>('batch')
 const assignView = ref<'wo' | 'process'>('process')
 /** 防止比例↔数量联动时互相触发 */
@@ -1544,8 +1565,7 @@ const submit = async () => {
 
 watch(mergeSameProcess, () => {
   assignMap.value = {}
-  if (mergeSameProcess.value) assignView.value = 'process'
-  else assignView.value = 'process'
+  assignView.value = 'process'
 })
 
 watch(selectedLines, () => {
@@ -1731,6 +1751,13 @@ onMounted(() => {
   border-bottom: 1px solid #e8f0eb;
   font-size: 13px;
 
+  .nd-merge-tip {
+    margin-left: 4px;
+    color: #9aaba0;
+    vertical-align: middle;
+    cursor: help;
+  }
+
   b {
     color: var(--nd-green);
     margin: 0 2px;
@@ -1910,6 +1937,20 @@ onMounted(() => {
     align-items: center;
     gap: 10px;
     flex-wrap: wrap;
+  }
+
+  .nd-mode-alert {
+    flex: 1 1 100%;
+    min-width: 280px;
+
+    :deep(.el-alert) {
+      padding: 6px 10px;
+    }
+
+    :deep(.el-alert__title) {
+      font-size: 12px;
+      line-height: 1.45;
+    }
   }
 
   .nd-hint {
