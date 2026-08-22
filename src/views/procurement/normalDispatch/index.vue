@@ -197,55 +197,107 @@
       </aside>
 
       <section class="nd-assign-pane">
-        <header>
-          <el-radio-group v-model="assignView" size="small">
-            <el-radio-button value="wo">按工单查看</el-radio-button>
-            <el-radio-button value="process">按工序汇总查看</el-radio-button>
-          </el-radio-group>
-          <span class="nd-hint">{{ mergeSameProcess ? '同工序合并：数量按各工单未派量比例拆分' : '各工序独立指派' }}</span>
+        <header class="nd-assign-pane__head">
+          <div class="nd-assign-pane__head-left">
+            <el-radio-group v-model="assignView" size="small">
+              <el-radio-button value="wo">按工单查看</el-radio-button>
+              <el-radio-button value="process">按工序汇总查看</el-radio-button>
+            </el-radio-group>
+            <el-radio-group v-model="allocMode" size="small" @change="onAllocModeChange">
+              <el-radio-button value="equal">平均</el-radio-button>
+              <el-radio-button value="ratio">比例</el-radio-button>
+              <el-radio-button value="manual">手动数量</el-radio-button>
+            </el-radio-group>
+          </div>
+          <div class="nd-assign-pane__head-right">
+            <span class="nd-hint">{{ mergeSameProcess ? '同工序合并：数量按各工单未派量比例拆分' : '各工序独立指派' }}</span>
+            <el-button size="small" @click="applyEqualAll">全部平均</el-button>
+          </div>
         </header>
 
         <el-table :data="assignTableRows" border height="100%" row-key="rowKey" :span-method="assignSpanMethod">
-          <el-table-column label="工单 / 工序" min-width="200">
+          <el-table-column label="工单 / 工序" min-width="180">
             <template #default="{ row }">
               <template v-if="row.kind === 'wo-head'">
                 <b class="nd-wo-head">{{ row.woNo }}</b>
                 <em>{{ fmtNum(row.assignedQty) }} / {{ fmtNum(row.remainQty) }}</em>
               </template>
               <template v-else>
-                <span>{{ row.prcCode }} {{ row.prcName }}</span>
-                <small v-if="row.woText">{{ row.woText }}</small>
+                <div class="nd-prc-cell">
+                  <span>{{ row.prcCode }} {{ row.prcName }}</span>
+                  <small v-if="row.woText">{{ row.woText }}</small>
+                </div>
               </template>
             </template>
           </el-table-column>
-          <el-table-column label="工序类型" min-width="120" prop="mrName" show-overflow-tooltip />
-          <el-table-column label="计划数量" width="100" align="right">
-            <template #default="{ row }">
-              <template v-if="row.kind !== 'wo-head'">{{ fmtNum(row.planQty) }}</template>
-            </template>
-          </el-table-column>
-          <el-table-column label="未派数量" width="100" align="right">
+          <el-table-column label="工序类型" min-width="100" prop="mrName" show-overflow-tooltip />
+          <el-table-column label="未派数量" width="96" align="right">
             <template #default="{ row }">
               <template v-if="row.kind !== 'wo-head'">{{ fmtNum(row.remainQty) }}</template>
             </template>
           </el-table-column>
-          <el-table-column label="指派人员" min-width="260">
+          <el-table-column label="精细化指派（人员 / 比例 / 数量）" min-width="420">
             <template #default="{ row }">
-              <div v-if="row.kind !== 'wo-head'" class="nd-workers">
-                <span v-for="w in row.workers" :key="w.empNo" class="nd-chip">
-                  <em>{{ (w.empName || '?').slice(0, 1) }}</em>
-                  {{ w.empName || w.empNo }}
-                  <button v-if="row.editable" type="button" @click="removeWorker(row.taskKey, w.empNo)">×</button>
-                </span>
-                <el-button v-if="row.editable" :icon="Plus" circle size="small" @click="openEmpFor(row.taskKey)" />
-                <span v-if="!row.workers.length && !row.editable" class="nd-muted">由汇总行分配后按比例拆分</span>
+              <div v-if="row.kind !== 'wo-head'" class="nd-fine">
+                <article v-for="w in row.workers" :key="w.empNo" class="nd-fine__card">
+                  <div class="nd-fine__who">
+                    <em>{{ (w.empName || '?').slice(0, 1) }}</em>
+                    <div>
+                      <strong>{{ w.empName || w.empNo }}</strong>
+                      <span>{{ w.empNo }}</span>
+                    </div>
+                    <button
+                      v-if="row.editable"
+                      class="nd-fine__remove"
+                      type="button"
+                      title="移除"
+                      @click="removeWorker(row.taskKey, w.empNo)"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <div class="nd-fine__fields">
+                    <label>
+                      比例%
+                      <el-input-number
+                        v-model="w.ratio"
+                        controls-position="right"
+                        :disabled="!row.editable || allocMode !== 'ratio'"
+                        :max="100"
+                        :min="0"
+                        :precision="0"
+                        :step="1"
+                        @change="onWorkerRatioChange(row.taskKey)"
+                      />
+                    </label>
+                    <label>
+                      数量
+                      <el-input-number
+                        v-model="w.planQty"
+                        controls-position="right"
+                        :disabled="!row.editable || allocMode !== 'manual'"
+                        :max="num(row.remainQty)"
+                        :min="0"
+                        :precision="2"
+                        :step="1"
+                        @change="onWorkerQtyChange(row.taskKey)"
+                      />
+                    </label>
+                  </div>
+                </article>
+                <div v-if="row.editable" class="nd-fine__actions">
+                  <el-button :icon="Plus" size="small" type="primary" @click="openEmpFor(row.taskKey)">加人</el-button>
+                  <el-button size="small" :disabled="!row.workers.length" @click="applyEqualTask(row.taskKey)">本行平均</el-button>
+                </div>
+                <span v-if="!row.workers.length && !row.editable" class="nd-muted">由汇总行分配后按未派量比例拆分</span>
+                <p v-if="row.editable && row.overAssign" class="nd-fine__warn">已分 {{ fmtNum(row.assignedQty) }} 超出未派 {{ fmtNum(row.remainQty) }}</p>
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="指派数量" width="160" align="right">
+          <el-table-column label="已分/未派" width="130" align="right">
             <template #default="{ row }">
               <template v-if="row.kind !== 'wo-head'">
-                <b :class="{ 'is-ok': num(row.assignedQty) > 0 }">{{ fmtNum(row.assignedQty) }}</b>
+                <b :class="{ 'is-ok': num(row.assignedQty) > 0, 'is-bad': row.overAssign }">{{ fmtNum(row.assignedQty) }}</b>
                 / {{ fmtNum(row.remainQty) }}
               </template>
             </template>
@@ -256,6 +308,7 @@
           <span>
             已分配任务 {{ assignedTaskCount }}/{{ assignRows.length }} · 数量
             {{ fmtNum(assignedTotalQty) }}/{{ fmtNum(totalRemainQty) }}
+            <em v-if="hasOverAssign" class="is-bad"> · 存在超量分配</em>
           </span>
           <div>
             <el-button @click="wizardStep = 0">上一步</el-button>
@@ -317,7 +370,7 @@ import {
   getQuickDispatchProcesses,
   submitQuickDispatch,
 } from '/@/api/procurement/quickDispatch'
-import { distributeByWeights, fmtNum, num, splitWorkersByRemain, type AllocWorker } from '/@/utils/dispatchAlloc'
+import { fmtNum, num, splitWorkersByRemain, type AllocWorker } from '/@/utils/dispatchAlloc'
 import EmpPickerDialog from './EmpPickerDialog.vue'
 
 defineOptions({ name: 'NormalDispatch' })
@@ -339,6 +392,8 @@ const saving = ref(false)
 const mergeSameProcess = ref(true)
 const pickTab = ref<'current' | 'batch' | 'picked'>('batch')
 const assignView = ref<'wo' | 'process'>('process')
+/** 精细化分配：默认平均；比例调 %；手动改每人数量 */
+const allocMode = ref<'equal' | 'ratio' | 'manual'>('equal')
 const woKeyword = ref('')
 const queryWoNo = ref('')
 const queryMoNo = ref('')
@@ -460,6 +515,7 @@ const assignRows = computed(() => {
         remainQty,
         planQty,
         assignedQty,
+        overAssign: assignedQty - remainQty > 0.000001,
         workers,
         lines,
       }
@@ -468,6 +524,8 @@ const assignRows = computed(() => {
   return selectedLines.value.map((line) => {
     const key = lineKey(line)
     const workers = assignMap.value[key] || []
+    const remainQty = num(line.remainQty)
+    const assignedQty = workers.reduce((s, w) => s + num(w.planQty), 0)
     return {
       kind: 'task',
       rowKey: key,
@@ -477,9 +535,10 @@ const assignRows = computed(() => {
       prcName: line.prcName,
       mrName: line.mrName,
       woText: line.woNo,
-      remainQty: num(line.remainQty),
+      remainQty,
       planQty: num(line.woQty),
-      assignedQty: workers.reduce((s, w) => s + num(w.planQty), 0),
+      assignedQty,
+      overAssign: assignedQty - remainQty > 0.000001,
       workers,
       lines: [line],
     }
@@ -529,6 +588,7 @@ const assignTableRows = computed(() => {
         remainQty: num(line.remainQty),
         planQty: num(line.woQty),
         assignedQty,
+        overAssign: assignedQty - num(line.remainQty) > 0.000001,
         workers,
         lines: [line],
       }
@@ -547,7 +607,7 @@ const assignTableRows = computed(() => {
 
 const assignSpanMethod = ({ row, columnIndex }: any) => {
   if (row.kind === 'wo-head') {
-    if (columnIndex === 0) return [1, 6]
+    if (columnIndex === 0) return [1, 5]
     return [0, 0]
   }
   return [1, 1]
@@ -558,6 +618,8 @@ const assignedTaskCount = computed(() => assignRows.value.filter((r) => num(r.as
 const assignedTotalQty = computed(() =>
   [...lineSplitMap.value.values()].reduce((s, ws) => s + ws.reduce((a, w) => a + num(w.planQty), 0), 0)
 )
+
+const hasOverAssign = computed(() => assignRows.value.some((r) => r.overAssign))
 
 const uniqueWorkerCount = computed(() => {
   const set = new Set<string>()
@@ -582,9 +644,11 @@ const confirmItems = computed(() =>
     .filter((r) => r.workers.length)
 )
 
-const canGoConfirm = computed(() => assignedTaskCount.value > 0 && assignedTotalQty.value > 0)
+const canGoConfirm = computed(
+  () => assignedTaskCount.value > 0 && assignedTotalQty.value > 0 && !hasOverAssign.value
+)
 
-const canSubmit = computed(() => confirmItems.value.length > 0)
+const canSubmit = computed(() => confirmItems.value.length > 0 && !hasOverAssign.value)
 
 const empDialogSelected = computed(() => {
   const list = assignMap.value[editingTaskKey.value] || []
@@ -683,30 +747,165 @@ const openEmpFor = (taskKey: string) => {
   empDialog.value = true
 }
 
+const taskCap = (taskKey: string) => {
+  const row = assignRows.value.find((r) => r.taskKey === taskKey)
+  return num(row?.remainQty)
+}
+
+const touchTask = (taskKey: string) => {
+  assignMap.value = { ...assignMap.value, [taskKey]: [...(assignMap.value[taskKey] || [])] }
+}
+
+/** 比例 = 占本行未派量的百分比 */
+const redistributeTaskByRatio = (taskKey: string) => {
+  const list = assignMap.value[taskKey] || []
+  const cap = taskCap(taskKey)
+  if (!list.length || cap <= 0) return
+  const preferInteger = Math.abs(cap - Math.round(cap)) < 0.000001
+  if (preferInteger) {
+    const intCap = Math.round(cap)
+    const parts = list.map((w) => {
+      const exact = (intCap * num(w.ratio)) / 100
+      const floor = Math.floor(exact)
+      return { w, floor, frac: exact - floor }
+    })
+    const ratioTotal = list.reduce((s, w) => s + num(w.ratio), 0)
+    const targetSum = Math.min(intCap, Math.round((intCap * ratioTotal) / 100))
+    let remain = targetSum - parts.reduce((s, p) => s + p.floor, 0)
+    parts
+      .slice()
+      .sort((a, b) => b.frac - a.frac)
+      .forEach((p) => {
+        if (remain > 0) {
+          p.floor += 1
+          remain -= 1
+        }
+      })
+    parts.forEach((p) => {
+      p.w.planQty = p.floor
+    })
+  } else {
+    list.forEach((w) => {
+      w.planQty = Number(((cap * num(w.ratio)) / 100).toFixed(2))
+    })
+  }
+  touchTask(taskKey)
+}
+
+const syncTaskRatioFromQty = (taskKey: string) => {
+  const list = assignMap.value[taskKey] || []
+  const cap = taskCap(taskKey)
+  if (!list.length) return
+  if (list.length === 1 && cap > 0) {
+    list[0].ratio = Math.min(100, Math.max(0, Math.round((num(list[0].planQty) / cap) * 100)))
+    touchTask(taskKey)
+    return
+  }
+  const sum = list.reduce((s, w) => s + num(w.planQty), 0)
+  if (sum <= 0) {
+    list.forEach((w) => {
+      w.ratio = 0
+    })
+    touchTask(taskKey)
+    return
+  }
+  let assigned = 0
+  list.forEach((w, i) => {
+    if (i === list.length - 1) w.ratio = Math.max(0, 100 - assigned)
+    else {
+      const r = Math.round((num(w.planQty) / sum) * 100)
+      w.ratio = r
+      assigned += r
+    }
+  })
+  touchTask(taskKey)
+}
+
+const applyEqualTask = (taskKey: string) => {
+  const list = assignMap.value[taskKey] || []
+  const n = list.length
+  if (!n) return
+  const each = Math.floor(100 / n)
+  list.forEach((w, i) => {
+    w.ratio = i === n - 1 ? 100 - each * (n - 1) : each
+  })
+  redistributeTaskByRatio(taskKey)
+}
+
+const applyEqualAll = () => {
+  allocMode.value = 'equal'
+  for (const row of assignRows.value) {
+    if (row.workers?.length) applyEqualTask(row.taskKey)
+  }
+}
+
+const onAllocModeChange = () => {
+  if (allocMode.value === 'equal') {
+    for (const row of assignRows.value) {
+      if (row.workers?.length) applyEqualTask(row.taskKey)
+    }
+  } else if (allocMode.value === 'ratio') {
+    for (const row of assignRows.value) {
+      if (row.workers?.length) redistributeTaskByRatio(row.taskKey)
+    }
+  } else {
+    for (const row of assignRows.value) {
+      if (row.workers?.length) syncTaskRatioFromQty(row.taskKey)
+    }
+  }
+}
+
+const onWorkerRatioChange = (taskKey: string) => {
+  if (allocMode.value === 'ratio') redistributeTaskByRatio(taskKey)
+}
+
+const onWorkerQtyChange = (taskKey: string) => {
+  if (allocMode.value === 'manual') syncTaskRatioFromQty(taskKey)
+  else touchTask(taskKey)
+}
+
 const removeWorker = (taskKey: string, empNo: string) => {
   const list = (assignMap.value[taskKey] || []).filter((w) => w.empNo !== empNo)
   assignMap.value = { ...assignMap.value, [taskKey]: list }
+  if (!list.length) return
+  if (allocMode.value === 'equal') applyEqualTask(taskKey)
+  else if (allocMode.value === 'ratio') redistributeTaskByRatio(taskKey)
+  else syncTaskRatioFromQty(taskKey)
 }
 
 const onEmpConfirm = (emps: { empNo: string; empName?: string; deptName?: string }[]) => {
   const key = editingTaskKey.value
   if (!key) return
-  const row = assignRows.value.find((r) => r.taskKey === key)
-  const cap = num(row?.remainQty)
   const prev = new Map((assignMap.value[key] || []).map((w) => [w.empNo, w]))
   const n = emps.length
-  const weights = emps.map((e) => num(prev.get(e.empNo)?.ratio) || 1)
-  const qtys = distributeByWeights(cap, weights.length ? weights : emps.map(() => 1))
-  const eachRatio = n ? Math.floor(100 / n) : 0
+  // 保留已有比例/数量；新人先占位，随后按当前模式重算（默认平均）
   assignMap.value = {
     ...assignMap.value,
-    [key]: emps.map((e, i) => ({
-      empNo: e.empNo,
-      empName: e.empName,
-      deptName: e.deptName,
-      ratio: i === n - 1 ? 100 - eachRatio * (n - 1) : eachRatio,
-      planQty: qtys[i] || 0,
-    })),
+    [key]: emps.map((e) => {
+      const old = prev.get(e.empNo)
+      return {
+        empNo: e.empNo,
+        empName: e.empName,
+        deptName: e.deptName,
+        ratio: num(old?.ratio),
+        planQty: num(old?.planQty),
+      }
+    }),
+  }
+  if (!n) return
+  if (allocMode.value === 'manual' && prev.size) {
+    // 手动：新人补 0，已有数量保留；若全是新人则平均
+    const allNew = emps.every((e) => !prev.has(e.empNo))
+    if (allNew) applyEqualTask(key)
+    else {
+      syncTaskRatioFromQty(key)
+      touchTask(key)
+    }
+  } else if (allocMode.value === 'ratio' && emps.some((e) => prev.has(e.empNo) && num(prev.get(e.empNo)?.ratio) > 0)) {
+    // 有旧比例：新人补均分剩余；简化为整体重平均更稳
+    applyEqualTask(key)
+  } else {
+    applyEqualTask(key)
   }
 }
 
@@ -1130,13 +1329,22 @@ onMounted(() => {
 }
 
 .nd-assign-pane {
-  > header {
+  > .nd-assign-pane__head {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
+    flex-wrap: wrap;
     padding: 10px 12px;
     border-bottom: 1px solid #e8f0eb;
+  }
+
+  &__head-left,
+  &__head-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
   }
 
   .nd-hint {
@@ -1147,18 +1355,112 @@ onMounted(() => {
   :deep(.el-table) {
     flex: 1;
   }
+
+  footer .is-bad,
+  .is-bad {
+    color: #c45656;
+  }
+}
+
+.nd-prc-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  small {
+    color: #8a9b90;
+    font-size: 11px;
+  }
+}
+
+.nd-fine {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 0;
+
+  &__card {
+    border: 1px solid #dce8e0;
+    border-radius: 8px;
+    padding: 8px 10px;
+    background: #fbfdfb;
+  }
+
+  &__who {
+    display: grid;
+    grid-template-columns: 28px 1fr auto;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+
+    em {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--nd-green);
+      color: #fff;
+      font-style: normal;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    strong {
+      display: block;
+      font-size: 13px;
+      line-height: 1.2;
+    }
+
+    span {
+      font-size: 11px;
+      color: #8a9b90;
+    }
+  }
+
+  &__remove {
+    border: 0;
+    background: transparent;
+    font-size: 18px;
+    color: #a0aea6;
+    cursor: pointer;
+    line-height: 1;
+  }
+
+  &__fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+
+    label {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 11px;
+      color: var(--nd-muted);
+    }
+
+    :deep(.el-input-number) {
+      width: 100%;
+    }
+  }
+
+  &__actions {
+    display: flex;
+    gap: 8px;
+  }
+
+  &__warn {
+    margin: 0;
+    font-size: 12px;
+    color: #c45656;
+  }
 }
 
 .nd-wo-head {
   margin-right: 10px;
   color: var(--nd-green);
-}
-
-.nd-workers {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
 }
 
 .nd-chip {
@@ -1169,26 +1471,6 @@ onMounted(() => {
   border-radius: 999px;
   background: #e8f4ec;
   font-size: 12px;
-
-  em {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--nd-green);
-    color: #fff;
-    font-style: normal;
-    font-size: 11px;
-  }
-
-  button {
-    border: 0;
-    background: transparent;
-    cursor: pointer;
-    color: #8a9b90;
-  }
 
   &--sm {
     border-radius: 6px;
