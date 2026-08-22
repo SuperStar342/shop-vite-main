@@ -3,7 +3,7 @@
     <header class="nd-hero">
       <div>
         <h1>普通派工</h1>
-        <p>多工单选工序；单价不同按工费份额拆量；支持一键派工（默认本车间 2 人）</p>
+        <p>多工单选工序；单价不同按工费份额拆量；支持一键/智能派工</p>
       </div>
       <nav class="nd-steps" aria-label="派工步骤">
         <button
@@ -221,6 +221,9 @@
             <el-button :loading="oneClickLoading" :disabled="!selectedWoNos.length" @click="oneClickDispatch">
               一键派工
             </el-button>
+            <el-button type="success" plain :loading="smartLoading" :disabled="!selectedWoNos.length" @click="openSmartDialog">
+              智能派工
+            </el-button>
             <el-button type="primary" :disabled="!selectedLines.length" @click="wizardStep = 1">
               下一步：选择人员
             </el-button>
@@ -263,6 +266,9 @@
                   : '各工序独立指派'
               }}
             </span>
+            <el-button size="small" type="success" plain :loading="smartLoading" @click="openSmartDialog">
+              智能派工
+            </el-button>
             <el-button size="small" type="primary" plain :loading="oneClickLoading" @click="oneClickDispatch">
               一键派工
             </el-button>
@@ -452,6 +458,34 @@
       :selected="empDialogSelected"
       @confirm="onEmpConfirm"
     />
+
+    <el-dialog v-model="smartDialog" title="智能派工" width="520px" append-to-body destroy-on-close>
+      <p class="nd-smart-tip">
+        按本车间近 {{ smartDays }} 天该工序经验 + 当前在途负荷推荐人员，采用后按工费份额均分，仍需确认提交。
+      </p>
+      <el-form label-width="88px">
+        <el-form-item label="推荐人数">
+          <el-input-number v-model="smartLimit" :max="5" :min="1" :step="1" />
+        </el-form-item>
+        <el-form-item label="回溯天数">
+          <el-input-number v-model="smartDays" :max="90" :min="7" :step="1" />
+        </el-form-item>
+      </el-form>
+      <ul v-if="smartPreview.length" class="nd-smart-list">
+        <li v-for="(e, i) in smartPreview" :key="e.empNo">
+          <b>{{ i + 1 }}. {{ e.empName || e.empNo }}</b>
+          <span>{{ e.empNo }}</span>
+          <em>{{ e.reason || '' }}</em>
+          <small>得分 {{ e.score }}</small>
+        </li>
+      </ul>
+      <el-empty v-else-if="smartPreviewTried" :image-size="56" description="暂无推荐结果" />
+      <template #footer>
+        <el-button @click="smartDialog = false">取消</el-button>
+        <el-button :loading="smartLoading" @click="previewSmartSuggest">预览推荐</el-button>
+        <el-button type="primary" :loading="smartLoading" @click="applySmartDispatch">采用并分配</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -461,6 +495,7 @@ import {
   getQuickDispatchEmployees,
   getQuickDispatchPreview,
   getQuickDispatchProcesses,
+  getQuickDispatchSmartSuggest,
   submitQuickDispatch,
 } from '/@/api/procurement/quickDispatch'
 import { fmtNum, num, splitWorkersByWage, type AllocWorker } from '/@/utils/dispatchAlloc'
@@ -483,6 +518,12 @@ const loading = ref(false)
 const prcLoading = ref(false)
 const saving = ref(false)
 const oneClickLoading = ref(false)
+const smartLoading = ref(false)
+const smartDialog = ref(false)
+const smartLimit = ref(2)
+const smartDays = ref(30)
+const smartPreview = ref<any[]>([])
+const smartPreviewTried = ref(false)
 const mergeSameProcess = ref(true)
 const pickTab = ref<'current' | 'batch' | 'picked'>('batch')
 const assignView = ref<'wo' | 'process'>('process')
@@ -1079,6 +1120,121 @@ const oneClickDispatch = async () => {
     $baseMessage(e?.message || '一键派工失败', 'error', 'hey')
   } finally {
     oneClickLoading.value = false
+  }
+}
+
+const selectedPrcCodes = computed(() => {
+  const set = new Set<string>()
+  for (const line of selectedLines.value) {
+    if (line?.prcCode) set.add(String(line.prcCode))
+  }
+  return [...set]
+})
+
+const openSmartDialog = async () => {
+  if (!selectedWoNos.value.length) {
+    $baseMessage('请先勾选工单', 'warning', 'hey')
+    return
+  }
+  smartPreview.value = []
+  smartPreviewTried.value = false
+  smartDialog.value = true
+  if (!selectedLines.value.length) {
+    await selectAllLinesForSelectedWos()
+  }
+}
+
+const previewSmartSuggest = async () => {
+  if (!selectedLines.value.length) {
+    await selectAllLinesForSelectedWos()
+  }
+  if (!selectedLines.value.length) {
+    $baseMessage('所选工单没有可派工序', 'warning', 'hey')
+    return
+  }
+  smartLoading.value = true
+  smartPreviewTried.value = true
+  try {
+    const data = await getQuickDispatchSmartSuggest({
+      deptId: preferredDeptId.value,
+      prcCodes: selectedPrcCodes.value,
+      limit: smartLimit.value,
+      days: smartDays.value,
+    })
+    smartPreview.value = Array.isArray(data?.employees) ? data.employees : []
+    if (!smartPreview.value.length) {
+      $baseMessage('未找到可推荐人员', 'warning', 'hey')
+    }
+  } catch (e: any) {
+    smartPreview.value = []
+    $baseMessage(e?.message || '智能推荐失败', 'error', 'hey')
+  } finally {
+    smartLoading.value = false
+  }
+}
+
+const applyEmpsToAllTasks = async (emps: any[], successMsg: string) => {
+  if (!emps.length) return
+  const next: Record<string, AllocWorker[]> = {}
+  const n = emps.length
+  const each = Math.floor(100 / n)
+  for (const row of assignRows.value) {
+    next[row.taskKey] = emps.map((e: any, i: number) => ({
+      empNo: e.empNo,
+      empName: e.empName,
+      deptName: e.deptName,
+      ratio: i === n - 1 ? 100 - each * (n - 1) : each,
+      planQty: 0,
+    }))
+  }
+  assignMap.value = next
+  await nextTick()
+  for (const row of assignRows.value) applyEqualTask(row.taskKey)
+  smartDialog.value = false
+  if (canGoConfirm.value) {
+    wizardStep.value = 2
+    $baseMessage(successMsg, 'success', 'hey')
+  } else {
+    wizardStep.value = 1
+    $baseMessage('已分配人员，请检查数量后确认', 'success', 'hey')
+  }
+}
+
+const applySmartDispatch = async () => {
+  if (!selectedWoNos.value.length) {
+    $baseMessage('请先勾选工单', 'warning', 'hey')
+    return
+  }
+  smartLoading.value = true
+  try {
+    if (!selectedLines.value.length) await selectAllLinesForSelectedWos()
+    await nextTick()
+    if (!selectedLines.value.length) {
+      $baseMessage('所选工单没有可派工序', 'warning', 'hey')
+      return
+    }
+    let emps = smartPreview.value
+    if (!emps.length) {
+      const data = await getQuickDispatchSmartSuggest({
+        deptId: preferredDeptId.value,
+        prcCodes: selectedPrcCodes.value,
+        limit: smartLimit.value,
+        days: smartDays.value,
+      })
+      emps = Array.isArray(data?.employees) ? data.employees : []
+      smartPreview.value = emps
+      smartPreviewTried.value = true
+    }
+    if (!emps.length) {
+      $baseMessage('智能推荐无结果，请改用一键派工或手动选人', 'warning', 'hey')
+      return
+    }
+    const names = emps.map((e: any) => e.empName || e.empNo).join('、')
+    await applyEmpsToAllTasks(emps, `智能派工已采用（${names}），请确认提交`)
+  } catch (e: any) {
+    $baseMessage(e?.message || '智能派工失败', 'error', 'hey')
+  } finally {
+    smartLoading.value = false
   }
 }
 
@@ -1750,6 +1906,56 @@ onMounted(() => {
     display: flex;
     align-items: center;
     gap: 10px;
+  }
+}
+
+.nd-smart-tip {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--nd-muted);
+  line-height: 1.5;
+}
+
+.nd-smart-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  max-height: 240px;
+  overflow: auto;
+
+  li {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2px 10px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    border: 1px solid #dce8e0;
+    border-radius: 8px;
+    background: #f7fbf8;
+
+    b {
+      font-size: 13px;
+      color: var(--nd-ink);
+    }
+
+    span {
+      font-size: 12px;
+      color: #8a9b90;
+      justify-self: end;
+    }
+
+    em {
+      grid-column: 1 / -1;
+      font-style: normal;
+      font-size: 12px;
+      color: var(--nd-muted);
+    }
+
+    small {
+      grid-column: 1 / -1;
+      color: var(--nd-green);
+      font-size: 12px;
+    }
   }
 }
 

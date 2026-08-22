@@ -63,6 +63,29 @@ export async function getQuickDispatchDeptSuggest(params?: { keyword?: string })
   return Array.isArray(data) ? data : []
 }
 
+/** 智能派工推荐：近期工序经验 + 在途负荷 */
+export async function getQuickDispatchSmartSuggest(params?: {
+  deptId?: number | string
+  prcCodes?: string | string[]
+  limit?: number
+  days?: number
+}) {
+  const codes = Array.isArray(params?.prcCodes)
+    ? params!.prcCodes!.filter(Boolean).join(',')
+    : params?.prcCodes || undefined
+  const res: any = await request({
+    url: `${BASE}/smart-suggest`,
+    method: 'get',
+    params: {
+      deptId: params?.deptId || undefined,
+      prcCodes: codes || undefined,
+      limit: params?.limit ?? 2,
+      days: params?.days ?? 30,
+    },
+  })
+  return assertOk(res, '智能推荐失败') || {}
+}
+
 export async function submitQuickDispatch(payload: {
   moNo: string
   woNos: string[]
