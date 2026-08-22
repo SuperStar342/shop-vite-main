@@ -461,7 +461,7 @@
 
     <el-dialog v-model="smartDialog" title="智能派工" width="520px" append-to-body destroy-on-close>
       <p class="nd-smart-tip">
-        按本车间近 {{ smartDays }} 天该工序经验 + 当前在途负荷推荐人员，采用后按工费份额均分，仍需确认提交。
+        按本车间近 {{ smartDays }} 天工序经验与在途负荷推荐人员；采用后按<strong>推荐得分占比</strong>分配比例（高分多派），再按工费份额拆到各工单。
       </p>
       <el-form label-width="88px">
         <el-form-item label="推荐人数">
@@ -476,7 +476,7 @@
           <b>{{ i + 1 }}. {{ e.empName || e.empNo }}</b>
           <span>{{ e.empNo }}</span>
           <em>{{ e.reason || '' }}</em>
-          <small>得分 {{ e.score }}</small>
+          <small>得分 {{ e.score }} · 预计比例 {{ smartPreviewRatio(e) }}%</small>
         </li>
       </ul>
       <el-empty v-else-if="smartPreviewTried" :image-size="56" description="暂无推荐结果" />
@@ -1094,14 +1094,13 @@ const oneClickDispatch = async () => {
     }
 
     const next: Record<string, AllocWorker[]> = {}
-    const n = emps.length
-    const each = Math.floor(100 / n)
+    const ratios = equalRatios(emps.length)
     for (const row of assignRows.value) {
       next[row.taskKey] = emps.map((e: any, i: number) => ({
         empNo: e.empNo,
         empName: e.empName,
         deptName: e.deptName,
-        ratio: i === n - 1 ? 100 - each * (n - 1) : each,
+        ratio: ratios[i] ?? 0,
         planQty: 0,
       }))
     }
@@ -1130,6 +1129,37 @@ const selectedPrcCodes = computed(() => {
   }
   return [...set]
 })
+
+/** 按推荐得分折算比例（合计 100%）；得分相同或缺失时退化为平均 */
+const ratiosFromScores = (emps: any[]) => {
+  const n = emps.length
+  if (!n) return []
+  if (n === 1) return [100]
+  const weights = emps.map((e) => Math.max(0, num(e.score)))
+  const sum = weights.reduce((s, w) => s + w, 0)
+  if (sum <= 0) return equalRatios(n)
+  let assigned = 0
+  return emps.map((_, i) => {
+    if (i === n - 1) return Math.max(0, 100 - assigned)
+    const r = Math.round((weights[i] * 100) / sum)
+    assigned += r
+    return r
+  })
+}
+
+const equalRatios = (n: number) => {
+  if (n <= 0) return []
+  const each = Math.floor(100 / n)
+  return Array.from({ length: n }, (_, i) => (i === n - 1 ? 100 - each * (n - 1) : each))
+}
+
+const smartPreviewRatio = (emp: any) => {
+  const list = smartPreview.value
+  if (!list.length || !emp?.empNo) return 0
+  const idx = list.findIndex((e) => e.empNo === emp.empNo)
+  if (idx < 0) return 0
+  return ratiosFromScores(list)[idx] ?? 0
+}
 
 const openSmartDialog = async () => {
   if (!selectedWoNos.value.length) {
@@ -1173,30 +1203,32 @@ const previewSmartSuggest = async () => {
   }
 }
 
-const applyEmpsToAllTasks = async (emps: any[], successMsg: string) => {
+const applyEmpsToAllTasks = async (emps: any[], successMsg: string, byScore = false) => {
   if (!emps.length) return
+  const ratios = byScore ? ratiosFromScores(emps) : equalRatios(emps.length)
   const next: Record<string, AllocWorker[]> = {}
-  const n = emps.length
-  const each = Math.floor(100 / n)
   for (const row of assignRows.value) {
     next[row.taskKey] = emps.map((e: any, i: number) => ({
       empNo: e.empNo,
       empName: e.empName,
       deptName: e.deptName,
-      ratio: i === n - 1 ? 100 - each * (n - 1) : each,
+      ratio: ratios[i] ?? 0,
       planQty: 0,
     }))
   }
   assignMap.value = next
   await nextTick()
-  for (const row of assignRows.value) applyEqualTask(row.taskKey)
+  for (const row of assignRows.value) {
+    if (byScore) redistributeTaskByRatio(row.taskKey)
+    else applyEqualTask(row.taskKey)
+  }
   smartDialog.value = false
   if (canGoConfirm.value) {
     wizardStep.value = 2
     $baseMessage(successMsg, 'success', 'hey')
   } else {
     wizardStep.value = 1
-    $baseMessage('已分配人员，请检查数量后确认', 'success', 'hey')
+    $baseMessage('已自动分配，请检查数量后确认', 'success', 'hey')
   }
 }
 
@@ -1230,7 +1262,8 @@ const applySmartDispatch = async () => {
       return
     }
     const names = emps.map((e: any) => e.empName || e.empNo).join('、')
-    await applyEmpsToAllTasks(emps, `智能派工已采用（${names}），请确认提交`)
+    const ratioHint = ratiosFromScores(emps).map((r) => `${r}%`).join(' / ')
+    await applyEmpsToAllTasks(emps, `智能派工已采用（${names}，比例 ${ratioHint}），请确认提交`, true)
   } catch (e: any) {
     $baseMessage(e?.message || '智能派工失败', 'error', 'hey')
   } finally {
