@@ -250,15 +250,11 @@
               <el-radio-button value="wo">按工单查看</el-radio-button>
               <el-radio-button value="process">按工序汇总查看</el-radio-button>
             </el-radio-group>
-            <el-radio-group v-model="allocMode" size="small" @change="onAllocModeChange">
-              <el-radio-button value="equal">平均</el-radio-button>
-              <el-radio-button value="ratio">比例</el-radio-button>
-              <el-radio-button value="manual">手动数量</el-radio-button>
-            </el-radio-group>
+            <span class="nd-hint">比例与数量联动：改比例自动算数量，改数量自动回写比例</span>
           </div>
           <div class="nd-assign-pane__head-right">
             <span class="nd-hint">{{ mergeSameProcess ? '同工序合并：数量按各工单未派量比例拆分' : '各工序独立指派' }}</span>
-            <el-button size="small" @click="applyEqualAll">全部平均</el-button>
+            <el-button size="small" type="primary" plain @click="applyEqualAll">全部平均</el-button>
           </div>
         </header>
 
@@ -329,7 +325,7 @@
                       <el-input-number
                         v-model="w.ratio"
                         controls-position="right"
-                        :disabled="!row.editable || allocMode !== 'ratio'"
+                        :disabled="!row.editable"
                         :max="100"
                         :min="0"
                         :precision="0"
@@ -342,7 +338,7 @@
                       <el-input-number
                         v-model="w.planQty"
                         controls-position="right"
-                        :disabled="!row.editable || allocMode !== 'manual'"
+                        :disabled="!row.editable"
                         :max="num(row.remainQty)"
                         :min="0"
                         :precision="2"
@@ -476,8 +472,8 @@ const saving = ref(false)
 const mergeSameProcess = ref(true)
 const pickTab = ref<'current' | 'batch' | 'picked'>('batch')
 const assignView = ref<'wo' | 'process'>('process')
-/** 精细化分配：默认平均；比例调 %；手动改每人数量 */
-const allocMode = ref<'equal' | 'ratio' | 'manual'>('equal')
+/** 防止比例↔数量联动时互相触发 */
+const allocSyncing = ref(false)
 const woKeyword = ref('')
 const queryWoNo = ref('')
 const queryMoNo = ref('')
@@ -987,44 +983,37 @@ const applyEqualTask = (taskKey: string) => {
 }
 
 const applyEqualAll = () => {
-  allocMode.value = 'equal'
   for (const row of assignRows.value) {
     if (row.workers?.length) applyEqualTask(row.taskKey)
   }
 }
 
-const onAllocModeChange = () => {
-  if (allocMode.value === 'equal') {
-    for (const row of assignRows.value) {
-      if (row.workers?.length) applyEqualTask(row.taskKey)
-    }
-  } else if (allocMode.value === 'ratio') {
-    for (const row of assignRows.value) {
-      if (row.workers?.length) redistributeTaskByRatio(row.taskKey)
-    }
-  } else {
-    for (const row of assignRows.value) {
-      if (row.workers?.length) syncTaskRatioFromQty(row.taskKey)
-    }
+/** 改比例 → 重算数量 */
+const onWorkerRatioChange = (taskKey: string) => {
+  if (allocSyncing.value) return
+  allocSyncing.value = true
+  try {
+    redistributeTaskByRatio(taskKey)
+  } finally {
+    allocSyncing.value = false
   }
 }
 
-const onWorkerRatioChange = (taskKey: string) => {
-  if (allocMode.value === 'ratio') redistributeTaskByRatio(taskKey)
-}
-
+/** 改数量 → 回写比例（与比例双向联动） */
 const onWorkerQtyChange = (taskKey: string) => {
-  if (allocMode.value === 'manual') syncTaskRatioFromQty(taskKey)
-  else touchTask(taskKey)
+  if (allocSyncing.value) return
+  allocSyncing.value = true
+  try {
+    syncTaskRatioFromQty(taskKey)
+  } finally {
+    allocSyncing.value = false
+  }
 }
 
 const removeWorker = (taskKey: string, empNo: string) => {
   const list = (assignMap.value[taskKey] || []).filter((w) => w.empNo !== empNo)
   assignMap.value = { ...assignMap.value, [taskKey]: list }
-  if (!list.length) return
-  if (allocMode.value === 'equal') applyEqualTask(taskKey)
-  else if (allocMode.value === 'ratio') redistributeTaskByRatio(taskKey)
-  else syncTaskRatioFromQty(taskKey)
+  if (list.length) applyEqualTask(taskKey)
 }
 
 const onEmpConfirm = (emps: { empNo: string; empName?: string; deptName?: string }[]) => {
@@ -1032,7 +1021,6 @@ const onEmpConfirm = (emps: { empNo: string; empName?: string; deptName?: string
   if (!key) return
   const prev = new Map((assignMap.value[key] || []).map((w) => [w.empNo, w]))
   const n = emps.length
-  // 保留已有比例/数量；新人先占位，随后按当前模式重算（默认平均）
   assignMap.value = {
     ...assignMap.value,
     [key]: emps.map((e) => {
@@ -1047,20 +1035,8 @@ const onEmpConfirm = (emps: { empNo: string; empName?: string; deptName?: string
     }),
   }
   if (!n) return
-  if (allocMode.value === 'manual' && prev.size) {
-    // 手动：新人补 0，已有数量保留；若全是新人则平均
-    const allNew = emps.every((e) => !prev.has(e.empNo))
-    if (allNew) applyEqualTask(key)
-    else {
-      syncTaskRatioFromQty(key)
-      touchTask(key)
-    }
-  } else if (allocMode.value === 'ratio' && emps.some((e) => prev.has(e.empNo) && num(prev.get(e.empNo)?.ratio) > 0)) {
-    // 有旧比例：新人补均分剩余；简化为整体重平均更稳
-    applyEqualTask(key)
-  } else {
-    applyEqualTask(key)
-  }
+  // 新人默认并入后整体平均，保证比例与数量联动一致
+  applyEqualTask(key)
 }
 
 const loadPreview = async () => {
