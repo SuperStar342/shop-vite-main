@@ -2,14 +2,14 @@
   <el-dialog
     :model-value="modelValue"
     class="emp-picker-dialog"
-    title="选择人员"
+    :title="dialogTitle"
     width="1100px"
     append-to-body
     destroy-on-close
     @update:model-value="emit('update:modelValue', $event)"
     @opened="onOpen"
   >
-    <div class="emp-picker-wrap" :class="{ 'is-multi-alloc': isMultiAlloc }">
+    <div class="emp-picker-wrap" :class="{ 'is-alloc-mode': isAllocMode }">
       <div class="emp-picker">
       <aside class="emp-picker__depts">
         <button class="emp-picker__dept-item" :class="{ 'is-active': empNavKey === 'all' }" type="button" @click="selectEmpNav('all')">
@@ -133,15 +133,24 @@
       </aside>
       </div>
 
-      <section v-if="isMultiAlloc" class="emp-picker__alloc">
+      <section v-if="isAllocMode" class="emp-picker__alloc">
         <header class="emp-picker__alloc-head">
           <div>
-            <strong>按工单分配 · {{ allocTitle }}</strong>
-            <span>已选人员将同步到各工单，数量按工单分别填写（单价×数量=工费）</span>
+            <strong>{{ allocHeadTitle }}</strong>
+            <span>{{ allocHeadHint }}</span>
           </div>
           <div class="emp-picker__alloc-actions">
-            <el-button size="small" :disabled="!empDraft.length" @click="fillAllLinesEqual">各工单平均填满</el-button>
-            <el-button size="small" :disabled="!empDraft.length" @click="syncRatiosAcrossLines">同步比例到全部工单</el-button>
+            <el-button size="small" :disabled="!empDraft.length" @click="fillAllLinesEqual">
+              {{ isMultiAlloc ? '各工单平均填满' : '平均填满' }}
+            </el-button>
+            <el-button
+              v-if="isMultiAlloc"
+              size="small"
+              :disabled="!empDraft.length"
+              @click="syncRatiosAcrossLines"
+            >
+              同步比例到全部工单
+            </el-button>
           </div>
         </header>
         <div class="emp-picker__alloc-grid">
@@ -236,6 +245,7 @@ const props = defineProps<{
   selected?: { empNo: string; empName?: string; deptName?: string }[]
   allocLines?: EmpAllocLine[]
   lineWorkers?: Record<string, AllocWorker[]>
+  dialogTitle?: string
 }>()
 
 const emit = defineEmits<{
@@ -259,13 +269,29 @@ const empDraft = ref<any[]>([])
 const lineAlloc = ref<Record<string, AllocWorker[]>>({})
 const prevDraftCount = ref(0)
 
+const isAllocMode = computed(() => (props.allocLines?.length || 0) > 0)
 const isMultiAlloc = computed(() => (props.allocLines?.length || 0) > 1)
+
+const dialogTitle = computed(() => props.dialogTitle || '选择人员')
 
 const allocTitle = computed(() => {
   const first = props.allocLines?.[0]
   if (!first) return ''
   return `${first.prcCode || ''} ${first.prcName || ''}`.trim()
 })
+
+const allocHeadTitle = computed(() => {
+  if (!isAllocMode.value) return ''
+  if (isMultiAlloc.value) return `按工单分配 · ${allocTitle.value}`
+  const line = props.allocLines![0]
+  return `本工单 · ${line.woNo} · ${allocTitle.value}`
+})
+
+const allocHeadHint = computed(() =>
+  isMultiAlloc.value
+    ? '人员同步到各工单；每张工单单独填比例/数量（单价×数量=工费）'
+    : '比例与数量联动；工费 = 单价 × 数量'
+)
 
 const lineEstWage = (key: string) => {
   const line = props.allocLines?.find((l) => l.key === key)
@@ -284,7 +310,7 @@ const lineOverAssign = (key: string) => {
 }
 
 const syncLineAllocWorkers = (fillEqual = false) => {
-  if (!isMultiAlloc.value) return
+  if (!isAllocMode.value) return
   const next: Record<string, AllocWorker[]> = {}
   for (const line of props.allocLines || []) {
     const prev = lineAlloc.value[line.key] || []
@@ -482,7 +508,7 @@ const onEmpDraftChange = (rows: any[]) => {
   kept.forEach((r) => map.set(r.empNo, r))
   selectedOnPage.forEach((r, k) => map.set(k, r))
   empDraft.value = [...map.values()]
-  if (isMultiAlloc.value) {
+  if (isAllocMode.value) {
     syncLineAllocWorkers(false)
     if (empDraft.value.length > prevDraftCount.value) fillAllLinesEqual()
     prevDraftCount.value = empDraft.value.length
@@ -539,7 +565,7 @@ const onOpen = async () => {
     deptName: w.deptName,
   }))
   prevDraftCount.value = empDraft.value.length
-  if (isMultiAlloc.value) {
+  if (isAllocMode.value) {
     const next: Record<string, AllocWorker[]> = {}
     for (const line of props.allocLines || []) {
       const src = props.lineWorkers?.[line.key] || []
@@ -561,7 +587,7 @@ const onOpen = async () => {
 }
 
 const confirm = () => {
-  if (isMultiAlloc.value) {
+  if (isAllocMode.value) {
     if (!empDraft.value.length) {
       $baseMessage('请先选择人员', 'warning', 'hey')
       return
@@ -643,7 +669,7 @@ watch(
   flex-direction: column;
   gap: 10px;
 
-  &.is-multi-alloc .emp-picker {
+  &.is-alloc-mode .emp-picker {
     height: 420px;
   }
 }

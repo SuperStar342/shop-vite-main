@@ -293,7 +293,7 @@
               {{
                 mergeSameProcess
                   ? '同工序合并：按工费份额拆到各工单（单价不同更公平）'
-                  : '各工序独立指派'
+                  : '按工序查看：工序下展示各工单，每张工单独立选人、填数量'
               }}
             </span>
             <el-button size="small" type="success" plain :loading="smartLoading" @click="openSmartDialog">
@@ -306,7 +306,14 @@
           </div>
         </header>
 
-        <el-table :data="assignTableData" border height="100%" row-key="rowKey" :span-method="assignSpanMethod">
+        <el-table
+          :data="assignTableData"
+          border
+          height="100%"
+          row-key="rowKey"
+          :row-class-name="assignRowClassName"
+          :span-method="assignSpanMethod"
+        >
           <el-table-column label="工单 / 工序" min-width="180">
             <template #default="{ row }">
               <template v-if="row.kind === 'wo-head'">
@@ -322,17 +329,21 @@
                 </div>
               </template>
               <template v-else-if="row.kind === 'process-head'">
-                <div class="nd-prc-cell">
+                <div class="nd-prc-cell nd-prc-cell--head">
                   <span>{{ row.prcCode }} {{ row.prcName }}</span>
-                  <small>{{ row.woCount }} 张工单 · {{ row.mrName || '' }}</small>
+                  <small>{{ row.mrName || '' }} · 含 {{ row.woCount }} 张工单</small>
+                </div>
+              </template>
+              <template v-else-if="row.kind === 'line-sub'">
+                <div class="nd-wo-under-prc">
+                  <el-tag effect="plain" size="small" type="info">{{ row.woText }}</el-tag>
+                  <small>本工单工序</small>
                 </div>
               </template>
               <template v-else>
                 <div class="nd-prc-cell">
-                  <span v-if="row.kind === 'line-sub'">{{ row.woText }}</span>
-                  <span v-else>{{ row.prcCode }} {{ row.prcName }}</span>
-                  <small v-if="row.woText && row.kind !== 'line-sub'">{{ row.woText }}</small>
-                  <small v-else-if="row.kind === 'line-sub'">{{ row.prcCode }} {{ row.prcName }}</small>
+                  <span>{{ row.prcCode }} {{ row.prcName }}</span>
+                  <small v-if="row.woText">{{ row.woText }}</small>
                 </div>
               </template>
             </template>
@@ -371,16 +382,10 @@
           <el-table-column label="精细化指派（人员 / 比例 / 数量）" min-width="380">
             <template #default="{ row }">
               <div v-if="row.kind === 'process-head'" class="nd-fine nd-fine--head">
-                <el-button :icon="Plus" size="small" type="primary" @click="openEmpForProcess(row.processKey)">
-                  配置人员与数量
+                <el-button :icon="Plus" size="small" type="primary" plain @click="openEmpForProcess(row.processKey)">
+                  为各工单统一选人
                 </el-button>
-                <span class="nd-muted">多工单同工序：在弹窗中按工单分别填数量，工费按各工单单价计算</span>
-              </div>
-              <div v-else-if="row.kind === 'line-sub'" class="nd-line-sub">
-                <span v-for="w in row.workers" :key="w.empNo" class="nd-chip nd-chip--sm">
-                  {{ w.empName || w.empNo }} {{ fmtNum(w.planQty) }}
-                </span>
-                <span v-if="!row.workers.length" class="nd-muted">未分配</span>
+                <span class="nd-muted">快捷：一次选人并分别填各工单数量；也可在下方每张工单行单独配置</span>
               </div>
               <div v-else-if="row.kind !== 'wo-head'" class="nd-fine">
                 <article v-for="w in row.workers" :key="w.empNo" class="nd-fine__card">
@@ -427,11 +432,18 @@
                         @change="onWorkerQtyChange(row.taskKey)"
                       />
                     </label>
+                    <span v-if="row.lines?.[0]" class="nd-fine__wage">
+                      工费 {{ fmtNum(num(w.planQty) * num(row.lines[0].machiningUp)) }}
+                    </span>
                   </div>
                 </article>
                 <div v-if="row.editable" class="nd-fine__actions">
-                  <el-button :icon="Plus" size="small" type="primary" @click="openEmpFor(row.taskKey)">加人</el-button>
-                  <el-button size="small" :disabled="!row.workers.length" @click="applyEqualTask(row.taskKey)">本行平均</el-button>
+                  <el-button :icon="Plus" size="small" type="primary" @click="openEmpFor(row.taskKey)">
+                    {{ row.kind === 'line-sub' ? '选择人员' : '加人' }}
+                  </el-button>
+                  <el-button size="small" :disabled="!row.workers.length" @click="applyEqualTask(row.taskKey)">
+                    本行平均
+                  </el-button>
                 </div>
                 <span v-if="!row.workers.length && !row.editable" class="nd-muted">由汇总行分配后按未派量比例拆分</span>
                 <p v-if="row.editable && row.overAssign" class="nd-fine__warn">已分 {{ fmtNum(row.assignedQty) }} 超出未派 {{ fmtNum(row.remainQty) }}</p>
@@ -521,6 +533,7 @@
     <EmpPickerDialog
       v-model="empDialog"
       :alloc-lines="editingAllocLines"
+      :dialog-title="empDialogTitle"
       :line-workers="editingLineWorkers"
       :preferred-dept-id="preferredDeptId"
       :selected="empDialogSelected"
@@ -882,7 +895,7 @@ const assignDisplayRows = computed(() => {
           ...row,
           kind: 'line-sub',
           rowKey: `sub:${row.rowKey}`,
-          editable: false,
+          editable: true,
           woText: row.lines[0]?.woNo || row.woText,
         })
       }
@@ -900,11 +913,17 @@ const assignTableData = computed(() => {
 })
 
 const assignSpanMethod = ({ row, columnIndex }: any) => {
-  if (row.kind === 'wo-head' || row.kind === 'process-head') {
+  if (row.kind === 'wo-head') {
     if (columnIndex === 0) return [1, 9]
     return [0, 0]
   }
   return [1, 1]
+}
+
+const assignRowClassName = ({ row }: { row: any }) => {
+  if (row.kind === 'line-sub') return 'is-wo-sub-row'
+  if (row.kind === 'process-head') return 'is-process-head-row'
+  return ''
 }
 
 const assignedTaskCount = computed(() => assignRows.value.filter((r) => num(r.assignedQty) > 0).length)
@@ -961,9 +980,14 @@ const canGoConfirm = computed(
 const canSubmit = computed(() => confirmItems.value.length > 0 && !hasOverAssign.value)
 
 const empDialogSelected = computed(() => {
-  if (editingAllocLines.value.length > 1) {
+  const lines = editingAllocLines.value
+  if (lines.length > 0) {
+    if (lines.length === 1) {
+      const list = assignMap.value[lines[0].key] || []
+      return list.map((w) => ({ empNo: w.empNo, empName: w.empName, deptName: w.deptName }))
+    }
     const union = new Map<string, { empNo: string; empName?: string; deptName?: string }>()
-    for (const line of editingAllocLines.value) {
+    for (const line of lines) {
       for (const w of assignMap.value[line.key] || []) {
         if (!union.has(w.empNo)) {
           union.set(w.empNo, { empNo: w.empNo, empName: w.empName, deptName: w.deptName })
@@ -976,8 +1000,21 @@ const empDialogSelected = computed(() => {
   return list.map((w) => ({ empNo: w.empNo, empName: w.empName, deptName: w.deptName }))
 })
 
+const empDialogTitle = computed(() => {
+  const lines = editingAllocLines.value
+  if (lines.length === 1) {
+    const l = lines[0]
+    return `选择人员 · ${l.woNo} · ${l.prcCode || ''} ${l.prcName || ''}`.trim()
+  }
+  if (lines.length > 1) {
+    const l = lines[0]
+    return `选择人员 · ${l.prcCode || ''} ${l.prcName || ''}（${lines.length} 张工单）`.trim()
+  }
+  return '选择人员'
+})
+
 const editingLineWorkers = computed(() => {
-  if (editingAllocLines.value.length <= 1) return undefined
+  if (!editingAllocLines.value.length) return undefined
   const map: Record<string, AllocWorker[]> = {}
   for (const line of editingAllocLines.value) {
     map[line.key] = (assignMap.value[line.key] || []).map((w) => ({
@@ -991,18 +1028,20 @@ const editingLineWorkers = computed(() => {
   return map
 })
 
+const buildAllocLine = (line: any): EmpAllocLine => ({
+  key: lineKey(line),
+  woNo: line.woNo,
+  remainQty: num(line.remainQty),
+  planQty: num(line.woQty),
+  machiningUp: num(line.machiningUp),
+  prcCode: line.prcCode,
+  prcName: line.prcName,
+})
+
 const buildEditingAllocLines = (line: any): EmpAllocLine[] => {
   const pk = processKey(line)
   const group = selectedLines.value.filter((l) => processKey(l) === pk)
-  return group.map((l) => ({
-    key: lineKey(l),
-    woNo: l.woNo,
-    remainQty: num(l.remainQty),
-    planQty: num(l.woQty),
-    machiningUp: num(l.machiningUp),
-    prcCode: l.prcCode,
-    prcName: l.prcName,
-  }))
+  return group.map(buildAllocLine)
 }
 
 const goStep = (idx: number) => {
@@ -1094,14 +1133,14 @@ const clearSelection = () => {
 
 const openEmpFor = (taskKey: string) => {
   editingTaskKey.value = taskKey
-  const line = selectedLines.value.find((l) => lineKey(l) === taskKey)
-  if (line && !mergeSameProcess.value) {
-    editingAllocLines.value = buildEditingAllocLines(line)
-  } else if (line) {
-    editingAllocLines.value = buildEditingAllocLines(line).slice(0, 1)
-  } else {
+  if (mergeSameProcess.value) {
     editingAllocLines.value = []
+    empDialog.value = true
+    return
   }
+  const line = selectedLines.value.find((l) => lineKey(l) === taskKey)
+  if (!line) return
+  editingAllocLines.value = [buildAllocLine(line)]
   empDialog.value = true
 }
 
@@ -1910,6 +1949,19 @@ onMounted(() => {
     flex: 1;
   }
 
+  :deep(.is-wo-sub-row > td) {
+    background: #fbfdfb;
+  }
+
+  :deep(.is-wo-sub-row > td:first-child) {
+    border-left: 3px solid #dce8e0;
+    padding-left: 20px;
+  }
+
+  :deep(.is-process-head-row > td) {
+    background: #f3faf6;
+  }
+
   footer .is-bad,
   .is-bad {
     color: #c45656;
@@ -1927,17 +1979,27 @@ onMounted(() => {
   flex-direction: column;
   gap: 2px;
 
+  &--head span {
+    font-weight: 600;
+    color: var(--nd-ink);
+  }
+
   small {
     color: #8a9b90;
     font-size: 11px;
   }
 }
 
-.nd-line-sub {
+.nd-wo-under-prc {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
+  flex-direction: column;
+  gap: 4px;
+  padding-left: 4px;
+
+  small {
+    font-size: 11px;
+    color: #9aaba0;
+  }
 }
 
 .nd-fine {
@@ -2004,8 +2066,9 @@ onMounted(() => {
 
   &__fields {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr auto;
     gap: 8px;
+    align-items: end;
 
     label {
       display: flex;
@@ -2018,6 +2081,14 @@ onMounted(() => {
     :deep(.el-input-number) {
       width: 100%;
     }
+  }
+
+  &__wage {
+    font-size: 12px;
+    color: #2e7d5a;
+    font-weight: 700;
+    padding-bottom: 4px;
+    white-space: nowrap;
   }
 
   &__actions {
