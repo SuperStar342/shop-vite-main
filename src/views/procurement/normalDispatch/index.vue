@@ -424,18 +424,20 @@
                     </button>
                   </div>
                   <div class="nd-fine__fields">
-                    <label>
+                    <label class="nd-fine__ratio">
                       比例%
-                      <el-input-number
-                        v-model="w.ratio"
-                        controls-position="right"
-                        :disabled="!row.editable"
-                        :max="100"
-                        :min="0"
-                        :precision="0"
-                        :step="1"
-                        @change="onWorkerRatioChange(row.taskKey)"
-                      />
+                      <div class="nd-fine__ratio-row">
+                        <el-slider
+                          v-model="w.ratio"
+                          :disabled="!row.editable"
+                          :max="100"
+                          :min="0"
+                          :show-tooltip="true"
+                          @change="onWorkerRatioChange(row.taskKey)"
+                          @input="onWorkerRatioChange(row.taskKey)"
+                        />
+                        <b>{{ Math.round(num(w.ratio)) }}%</b>
+                      </div>
                     </label>
                     <label>
                       数量
@@ -1077,6 +1079,21 @@ const buildEditingAllocLines = (line: any): EmpAllocLine[] => {
   return group.map(buildAllocLine)
 }
 
+/** 一键派工：按当前任务行（合并/逐行）生成可编辑分配行 */
+const buildOneClickAllocLines = (): EmpAllocLine[] =>
+  assignRows.value.map((row) => {
+    const sample = row.lines?.[0]
+    return {
+      key: row.taskKey,
+      woNo: row.woText || sample?.woNo || '',
+      remainQty: num(row.remainQty),
+      planQty: num(row.planQty),
+      machiningUp: num(sample?.machiningUp),
+      prcCode: row.prcCode,
+      prcName: row.prcName,
+    }
+  })
+
 const goStep = (idx: number) => {
   if (idx === 0) wizardStep.value = 0
   else if (idx === 1 && selectedLines.value.length) wizardStep.value = 1
@@ -1438,16 +1455,16 @@ const onEmpPickerConfirmAlloc = (lines: { key: string; workers: AllocWorker[] }[
   }
   assignMap.value = next
   editingAllocLines.value = []
+  editingTaskKey.value = ''
+  $baseMessage('人员分配已更新，请核对比例与数量后确认派工', 'success', 'hey')
 }
 
-const onEmpPickerOneClick = async (
+const onEmpPickerOneClick = (
   emps: { empNo: string; empName?: string; deptName?: string }[]
 ) => {
-  if (!emps.length) return
-  editingAllocLines.value = []
-  empDialog.value = false
-  const names = emps.map((e) => e.empName || e.empNo).join('、')
-  await applyEmpsToAllTasks(emps, `一键派工完成（${names}），请确认提交`, false)
+  if (!emps.length || !selectedLines.value.length) return
+  editingTaskKey.value = ''
+  editingAllocLines.value = buildOneClickAllocLines()
 }
 
 const onEmpPickerConfirm = (emps: { empNo: string; empName?: string; deptName?: string }[]) => {
@@ -2079,7 +2096,7 @@ onMounted(() => {
 
   &__fields {
     display: grid;
-    grid-template-columns: 1fr 1fr auto;
+    grid-template-columns: minmax(0, 1.2fr) 1fr auto;
     gap: 8px;
     align-items: end;
 
@@ -2093,6 +2110,25 @@ onMounted(() => {
 
     :deep(.el-input-number) {
       width: 100%;
+    }
+  }
+
+  &__ratio-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+
+    b {
+      min-width: 36px;
+      text-align: right;
+      font-size: 12px;
+      color: var(--nd-green);
+      font-variant-numeric: tabular-nums;
+    }
+
+    :deep(.el-slider) {
+      margin: 0 4px;
     }
   }
 

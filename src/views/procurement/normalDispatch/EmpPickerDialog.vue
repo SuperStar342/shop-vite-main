@@ -118,7 +118,9 @@
           <strong>已选 {{ empDraft.length }} 人</strong>
           <el-button link type="primary" :disabled="!empDraft.length" @click="clearEmpDraft">清空</el-button>
         </header>
-        <p v-if="oneClickable" class="emp-picker__tray-tip">一键派工：将已选人员应用到全部已选工序（各工序平均分配）</p>
+        <p v-if="oneClickable" class="emp-picker__tray-tip">
+          一键派工：将已选人员应用到全部工序并平均预填，可在下方调整各工人比例与数量后点确定
+        </p>
         <el-scrollbar class="emp-picker__tray-scroll">
           <article v-for="row in empDraft" :key="row.empNo" class="emp-tray-card">
             <span class="emp-avatar">{{ empInitial(row.empName || row.empNo) }}</span>
@@ -174,18 +176,20 @@
             <div v-else class="emp-alloc-wo__rows">
               <div v-for="w in lineAlloc[line.key] || []" :key="w.empNo" class="emp-alloc-wo__row">
                 <span class="emp-alloc-wo__who">{{ w.empName || w.empNo }}</span>
-                <label>
+                <label class="emp-alloc-wo__ratio">
                   比例%
-                  <el-input-number
-                    v-model="w.ratio"
-                    controls-position="right"
-                    :max="100"
-                    :min="0"
-                    :precision="0"
-                    :step="1"
-                    size="small"
-                    @change="onLineRatio(line.key)"
-                  />
+                  <div class="emp-alloc-wo__ratio-row">
+                    <el-slider
+                      v-model="w.ratio"
+                      :max="100"
+                      :min="0"
+                      :show-tooltip="true"
+                      size="small"
+                      @change="onLineRatio(line.key)"
+                      @input="onLineRatio(line.key)"
+                    />
+                    <b>{{ Math.round(num(w.ratio)) }}%</b>
+                  </div>
                 </label>
                 <label>
                   数量
@@ -597,6 +601,11 @@ const oneClickApply = () => {
     $baseMessage('请先勾选人员', 'warning', 'hey')
     return
   }
+  if (isAllocMode.value) {
+    fillAllLinesEqual()
+    $baseMessage('已按平均分配预填，请核对后确定', 'success', 'hey')
+    return
+  }
   emit(
     'oneClick',
     empDraft.value.map((r) => ({
@@ -663,6 +672,19 @@ watch(
   () => {
     empPageNo.value = 1
     syncEmpTableSelection()
+  }
+)
+
+/** 一键派工：弹窗已打开时由父级注入 allocLines，进入分配区并平均预填 */
+watch(
+  () => [props.modelValue, props.allocLines?.length ?? 0] as const,
+  ([open, len], old) => {
+    if (!open || !len) return
+    const wasOpen = old?.[0] === true
+    const hadAlloc = (old?.[1] ?? 0) > 0
+    if (wasOpen && !hadAlloc) {
+      nextTick(() => syncLineAllocWorkers(true))
+    }
   }
 )
 </script>
@@ -936,7 +958,7 @@ watch(
 
   &__row {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 88px 88px 56px;
+    grid-template-columns: minmax(0, 1fr) minmax(120px, 1.2fr) 88px 56px;
     gap: 6px;
     align-items: end;
     font-size: 11px;
@@ -950,6 +972,25 @@ watch(
 
     :deep(.el-input-number) {
       width: 100%;
+    }
+  }
+
+  &__ratio-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px;
+    align-items: center;
+
+    b {
+      min-width: 32px;
+      text-align: right;
+      font-size: 11px;
+      color: #2e7d5a;
+      font-variant-numeric: tabular-nums;
+    }
+
+    :deep(.el-slider) {
+      margin: 0 2px;
     }
   }
 

@@ -86,11 +86,12 @@
           <el-tree
             :key="treeReloadKey"
             ref="treeRef"
+            check-on-click-node
             :filter-node-method="filterTreeNode"
             lazy
             :load="loadTreeNode"
             node-key="id"
-            :props="{ label: 'label', children: 'children', isLeaf: 'isLeaf' }"
+            :props="{ label: 'label', children: 'children', isLeaf: 'isLeaf', disabled: 'disabled' }"
             show-checkbox
             @check="onTreeCheck"
           >
@@ -120,7 +121,7 @@
       <section class="qd-panel qd-panel--people">
         <header class="qd-panel__head">
           <strong>2. 分配人员与比例</strong>
-          <el-button :disabled="!selectedLeaves.length" :icon="Plus" size="small" type="primary" @click="openEmpDialog">
+          <el-button :icon="Plus" size="small" type="primary" @click="openEmpDialog">
             选择人员
           </el-button>
         </header>
@@ -236,13 +237,18 @@
             <p v-if="card.woText" class="preview-card__wo">{{ card.woText }}</p>
             <p v-if="card.wageBrief" class="preview-card__wage">
               {{ card.wageBrief }}
-              <template v-if="num(card.estWage) > 0"> · 预估工费 {{ fmtNum(card.estWage) }}</template>
+              <template v-if="num(card.estWage) > 0"> · 工序合计工费 {{ fmtNum(card.estWage) }}</template>
             </p>
+            <div v-if="card.workers.length" class="preview-card__cols">
+              <span>人员</span>
+              <span>比例·数量</span>
+              <span>工费</span>
+            </div>
             <ul>
               <li v-for="w in card.workers" :key="w.empNo">
-                <span>{{ w.empName || w.empNo }}</span>
-                <em>{{ w.ratio }}%</em>
-                <b>{{ fmtNum(w.planQty) }}</b>
+                <span class="preview-card__who">{{ w.empName || w.empNo }}</span>
+                <em>{{ Math.round(num(w.ratio)) }}% · {{ fmtNum(w.planQty) }}</em>
+                <b class="preview-card__worker-wage">{{ fmtNum(w.estWage) }}</b>
               </li>
               <li v-if="!card.workers.length" class="is-empty">尚未分配人员</li>
             </ul>
@@ -532,6 +538,27 @@ const mapLineToNode = (line: any) => ({
   line,
 })
 
+const ensureWoLines = async (woNo: string, moNo?: string) => {
+  let lines = linesByWo.value[woNo]
+  if (lines) return lines
+  lines = await getQuickDispatchProcesses({
+    woNo,
+    moNo: moNo || queryForm.moNo || undefined,
+  })
+  linesByWo.value = { ...linesByWo.value, [woNo]: lines || [] }
+  return linesByWo.value[woNo] || []
+}
+
+const restoreTreeChecks = (nodes?: any[]) => {
+  const tree = treeRef.value
+  if (!tree || !checkedLeafIds.value.length) return
+  const ids = new Set(checkedLeafIds.value)
+  const list = nodes?.length ? nodes : checkedLeafIds.value.map((id) => tree.getNode(id)?.data).filter(Boolean)
+  list.forEach((n: any) => {
+    if (n?.id && ids.has(n.id)) tree.setChecked(n.id, true, false)
+  })
+}
+
 const loadTreeNode = async (node: any, resolve: (data: any[]) => void) => {
   if (node.level === 0) {
     resolve(filteredWorkOrders.value.map(mapWoToNode))
@@ -557,15 +584,15 @@ const loadTreeNode = async (node: any, resolve: (data: any[]) => void) => {
       linesByWo.value = { ...linesByWo.value, [woNo]: lines || [] }
     }
     const prc = queryForm.prcName.trim().toLowerCase()
-    resolve(
-      (lines || [])
-        .filter((line: any) => {
-          if (num(line.remainQty) <= 0) return false
-          if (!prc) return true
-          return `${line.prcName || ''}${line.prcCode || ''}${line.mrName || ''}`.toLowerCase().includes(prc)
-        })
-        .map(mapLineToNode)
-    )
+    const nodes = (lines || [])
+      .filter((line: any) => {
+        if (num(line.remainQty) <= 0) return false
+        if (!prc) return true
+        return `${line.prcName || ''}${line.prcCode || ''}${line.mrName || ''}`.toLowerCase().includes(prc)
+      })
+      .map(mapLineToNode)
+    resolve(nodes)
+    nextTick(() => restoreTreeChecks(nodes))
   } catch (e: any) {
     $baseMessage(e?.message || '加载工序失败', 'error', 'hey')
     resolve([])
@@ -581,7 +608,15 @@ const selectedLeaves = computed(() => {
       map.set(node.id, node)
     }
   }
-  return checkedLeafIds.value.map((id) => map.get(id)).filter(Boolean)
+  const tree = treeRef.value
+  return checkedLeafIds.value
+    .map((id) => {
+      const hit = map.get(id)
+      if (hit) return hit
+      const node = tree?.getNode?.(id)
+      return node?.data?.nodeType === 'prc' ? node.data : null
+    })
+    .filter(Boolean)
 })
 
 const selectedLines = computed(() => selectedLeaves.value.map((n) => n.line))
@@ -696,6 +731,17 @@ const cardWageMeta = (leaves: any[]) => {
   }
 }
 
+/** 预览卡片：按各工序行汇总每位工人的工费 */
+const enrichPreviewWorkers = (leaves: any[], workers: any[]) =>
+  workers.map((w) => {
+    let estWage = 0
+    for (const leaf of leaves) {
+      const hit = workersForRemain(num(leaf.line.remainQty)).find((x) => x.empNo === w.empNo)
+      if (hit) estWage += estimateBorWage(leaf.line, num(hit.planQty))
+    }
+    return { ...w, estWage }
+  })
+
 const assignedTotalQty = computed(() =>
   selectedLines.value.reduce((s, line) => {
     return s + workersForRemain(num(line.remainQty)).reduce((a, w) => a + num(w.planQty), 0)
@@ -767,7 +813,7 @@ const previewCards = computed(() => {
         name: leaves[0]?.line?.goodsName || '工单',
         qty,
         woText: `${leaves.length} 道工序`,
-        workers: [...workerMap.values()],
+        workers: enrichPreviewWorkers(leaves, [...workerMap.values()]),
         ...cardWageMeta(leaves),
       }
     })
@@ -800,7 +846,7 @@ const previewCards = computed(() => {
         name: sample.prcName || sample.prcCode,
         qty,
         woText: `关联工单 ${woNos.join('、')}`,
-        workers: [...workerMap.values()],
+        workers: enrichPreviewWorkers(leaves, [...workerMap.values()]),
         ...cardWageMeta(leaves),
       }
     })
@@ -816,7 +862,7 @@ const previewCards = computed(() => {
       name: leaf.line.prcName || leaf.line.prcCode,
       qty,
       woText: `工单 ${leaf.line.woNo}`,
-      workers,
+      workers: enrichPreviewWorkers([leaf], workers),
       ...cardWageMeta([leaf]),
     }
   })
@@ -899,10 +945,41 @@ const onTreeKeywordClear = () => {
   treeRef.value?.filter('')
 }
 
-const onTreeCheck = (_data: any, ctx: any) => {
-  const keys: string[] = ctx?.checkedKeys || []
-  checkedLeafIds.value = keys.filter((k) => !String(k).startsWith('wo:'))
+const onTreeCheck = async (data: any, ctx: any) => {
+  try {
+    await syncTreeSelection(data, ctx)
+  } catch (e: any) {
+    $baseMessage(e?.message || '同步工序选择失败', 'error', 'hey')
+  }
   applyAlloc()
+}
+
+/** 懒加载树：勾选工单父节点时主动拉取工序并写入 checkedLeafIds */
+const syncTreeSelection = async (data?: any, ctx?: any) => {
+  const tree = treeRef.value
+  const checkedKeys = new Set<string>((ctx?.checkedKeys || tree?.getCheckedKeys(false) || []).map(String))
+  const isChecked = data?.id != null && checkedKeys.has(String(data.id))
+
+  if (data?.nodeType === 'wo') {
+    const woNo = data.wo?.woNo || String(data.id || '').replace(/^wo:/, '')
+    if (!woNo) return
+    const lines = await ensureWoLines(woNo, data.wo?.moNo)
+    const childIds = lines.map((line: any) => lineKey(line))
+    const next = new Set(checkedLeafIds.value)
+    if (isChecked) childIds.forEach((id) => next.add(id))
+    else childIds.forEach((id) => next.delete(id))
+    checkedLeafIds.value = [...next]
+    await nextTick()
+    childIds.forEach((id) => {
+      if (tree?.getNode(id)) tree.setChecked(id, isChecked, false)
+    })
+    return
+  }
+
+  await nextTick()
+  checkedLeafIds.value = ((tree?.getCheckedKeys(true) as string[]) || []).filter(
+    (k) => !String(k).startsWith('wo:')
+  )
 }
 
 const clearTreeSelection = () => {
@@ -1168,13 +1245,16 @@ const syncEmpTableSelection = async () => {
   const table = empTableRef.value
   if (!table) return
   empSelecting.value = true
-  table.clearSelection()
-  const keep = new Set(empDraft.value.map((r) => r.empNo))
-  pagedEmployees.value.forEach((row) => {
-    if (keep.has(row.empNo)) table.toggleRowSelection(row, true)
-  })
-  await nextTick()
-  empSelecting.value = false
+  try {
+    table.clearSelection()
+    const keep = new Set(empDraft.value.map((r) => r.empNo))
+    pagedEmployees.value.forEach((row) => {
+      if (keep.has(row.empNo)) table.toggleRowSelection(row, true)
+    })
+    await nextTick()
+  } finally {
+    empSelecting.value = false
+  }
 }
 
 const onEmpDraftChange = (rows: any[]) => {
@@ -1611,6 +1691,16 @@ onMounted(() => {
   min-height: 36px;
   padding: 4px 0;
   align-items: flex-start;
+
+  > .el-checkbox {
+    flex-shrink: 0;
+    margin-right: 4px;
+  }
+
+  > .el-tree-node__label {
+    flex: 1;
+    min-width: 0;
+  }
 }
 
 .qd-active-task {
@@ -1834,30 +1924,54 @@ onMounted(() => {
 
   li {
     display: grid;
-    grid-template-columns: 1fr auto auto;
+    grid-template-columns: minmax(0, 1fr) auto auto;
     gap: 8px;
     padding: 4px 6px;
     border-radius: 4px;
     background: #f4f8f5;
     font-size: 12px;
     color: #5f6f66;
+    align-items: center;
+
+    &.is-empty {
+      grid-template-columns: 1fr;
+    }
 
     em {
       font-style: normal;
       color: #8a9b90;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
     }
 
-    b {
+    b,
+    .preview-card__worker-wage {
       color: var(--qd-green);
       font-variant-numeric: tabular-nums;
+      white-space: nowrap;
     }
+  }
 
-    &.is-empty {
-      justify-content: center;
-      grid-template-columns: 1fr;
-      color: #9aaba0;
-      background: transparent;
-    }
+  &__who {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__cols {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 8px;
+    padding: 0 6px 4px;
+    font-size: 10px;
+    color: #9aaba0;
+  }
+
+  li.is-empty {
+    justify-content: center;
+    grid-template-columns: 1fr;
+    color: #9aaba0;
+    background: transparent;
   }
 }
 
