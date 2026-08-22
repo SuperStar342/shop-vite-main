@@ -49,10 +49,13 @@
                 <el-tag v-if="selectedWoSet.has(wo.woNo)" effect="plain" size="small" type="success">已选</el-tag>
               </div>
               <p>{{ wo.goodsName || '-' }}</p>
-              <div class="nd-wo-card__meta">
-                <span>{{ wo.dispatchStatus || '未派工' }}</span>
-                <em>{{ fmtNum(wo.remainQty) }} / {{ fmtNum(wo.planQty || wo.woQty) }}</em>
-              </div>
+              <DispatchQtyCell
+                align="left"
+                :plan-qty="wo.planQty || wo.woQty"
+                :remain-qty="wo.remainQty"
+                :status="wo.dispatchStatus"
+                :wt-qty="wo.wtQty"
+              />
             </div>
           </label>
           <el-empty v-if="!filteredWorkOrders.length && !loading" description="暂无可派工单" />
@@ -98,13 +101,19 @@
                 <template #default="{ row }">{{ fmtNum(row.machiningUp) }}</template>
               </el-table-column>
               <el-table-column label="加工工时" width="100" align="right">
-                <template #default="{ row }">{{ fmtTime(row.machiningTime, row.timeUnit) }}</template>
+                <template #default="{ row }">{{ fmtMachiningTime(row.machiningTime, row.timeUnit) }}</template>
               </el-table-column>
               <el-table-column label="加工次数" width="80" align="right">
                 <template #default="{ row }">{{ fmtNum(row.machiningTimes) }}</template>
               </el-table-column>
-              <el-table-column label="未派工/计划" width="130" align="right">
-                <template #default="{ row }">{{ fmtNum(row.remainQty) }} / {{ fmtNum(row.woQty) }}</template>
+              <el-table-column label="派工状态/数量" width="148" align="right">
+                <template #default="{ row }">
+                  <DispatchQtyCell
+                    :plan-qty="row.woQty"
+                    :remain-qty="row.remainQty"
+                    :wt-qty="row.wtQty"
+                  />
+                </template>
               </el-table-column>
             </el-table>
           </template>
@@ -125,11 +134,17 @@
                       >
                         {{ line.woNo }}
                       </el-checkbox>
+                      <DispatchQtyCell
+                        align="left"
+                        size="sm"
+                        :plan-qty="line.woQty"
+                        :remain-qty="line.remainQty"
+                        :wt-qty="line.wtQty"
+                      />
                       <span class="nd-expand__meta">
-                        未派 {{ fmtNum(line.remainQty) }}/{{ fmtNum(line.woQty) }}
-                        · {{ wageTypeLabel(line.pWageType) }}
+                        {{ wageTypeLabel(line.pWageType) }}
                         · 单价 {{ fmtNum(line.machiningUp) }}
-                        · 工时 {{ fmtTime(line.machiningTime, line.timeUnit) }}
+                        · 工时 {{ fmtMachiningTime(line.machiningTime, line.timeUnit) }}
                         · 次数 {{ fmtNum(line.machiningTimes) }}
                       </span>
                     </div>
@@ -174,11 +189,20 @@
               <el-table-column label="包含工单数" width="100" align="center">
                 <template #default="{ row }">{{ row.lines.length }}</template>
               </el-table-column>
-              <el-table-column label="未派工/计划" width="140" align="right">
-                <template #default="{ row }">{{ fmtNum(row.remainSum) }} / {{ fmtNum(row.planSum) }}</template>
+              <el-table-column label="派工状态/数量" width="148" align="right">
+                <template #default="{ row }">
+                  <DispatchQtyCell
+                    :plan-qty="row.planSum"
+                    :remain-qty="row.remainSum"
+                    :status="groupDispatchStatus(row.lines)"
+                  />
+                </template>
               </el-table-column>
             </el-table>
             <div class="nd-legend">
+              <span><i class="is-none" />未派工</span>
+              <span><i class="is-partial" />部分派工</span>
+              <span><i class="is-done" />已派工</span>
               <span><i class="is-all" />所有已选工单都包含此工序</span>
               <span><i class="is-part" />部分工单包含此工序</span>
             </div>
@@ -197,13 +221,19 @@
                 <template #default="{ row }">{{ fmtNum(row.machiningUp) }}</template>
               </el-table-column>
               <el-table-column label="加工工时" width="100" align="right">
-                <template #default="{ row }">{{ fmtTime(row.machiningTime, row.timeUnit) }}</template>
+                <template #default="{ row }">{{ fmtMachiningTime(row.machiningTime, row.timeUnit) }}</template>
               </el-table-column>
-              <el-table-column label="未派工" width="90" align="right">
-                <template #default="{ row }">{{ fmtNum(row.remainQty) }}</template>
+              <el-table-column label="派工状态/数量" width="148" align="right">
+                <template #default="{ row }">
+                  <DispatchQtyCell
+                    :plan-qty="row.woQty"
+                    :remain-qty="row.remainQty"
+                    :wt-qty="row.wtQty"
+                  />
+                </template>
               </el-table-column>
               <el-table-column label="预估工费" width="100" align="right">
-                <template #default="{ row }">{{ fmtNum(num(row.machiningUp) * num(row.remainQty)) }}</template>
+                <template #default="{ row }">{{ fmtNum(estimateBorWage(row)) }}</template>
               </el-table-column>
               <el-table-column label="操作" width="80">
                 <template #default="{ row }">
@@ -276,17 +306,33 @@
           </div>
         </header>
 
-        <el-table :data="assignTableRows" border height="100%" row-key="rowKey" :span-method="assignSpanMethod">
+        <el-table :data="assignTableData" border height="100%" row-key="rowKey" :span-method="assignSpanMethod">
           <el-table-column label="工单 / 工序" min-width="180">
             <template #default="{ row }">
               <template v-if="row.kind === 'wo-head'">
-                <b class="nd-wo-head">{{ row.woNo }}</b>
-                <em>{{ fmtNum(row.assignedQty) }} / {{ fmtNum(row.remainQty) }}</em>
+                <div class="nd-wo-head-row">
+                  <b class="nd-wo-head">{{ row.woNo }}</b>
+                  <DispatchQtyCell
+                    align="left"
+                    mode="alloc"
+                    size="sm"
+                    :assigned-qty="row.assignedQty"
+                    :remain-qty="row.remainQty"
+                  />
+                </div>
+              </template>
+              <template v-else-if="row.kind === 'process-head'">
+                <div class="nd-prc-cell">
+                  <span>{{ row.prcCode }} {{ row.prcName }}</span>
+                  <small>{{ row.woCount }} 张工单 · {{ row.mrName || '' }}</small>
+                </div>
               </template>
               <template v-else>
                 <div class="nd-prc-cell">
-                  <span>{{ row.prcCode }} {{ row.prcName }}</span>
-                  <small v-if="row.woText">{{ row.woText }}</small>
+                  <span v-if="row.kind === 'line-sub'">{{ row.woText }}</span>
+                  <span v-else>{{ row.prcCode }} {{ row.prcName }}</span>
+                  <small v-if="row.woText && row.kind !== 'line-sub'">{{ row.woText }}</small>
+                  <small v-else-if="row.kind === 'line-sub'">{{ row.prcCode }} {{ row.prcName }}</small>
                 </div>
               </template>
             </template>
@@ -312,14 +358,31 @@
               <template v-if="row.kind !== 'wo-head'">{{ row.timeText }}</template>
             </template>
           </el-table-column>
-          <el-table-column label="未派数量" width="90" align="right">
+          <el-table-column label="派工状态/数量" width="148" align="right">
             <template #default="{ row }">
-              <template v-if="row.kind !== 'wo-head'">{{ fmtNum(row.remainQty) }}</template>
+              <DispatchQtyCell
+                v-if="row.kind !== 'wo-head'"
+                :plan-qty="row.planQty"
+                :remain-qty="row.remainQty"
+                :wt-qty="row.wtQty"
+              />
             </template>
           </el-table-column>
           <el-table-column label="精细化指派（人员 / 比例 / 数量）" min-width="380">
             <template #default="{ row }">
-              <div v-if="row.kind !== 'wo-head'" class="nd-fine">
+              <div v-if="row.kind === 'process-head'" class="nd-fine nd-fine--head">
+                <el-button :icon="Plus" size="small" type="primary" @click="openEmpForProcess(row.processKey)">
+                  配置人员与数量
+                </el-button>
+                <span class="nd-muted">多工单同工序：在弹窗中按工单分别填数量，工费按各工单单价计算</span>
+              </div>
+              <div v-else-if="row.kind === 'line-sub'" class="nd-line-sub">
+                <span v-for="w in row.workers" :key="w.empNo" class="nd-chip nd-chip--sm">
+                  {{ w.empName || w.empNo }} {{ fmtNum(w.planQty) }}
+                </span>
+                <span v-if="!row.workers.length" class="nd-muted">未分配</span>
+              </div>
+              <div v-else-if="row.kind !== 'wo-head'" class="nd-fine">
                 <article v-for="w in row.workers" :key="w.empNo" class="nd-fine__card">
                   <div class="nd-fine__who">
                     <em>{{ (w.empName || '?').slice(0, 1) }}</em>
@@ -375,12 +438,15 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="已分/未派" width="120" align="right">
+          <el-table-column label="本次分配/未派" width="148" align="right">
             <template #default="{ row }">
-              <template v-if="row.kind !== 'wo-head'">
-                <b :class="{ 'is-ok': num(row.assignedQty) > 0, 'is-bad': row.overAssign }">{{ fmtNum(row.assignedQty) }}</b>
-                / {{ fmtNum(row.remainQty) }}
-              </template>
+              <div v-if="row.kind !== 'wo-head'" :class="{ 'is-bad': row.overAssign }">
+                <DispatchQtyCell
+                  mode="alloc"
+                  :assigned-qty="row.assignedQty"
+                  :remain-qty="row.remainQty"
+                />
+              </div>
             </template>
           </el-table-column>
           <el-table-column label="预估工费" width="100" align="right">
@@ -454,9 +520,12 @@
 
     <EmpPickerDialog
       v-model="empDialog"
+      :alloc-lines="editingAllocLines"
+      :line-workers="editingLineWorkers"
       :preferred-dept-id="preferredDeptId"
       :selected="empDialogSelected"
-      @confirm="onEmpConfirm"
+      @confirm="onEmpPickerConfirm"
+      @confirm-alloc="onEmpPickerConfirmAlloc"
     />
 
     <el-dialog v-model="smartDialog" title="智能派工" width="520px" append-to-body destroy-on-close>
@@ -498,8 +567,25 @@ import {
   getQuickDispatchSmartSuggest,
   submitQuickDispatch,
 } from '/@/api/procurement/quickDispatch'
-import { fmtNum, num, splitWorkersByWage, type AllocWorker } from '/@/utils/dispatchAlloc'
-import EmpPickerDialog from './EmpPickerDialog.vue'
+import {
+  applyEqualWorkers,
+  fmtNum,
+  num,
+  redistributeWorkersByRatio,
+  resolveDispatchStatus,
+  splitWorkersByWage,
+  syncWorkersRatioFromQty,
+  type AllocWorker,
+} from '/@/utils/dispatchAlloc'
+import {
+  borLineKey,
+  estimateBorWage,
+  fmtMachiningTime,
+  summarizeBorWageFields,
+  wageTypeLabel,
+} from '/@/utils/dispatchBor'
+import DispatchQtyCell from './DispatchQtyCell.vue'
+import EmpPickerDialog, { type EmpAllocLine } from './EmpPickerDialog.vue'
 
 defineOptions({ name: 'NormalDispatch' })
 
@@ -541,54 +627,17 @@ const checkedLeafIds = ref<string[]>([])
 const assignMap = ref<Record<string, AllocWorker[]>>({})
 const empDialog = ref(false)
 const editingTaskKey = ref('')
+const editingAllocLines = ref<EmpAllocLine[]>([])
 const currentTableRef = ref<any>(null)
 const syncingCurrentTable = ref(false)
 
-const lineKey = (row: any) =>
-  `${row.woNo}|${row.mrCode || ''}|${row.prcCode || ''}|${row.goodsId || ''}|${row.woBorSno || ''}`
+const lineKey = borLineKey
 
 const processKey = (row: any) => `${row.mrCode || ''}|${row.prcCode || ''}`
 
 const taskKeyOf = (line: any) => (mergeSameProcess.value ? processKey(line) : lineKey(line))
 
-/** SF 常见：1 计时 / 2 计件 */
-const wageTypeLabel = (v: any) => {
-  const t = String(v ?? '').trim()
-  if (t === '1') return '计时'
-  if (t === '2') return '计件'
-  return t || '-'
-}
-
-const fmtTime = (time: any, unit?: any) => {
-  const t = num(time)
-  if (t <= 0) return '-'
-  const u = String(unit || '').trim()
-  return u ? `${fmtNum(t)}${u}` : fmtNum(t)
-}
-
-const uniqueTexts = (values: string[]) => [...new Set(values.filter(Boolean))]
-
-const summarizeWageFields = (lines: any[]) => {
-  const ups = uniqueTexts(lines.map((l) => fmtNum(l.machiningUp)))
-  const types = uniqueTexts(lines.map((l) => wageTypeLabel(l.pWageType)))
-  const times = uniqueTexts(lines.map((l) => fmtTime(l.machiningTime, l.timeUnit)))
-  const upMixed = ups.length > 1
-  return {
-    wageTypeText: types.length <= 1 ? types[0] || '-' : types.join('/'),
-    upText: upMixed ? `${ups[0]}~${ups[ups.length - 1]}` : ups[0] || '0',
-    upMixed,
-    timeText: times.length <= 1 ? times[0] || '-' : '多项',
-    /** 按各工单行各自单价×数量汇总，避免合并均价失真 */
-    estWageByQty: (qtyByLineKey: Map<string, number> | null, fallbackQty: number) => {
-      if (qtyByLineKey) {
-        return lines.reduce((s, l) => s + num(l.machiningUp) * num(qtyByLineKey.get(lineKey(l)) || 0), 0)
-      }
-      // 未分配时按未派量估算
-      if (lines.length === 1) return num(lines[0].machiningUp) * fallbackQty
-      return lines.reduce((s, l) => s + num(l.machiningUp) * num(l.remainQty), 0)
-    },
-  }
-}
+const summarizeWageFields = summarizeBorWageFields
 
 const selectedWoNos = computed(() => [...selectedWoSet.value])
 
@@ -693,6 +742,7 @@ const assignRows = computed(() => {
         woText: `关联 ${[...new Set(lines.map((l) => l.woNo))].join('、')}`,
         remainQty,
         planQty,
+        wtQty: lines.reduce((s, l) => s + num(l.wtQty), 0),
         assignedQty,
         overAssign: assignedQty - remainQty > 0.000001,
         workers,
@@ -720,12 +770,13 @@ const assignRows = computed(() => {
       woText: line.woNo,
       remainQty,
       planQty: num(line.woQty),
+      wtQty: num(line.wtQty),
       assignedQty,
       overAssign: assignedQty - remainQty > 0.000001,
       workers,
       lines: [line],
       ...wage,
-      estWage: num(line.machiningUp) * qty,
+      estWage: estimateBorWage(line, qty),
     }
   })
 })
@@ -774,12 +825,13 @@ const assignTableRows = computed(() => {
         mrName: line.mrName,
         remainQty: num(line.remainQty),
         planQty: num(line.woQty),
+        wtQty: num(line.wtQty),
         assignedQty,
         overAssign: assignedQty - num(line.remainQty) > 0.000001,
         workers,
         lines: [line],
         ...wage,
-        estWage: num(line.machiningUp) * qty,
+        estWage: estimateBorWage(line, qty),
       }
     })
     rows.push({
@@ -794,8 +846,61 @@ const assignTableRows = computed(() => {
   return rows
 })
 
+/** 不合并 + 按工序查看：同工多工单折叠为工序头 + 工单子行 */
+const assignDisplayRows = computed(() => {
+  const rows = assignRows.value
+  const byProcess = new Map<string, any[]>()
+  for (const row of rows) {
+    const pk = processKey(row.lines[0])
+    const list = byProcess.get(pk) || []
+    list.push(row)
+    byProcess.set(pk, list)
+  }
+  const out: any[] = []
+  const entries = [...byProcess.entries()].sort((a, b) =>
+    String(a[1][0]?.prcCode || '').localeCompare(String(b[1][0]?.prcCode || ''))
+  )
+  for (const [pk, groupRows] of entries) {
+    if (groupRows.length > 1) {
+      const sample = groupRows[0]
+      const wage = summarizeWageFields(groupRows.flatMap((r) => r.lines))
+      out.push({
+        kind: 'process-head',
+        rowKey: `proc:${pk}`,
+        processKey: pk,
+        prcCode: sample.prcCode,
+        prcName: sample.prcName,
+        mrName: sample.mrName,
+        woCount: groupRows.length,
+        remainQty: groupRows.reduce((s, r) => s + num(r.remainQty), 0),
+        assignedQty: groupRows.reduce((s, r) => s + num(r.assignedQty), 0),
+        estWage: groupRows.reduce((s, r) => s + num(r.estWage), 0),
+        ...wage,
+      })
+      for (const row of groupRows) {
+        out.push({
+          ...row,
+          kind: 'line-sub',
+          rowKey: `sub:${row.rowKey}`,
+          editable: false,
+          woText: row.lines[0]?.woNo || row.woText,
+        })
+      }
+    } else {
+      out.push({ ...groupRows[0], kind: 'task', editable: true })
+    }
+  }
+  return out
+})
+
+const assignTableData = computed(() => {
+  if (mergeSameProcess.value) return assignTableRows.value
+  if (assignView.value === 'wo') return assignTableRows.value
+  return assignDisplayRows.value
+})
+
 const assignSpanMethod = ({ row, columnIndex }: any) => {
-  if (row.kind === 'wo-head') {
+  if (row.kind === 'wo-head' || row.kind === 'process-head') {
     if (columnIndex === 0) return [1, 9]
     return [0, 0]
   }
@@ -824,7 +929,7 @@ const estimatedWageTotal = computed(() => {
   for (const line of selectedLines.value) {
     const workers = lineSplitMap.value.get(lineKey(line)) || []
     const qty = workers.reduce((s, w) => s + num(w.planQty), 0)
-    total += num(line.machiningUp) * (qty > 0 ? qty : num(line.remainQty))
+    total += estimateBorWage(line, qty > 0 ? qty : undefined)
   }
   return total
 })
@@ -840,10 +945,10 @@ const confirmItems = computed(() =>
         prcName: line.prcName,
         wageTypeText: wageTypeLabel(line.pWageType),
         machiningUp: num(line.machiningUp),
-        timeText: fmtTime(line.machiningTime, line.timeUnit),
+        timeText: fmtMachiningTime(line.machiningTime, line.timeUnit),
         workers,
         qty,
-        estWage: num(line.machiningUp) * qty,
+        estWage: estimateBorWage(line, qty),
       }
     })
     .filter((r) => r.workers.length)
@@ -856,9 +961,49 @@ const canGoConfirm = computed(
 const canSubmit = computed(() => confirmItems.value.length > 0 && !hasOverAssign.value)
 
 const empDialogSelected = computed(() => {
+  if (editingAllocLines.value.length > 1) {
+    const union = new Map<string, { empNo: string; empName?: string; deptName?: string }>()
+    for (const line of editingAllocLines.value) {
+      for (const w of assignMap.value[line.key] || []) {
+        if (!union.has(w.empNo)) {
+          union.set(w.empNo, { empNo: w.empNo, empName: w.empName, deptName: w.deptName })
+        }
+      }
+    }
+    return [...union.values()]
+  }
   const list = assignMap.value[editingTaskKey.value] || []
   return list.map((w) => ({ empNo: w.empNo, empName: w.empName, deptName: w.deptName }))
 })
+
+const editingLineWorkers = computed(() => {
+  if (editingAllocLines.value.length <= 1) return undefined
+  const map: Record<string, AllocWorker[]> = {}
+  for (const line of editingAllocLines.value) {
+    map[line.key] = (assignMap.value[line.key] || []).map((w) => ({
+      empNo: w.empNo,
+      empName: w.empName,
+      deptName: w.deptName,
+      ratio: num(w.ratio),
+      planQty: num(w.planQty),
+    }))
+  }
+  return map
+})
+
+const buildEditingAllocLines = (line: any): EmpAllocLine[] => {
+  const pk = processKey(line)
+  const group = selectedLines.value.filter((l) => processKey(l) === pk)
+  return group.map((l) => ({
+    key: lineKey(l),
+    woNo: l.woNo,
+    remainQty: num(l.remainQty),
+    planQty: num(l.woQty),
+    machiningUp: num(l.machiningUp),
+    prcCode: l.prcCode,
+    prcName: l.prcName,
+  }))
+}
 
 const goStep = (idx: number) => {
   if (idx === 0) wizardStep.value = 0
@@ -949,6 +1094,22 @@ const clearSelection = () => {
 
 const openEmpFor = (taskKey: string) => {
   editingTaskKey.value = taskKey
+  const line = selectedLines.value.find((l) => lineKey(l) === taskKey)
+  if (line && !mergeSameProcess.value) {
+    editingAllocLines.value = buildEditingAllocLines(line)
+  } else if (line) {
+    editingAllocLines.value = buildEditingAllocLines(line).slice(0, 1)
+  } else {
+    editingAllocLines.value = []
+  }
+  empDialog.value = true
+}
+
+const openEmpForProcess = (pk: string) => {
+  const line = selectedLines.value.find((l) => processKey(l) === pk)
+  if (!line) return
+  editingTaskKey.value = lineKey(line)
+  editingAllocLines.value = buildEditingAllocLines(line)
   empDialog.value = true
 }
 
@@ -966,34 +1127,7 @@ const redistributeTaskByRatio = (taskKey: string) => {
   const list = assignMap.value[taskKey] || []
   const cap = taskCap(taskKey)
   if (!list.length || cap <= 0) return
-  const preferInteger = Math.abs(cap - Math.round(cap)) < 0.000001
-  if (preferInteger) {
-    const intCap = Math.round(cap)
-    const parts = list.map((w) => {
-      const exact = (intCap * num(w.ratio)) / 100
-      const floor = Math.floor(exact)
-      return { w, floor, frac: exact - floor }
-    })
-    const ratioTotal = list.reduce((s, w) => s + num(w.ratio), 0)
-    const targetSum = Math.min(intCap, Math.round((intCap * ratioTotal) / 100))
-    let remain = targetSum - parts.reduce((s, p) => s + p.floor, 0)
-    parts
-      .slice()
-      .sort((a, b) => b.frac - a.frac)
-      .forEach((p) => {
-        if (remain > 0) {
-          p.floor += 1
-          remain -= 1
-        }
-      })
-    parts.forEach((p) => {
-      p.w.planQty = p.floor
-    })
-  } else {
-    list.forEach((w) => {
-      w.planQty = Number(((cap * num(w.ratio)) / 100).toFixed(2))
-    })
-  }
+  redistributeWorkersByRatio(list, cap)
   touchTask(taskKey)
 }
 
@@ -1001,40 +1135,16 @@ const syncTaskRatioFromQty = (taskKey: string) => {
   const list = assignMap.value[taskKey] || []
   const cap = taskCap(taskKey)
   if (!list.length) return
-  if (list.length === 1 && cap > 0) {
-    list[0].ratio = Math.min(100, Math.max(0, Math.round((num(list[0].planQty) / cap) * 100)))
-    touchTask(taskKey)
-    return
-  }
-  const sum = list.reduce((s, w) => s + num(w.planQty), 0)
-  if (sum <= 0) {
-    list.forEach((w) => {
-      w.ratio = 0
-    })
-    touchTask(taskKey)
-    return
-  }
-  let assigned = 0
-  list.forEach((w, i) => {
-    if (i === list.length - 1) w.ratio = Math.max(0, 100 - assigned)
-    else {
-      const r = Math.round((num(w.planQty) / sum) * 100)
-      w.ratio = r
-      assigned += r
-    }
-  })
+  syncWorkersRatioFromQty(list, cap)
   touchTask(taskKey)
 }
 
 const applyEqualTask = (taskKey: string) => {
   const list = assignMap.value[taskKey] || []
-  const n = list.length
-  if (!n) return
-  const each = Math.floor(100 / n)
-  list.forEach((w, i) => {
-    w.ratio = i === n - 1 ? 100 - each * (n - 1) : each
-  })
-  redistributeTaskByRatio(taskKey)
+  const cap = taskCap(taskKey)
+  if (!list.length) return
+  applyEqualWorkers(list, cap)
+  touchTask(taskKey)
 }
 
 const applyEqualAll = () => {
@@ -1299,7 +1409,17 @@ const removeWorker = (taskKey: string, empNo: string) => {
   if (list.length) applyEqualTask(taskKey)
 }
 
-const onEmpConfirm = (emps: { empNo: string; empName?: string; deptName?: string }[]) => {
+const onEmpPickerConfirmAlloc = (lines: { key: string; workers: AllocWorker[] }[]) => {
+  const next = { ...assignMap.value }
+  for (const { key, workers } of lines) {
+    next[key] = workers
+  }
+  assignMap.value = next
+  editingAllocLines.value = []
+}
+
+const onEmpPickerConfirm = (emps: { empNo: string; empName?: string; deptName?: string }[]) => {
+  editingAllocLines.value = []
   const key = editingTaskKey.value
   if (!key) return
   const prev = new Map((assignMap.value[key] || []).map((w) => [w.empNo, w]))
@@ -1318,7 +1438,6 @@ const onEmpConfirm = (emps: { empNo: string; empName?: string; deptName?: string
     }),
   }
   if (!n) return
-  // 新人默认并入后整体平均，保证比例与数量联动一致
   applyEqualTask(key)
 }
 
@@ -1415,6 +1534,7 @@ const submit = async () => {
 watch(mergeSameProcess, () => {
   assignMap.value = {}
   if (mergeSameProcess.value) assignView.value = 'process'
+  else assignView.value = 'process'
 })
 
 watch(selectedLines, () => {
@@ -1590,17 +1710,6 @@ onMounted(() => {
     color: var(--nd-muted);
   }
 
-  &__meta {
-    display: flex;
-    justify-content: space-between;
-    font-size: 12px;
-    color: #8a9b90;
-
-    em {
-      font-style: normal;
-      color: var(--nd-green);
-    }
-  }
 }
 
 .nd-prc-pane__head {
@@ -1695,11 +1804,17 @@ onMounted(() => {
     border-radius: 50%;
     margin-right: 4px;
 
-    &.is-all {
+    &.is-all,
+    &.is-done {
       background: #2e7d5a;
     }
 
-    &.is-part {
+    &.is-none {
+      background: #94a3b8;
+    }
+
+    &.is-part,
+    &.is-partial {
       background: #ea580c;
     }
   }
@@ -1798,6 +1913,12 @@ onMounted(() => {
   footer .is-bad,
   .is-bad {
     color: #c45656;
+
+    :deep(.nd-dispatch-badge) {
+      color: #c45656;
+      background: #fef2f2;
+      border-color: #fecaca;
+    }
   }
 }
 
@@ -1812,11 +1933,25 @@ onMounted(() => {
   }
 }
 
+.nd-line-sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
 .nd-fine {
   display: flex;
   flex-direction: column;
   gap: 8px;
   padding: 4px 0;
+
+  &--head {
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
 
   &__card {
     border: 1px solid #dce8e0;
@@ -1897,8 +2032,14 @@ onMounted(() => {
   }
 }
 
+.nd-wo-head-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .nd-wo-head {
-  margin-right: 10px;
   color: var(--nd-green);
 }
 

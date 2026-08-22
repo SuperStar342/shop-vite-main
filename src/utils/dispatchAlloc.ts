@@ -164,3 +164,112 @@ export const splitWorkersByWage = <T extends { remainQty?: any; machiningUp?: an
       .filter((w) => num(w.planQty) > 0),
   }))
 }
+
+/** ERP 派工状态：未派工 / 部分派工 / 已派工 */
+export const resolveDispatchStatus = (
+  remainQty: any,
+  planQty: any,
+  wtQty?: any,
+  explicit?: string
+) => {
+  const status = String(explicit || '').trim()
+  if (status) return status
+  const remain = num(remainQty)
+  const plan = num(planQty)
+  const wt = num(wtQty)
+  if (wt <= 0 && remain >= plan) return '未派工'
+  if (remain <= 0 && wt > 0) return '已派工'
+  if (wt > 0 || (plan > 0 && remain < plan)) return '部分派工'
+  return '未派工'
+}
+
+export const dispatchStatusKind = (status: string) => {
+  if (status === '已派工') return 'done'
+  if (status === '部分派工') return 'partial'
+  return 'none'
+}
+
+/** 本次指派进度：未分配 / 部分分配 / 已分满 */
+export const resolveAllocStatus = (assignedQty: any, remainQty: any) => {
+  const assigned = num(assignedQty)
+  const remain = num(remainQty)
+  if (assigned <= 0) return '未分配'
+  if (assigned >= remain) return '已分满'
+  return '部分分配'
+}
+
+export const allocStatusKind = (status: string) => {
+  if (status === '已分满') return 'done'
+  if (status === '部分分配') return 'partial'
+  return 'none'
+}
+
+/** 按比例重算每人数量（cap = 本行未派量） */
+export const redistributeWorkersByRatio = (workers: AllocWorker[], cap: number) => {
+  const list = workers || []
+  if (!list.length || cap <= 0) return
+  const preferInteger = Math.abs(cap - Math.round(cap)) < 0.000001
+  if (preferInteger) {
+    const intCap = Math.round(cap)
+    const parts = list.map((w) => {
+      const exact = (intCap * num(w.ratio)) / 100
+      const floor = Math.floor(exact)
+      return { w, floor, frac: exact - floor }
+    })
+    const ratioTotal = list.reduce((s, w) => s + num(w.ratio), 0)
+    const targetSum = Math.min(intCap, Math.round((intCap * ratioTotal) / 100))
+    let remain = targetSum - parts.reduce((s, p) => s + p.floor, 0)
+    parts
+      .slice()
+      .sort((a, b) => b.frac - a.frac)
+      .forEach((p) => {
+        if (remain > 0) {
+          p.floor += 1
+          remain -= 1
+        }
+      })
+    parts.forEach((p) => {
+      p.w.planQty = p.floor
+    })
+  } else {
+    list.forEach((w) => {
+      w.planQty = Number(((cap * num(w.ratio)) / 100).toFixed(2))
+    })
+  }
+}
+
+export const syncWorkersRatioFromQty = (workers: AllocWorker[], cap: number) => {
+  const list = workers || []
+  if (!list.length) return
+  if (list.length === 1 && cap > 0) {
+    list[0].ratio = Math.min(100, Math.max(0, Math.round((num(list[0].planQty) / cap) * 100)))
+    return
+  }
+  const sum = list.reduce((s, w) => s + num(w.planQty), 0)
+  if (sum <= 0) {
+    list.forEach((w) => {
+      w.ratio = 0
+    })
+    return
+  }
+  let assigned = 0
+  list.forEach((w, i) => {
+    if (i === list.length - 1) w.ratio = Math.max(0, 100 - assigned)
+    else {
+      const r = Math.round((num(w.planQty) / sum) * 100)
+      w.ratio = r
+      assigned += r
+    }
+  })
+}
+
+export const applyEqualWorkers = (workers: AllocWorker[], cap: number) => {
+  const list = workers || []
+  const n = list.length
+  if (!n) return
+  const each = Math.floor(100 / n)
+  list.forEach((w, i) => {
+    w.ratio = i === n - 1 ? 100 - each * (n - 1) : each
+  })
+  redistributeWorkersByRatio(list, cap)
+}

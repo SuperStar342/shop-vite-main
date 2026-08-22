@@ -1,4 +1,5 @@
 import { getEnvelope, unwrap } from '/@/utils/bladeAdapter'
+import { normalizeBorLines } from '/@/utils/dispatchBor'
 import request from '/@/utils/request'
 
 const BASE = '/api/blade-system/quick-dispatch'
@@ -34,7 +35,7 @@ export async function getQuickDispatchProcesses(params: { woNo: string; moNo?: s
     },
   })
   const data = assertOk(res, '加载工序失败')
-  return Array.isArray(data) ? data : []
+  return normalizeBorLines(Array.isArray(data) ? data : [])
 }
 
 export async function getQuickDispatchEmployees(params?: { deptId?: number | string; keyword?: string }) {

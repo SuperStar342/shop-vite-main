@@ -234,6 +234,10 @@
               <b>{{ fmtNum(card.qty) }}</b>
             </header>
             <p v-if="card.woText" class="preview-card__wo">{{ card.woText }}</p>
+            <p v-if="card.wageBrief" class="preview-card__wage">
+              {{ card.wageBrief }}
+              <template v-if="num(card.estWage) > 0"> · 预估工费 {{ fmtNum(card.estWage) }}</template>
+            </p>
             <ul>
               <li v-for="w in card.workers" :key="w.empNo">
                 <span>{{ w.empName || w.empNo }}</span>
@@ -254,6 +258,10 @@
             <div><dt>涉及工序</dt><dd>{{ dispatchSummary.prcCount }}</dd></div>
             <div><dt>参与人员</dt><dd>{{ dispatchSummary.workerCount }}</dd></div>
             <div class="is-total"><dt>派工总量</dt><dd>{{ fmtNum(dispatchSummary.totalQty) }}</dd></div>
+            <div v-if="dispatchSummary.estWageTotal > 0">
+              <dt>预估工费</dt>
+              <dd>{{ fmtNum(dispatchSummary.estWageTotal) }}</dd>
+            </div>
           </dl>
         </aside>
       </section>
@@ -430,6 +438,8 @@ import {
   submitQuickDispatch,
 } from '/@/api/procurement/quickDispatch'
 import { filterDeptsByKeyword, filterEmpsByKeyword, isPinyinLikeKeyword } from '/@/utils/empMatch'
+import { fmtNum, num } from '/@/utils/dispatchAlloc'
+import { borLineKey, borWageBrief, estimateBorWage, summarizeBorWageFields } from '/@/utils/dispatchBor'
 
 defineOptions({ name: 'QuickDispatch' })
 
@@ -480,17 +490,7 @@ const pickedWorkers = ref<any[]>([])
 /** 查询变更时强制重建树，避免 lazy 节点残留 */
 const treeReloadKey = ref(0)
 
-const num = (v: any) => {
-  const n = Number(v)
-  return Number.isFinite(n) ? n : 0
-}
-
-const fmtNum = (v: any) => {
-  const n = num(v)
-  return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/\.?0+$/, '')
-}
-
-const lineKey = (row: any) => `${row.woNo}|${row.mrCode || ''}|${row.prcCode || ''}|${row.goodsId || ''}|${row.woBorSno || ''}`
+const lineKey = borLineKey
 
 const filteredWorkOrders = computed(() => {
   const status = queryForm.dispatchStatus
@@ -524,7 +524,7 @@ const mapLineToNode = (line: any) => ({
   id: lineKey(line),
   nodeType: 'prc',
   label: `${line.prcCode || ''} ${line.prcName || ''}`.trim(),
-  subLabel: line.mrName || '',
+  subLabel: [line.mrName, borWageBrief(line)].filter(Boolean).join(' · '),
   planQty: line.woQty,
   remainQty: line.remainQty,
   disabled: num(line.remainQty) <= 0,
@@ -671,6 +671,31 @@ const workersForRemain = (remain: number) => {
     .filter((w) => num(w.planQty) > 0)
 }
 
+const cardWageMeta = (leaves: any[]) => {
+  const lines = leaves.map((l) => l.line).filter(Boolean)
+  if (!lines.length) return { wageBrief: '', estWage: 0 }
+  const qtyMap = new Map<string, number>()
+  for (const leaf of leaves) {
+    const remain = num(leaf.line.remainQty)
+    const q = workersForRemain(remain).reduce((s, w) => s + num(w.planQty), 0)
+    qtyMap.set(lineKey(leaf.line), q)
+  }
+  if (lines.length === 1) {
+    const line = lines[0]
+    const qty = qtyMap.get(lineKey(line)) || 0
+    return {
+      wageBrief: borWageBrief(line),
+      estWage: estimateBorWage(line, qty),
+    }
+  }
+  const wage = summarizeBorWageFields(lines)
+  const totalQty = [...qtyMap.values()].reduce((s, q) => s + num(q), 0)
+  return {
+    wageBrief: `${wage.wageTypeText} · 单价 ${wage.upText} · 工时 ${wage.timeText}`,
+    estWage: wage.estWageByQty(qtyMap, totalQty),
+  }
+}
+
 const assignedTotalQty = computed(() =>
   selectedLines.value.reduce((s, line) => {
     return s + workersForRemain(num(line.remainQty)).reduce((a, w) => a + num(w.planQty), 0)
@@ -743,6 +768,7 @@ const previewCards = computed(() => {
         qty,
         woText: `${leaves.length} 道工序`,
         workers: [...workerMap.values()],
+        ...cardWageMeta(leaves),
       }
     })
   }
@@ -775,6 +801,7 @@ const previewCards = computed(() => {
         qty,
         woText: `关联工单 ${woNos.join('、')}`,
         workers: [...workerMap.values()],
+        ...cardWageMeta(leaves),
       }
     })
   }
@@ -790,6 +817,7 @@ const previewCards = computed(() => {
       qty,
       woText: `工单 ${leaf.line.woNo}`,
       workers,
+      ...cardWageMeta([leaf]),
     }
   })
 })
@@ -800,6 +828,7 @@ const dispatchSummary = computed(() => ({
   prcCount: selectedLeaves.value.length,
   workerCount: pickedWorkers.value.length,
   totalQty: assignedTotalQty.value,
+  estWageTotal: previewCards.value.reduce((s, c) => s + num(c.estWage), 0),
 }))
 
 const canSubmit = computed(() => {
@@ -1785,6 +1814,13 @@ onMounted(() => {
     margin: 0 0 8px;
     font-size: 12px;
     color: var(--qd-muted);
+  }
+
+  &__wage {
+    margin: 0 0 8px;
+    font-size: 11px;
+    line-height: 1.45;
+    color: #5a7264;
   }
 
   ul {

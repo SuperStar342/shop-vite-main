@@ -9,7 +9,8 @@
     @update:model-value="emit('update:modelValue', $event)"
     @opened="onOpen"
   >
-    <div class="emp-picker">
+    <div class="emp-picker-wrap" :class="{ 'is-multi-alloc': isMultiAlloc }">
+      <div class="emp-picker">
       <aside class="emp-picker__depts">
         <button class="emp-picker__dept-item" :class="{ 'is-active': empNavKey === 'all' }" type="button" @click="selectEmpNav('all')">
           <span>全部部门</span>
@@ -130,6 +131,71 @@
           <el-empty v-if="!empDraft.length" :image-size="56" description="勾选左侧人员" />
         </el-scrollbar>
       </aside>
+      </div>
+
+      <section v-if="isMultiAlloc" class="emp-picker__alloc">
+        <header class="emp-picker__alloc-head">
+          <div>
+            <strong>按工单分配 · {{ allocTitle }}</strong>
+            <span>已选人员将同步到各工单，数量按工单分别填写（单价×数量=工费）</span>
+          </div>
+          <div class="emp-picker__alloc-actions">
+            <el-button size="small" :disabled="!empDraft.length" @click="fillAllLinesEqual">各工单平均填满</el-button>
+            <el-button size="small" :disabled="!empDraft.length" @click="syncRatiosAcrossLines">同步比例到全部工单</el-button>
+          </div>
+        </header>
+        <div class="emp-picker__alloc-grid">
+          <article v-for="line in allocLines" :key="line.key" class="emp-alloc-wo">
+            <header class="emp-alloc-wo__head">
+              <b>{{ line.woNo }}</b>
+              <span>未派 <em>{{ fmtNum(line.remainQty) }}</em></span>
+              <span>单价 <em>{{ fmtNum(line.machiningUp) }}</em></span>
+              <span class="emp-alloc-wo__wage">工费 <em>{{ fmtNum(lineEstWage(line.key)) }}</em></span>
+              <el-tag
+                v-if="lineOverAssign(line.key)"
+                effect="plain"
+                size="small"
+                type="danger"
+              >
+                超量
+              </el-tag>
+            </header>
+            <div v-if="!empDraft.length" class="emp-alloc-wo__empty">请先勾选左侧人员</div>
+            <div v-else class="emp-alloc-wo__rows">
+              <div v-for="w in lineAlloc[line.key] || []" :key="w.empNo" class="emp-alloc-wo__row">
+                <span class="emp-alloc-wo__who">{{ w.empName || w.empNo }}</span>
+                <label>
+                  比例%
+                  <el-input-number
+                    v-model="w.ratio"
+                    controls-position="right"
+                    :max="100"
+                    :min="0"
+                    :precision="0"
+                    :step="1"
+                    size="small"
+                    @change="onLineRatio(line.key)"
+                  />
+                </label>
+                <label>
+                  数量
+                  <el-input-number
+                    v-model="w.planQty"
+                    controls-position="right"
+                    :max="num(line.remainQty)"
+                    :min="0"
+                    :precision="2"
+                    :step="1"
+                    size="small"
+                    @change="onLineQty(line.key)"
+                  />
+                </label>
+                <span class="emp-alloc-wo__sub">¥{{ fmtNum(num(w.planQty) * num(line.machiningUp)) }}</span>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
     </div>
 
     <template #footer>
@@ -142,7 +208,25 @@
 <script lang="ts" setup>
 import { Search } from '@element-plus/icons-vue'
 import { getQuickDispatchDeptSuggest, getQuickDispatchEmployees } from '/@/api/procurement/quickDispatch'
+import {
+  applyEqualWorkers,
+  fmtNum,
+  num,
+  redistributeWorkersByRatio,
+  syncWorkersRatioFromQty,
+  type AllocWorker,
+} from '/@/utils/dispatchAlloc'
 import { filterDeptsByKeyword, filterEmpsByKeyword, isPinyinLikeKeyword } from '/@/utils/empMatch'
+
+export type EmpAllocLine = {
+  key: string
+  woNo: string
+  remainQty: number
+  planQty?: number
+  machiningUp: number
+  prcCode?: string
+  prcName?: string
+}
 
 defineOptions({ name: 'EmpPickerDialog' })
 
@@ -150,11 +234,14 @@ const props = defineProps<{
   modelValue: boolean
   preferredDeptId?: number | string | null
   selected?: { empNo: string; empName?: string; deptName?: string }[]
+  allocLines?: EmpAllocLine[]
+  lineWorkers?: Record<string, AllocWorker[]>
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [boolean]
   confirm: [{ empNo: string; empName?: string; deptName?: string }[]]
+  confirmAlloc: [{ key: string; workers: AllocWorker[] }[]]
 }>()
 
 const empTableRef = ref<any>(null)
@@ -169,6 +256,99 @@ const empPageSize = ref(20)
 const empSelecting = ref(false)
 const employees = ref<any[]>([])
 const empDraft = ref<any[]>([])
+const lineAlloc = ref<Record<string, AllocWorker[]>>({})
+const prevDraftCount = ref(0)
+
+const isMultiAlloc = computed(() => (props.allocLines?.length || 0) > 1)
+
+const allocTitle = computed(() => {
+  const first = props.allocLines?.[0]
+  if (!first) return ''
+  return `${first.prcCode || ''} ${first.prcName || ''}`.trim()
+})
+
+const lineEstWage = (key: string) => {
+  const line = props.allocLines?.find((l) => l.key === key)
+  if (!line) return 0
+  const workers = lineAlloc.value[key] || []
+  return workers.reduce((s, w) => s + num(w.planQty) * num(line.machiningUp), 0)
+}
+
+const lineAssignedQty = (key: string) =>
+  (lineAlloc.value[key] || []).reduce((s, w) => s + num(w.planQty), 0)
+
+const lineOverAssign = (key: string) => {
+  const line = props.allocLines?.find((l) => l.key === key)
+  if (!line) return false
+  return lineAssignedQty(key) - num(line.remainQty) > 0.000001
+}
+
+const syncLineAllocWorkers = (fillEqual = false) => {
+  if (!isMultiAlloc.value) return
+  const next: Record<string, AllocWorker[]> = {}
+  for (const line of props.allocLines || []) {
+    const prev = lineAlloc.value[line.key] || []
+    const prevMap = new Map(prev.map((w) => [w.empNo, w]))
+    next[line.key] = empDraft.value.map((e) => {
+      const old = prevMap.get(e.empNo)
+      return {
+        empNo: e.empNo,
+        empName: e.empName,
+        deptName: e.deptName,
+        ratio: num(old?.ratio),
+        planQty: num(old?.planQty),
+      }
+    })
+    if (fillEqual && next[line.key].length) {
+      applyEqualWorkers(next[line.key], num(line.remainQty))
+    }
+  }
+  lineAlloc.value = next
+}
+
+const onLineRatio = (key: string) => {
+  const line = props.allocLines?.find((l) => l.key === key)
+  if (!line) return
+  redistributeWorkersByRatio(lineAlloc.value[key] || [], num(line.remainQty))
+  lineAlloc.value = { ...lineAlloc.value }
+}
+
+const onLineQty = (key: string) => {
+  const line = props.allocLines?.find((l) => l.key === key)
+  if (!line) return
+  syncWorkersRatioFromQty(lineAlloc.value[key] || [], num(line.remainQty))
+  lineAlloc.value = { ...lineAlloc.value }
+}
+
+const applyEqualLine = (key: string) => {
+  const line = props.allocLines?.find((l) => l.key === key)
+  if (!line) return
+  applyEqualWorkers(lineAlloc.value[key] || [], num(line.remainQty))
+  lineAlloc.value = { ...lineAlloc.value }
+}
+
+const fillAllLinesEqual = () => {
+  for (const line of props.allocLines || []) {
+    applyEqualLine(line.key)
+  }
+}
+
+const syncRatiosAcrossLines = () => {
+  const first = props.allocLines?.[0]
+  if (!first?.key) return
+  const template = lineAlloc.value[first.key] || []
+  if (!template.length) return
+  for (const line of props.allocLines || []) {
+    if (line.key === first.key) continue
+    const workers = lineAlloc.value[line.key] || []
+    const ratioMap = new Map(template.map((w) => [w.empNo, num(w.ratio)]))
+    workers.forEach((w) => {
+      w.ratio = ratioMap.get(w.empNo) ?? w.ratio
+    })
+    redistributeWorkersByRatio(workers, num(line.remainQty))
+  }
+  lineAlloc.value = { ...lineAlloc.value }
+}
 
 const empInitial = (name: string) => String(name || '?').trim().slice(0, 1) || '?'
 
@@ -302,10 +482,16 @@ const onEmpDraftChange = (rows: any[]) => {
   kept.forEach((r) => map.set(r.empNo, r))
   selectedOnPage.forEach((r, k) => map.set(k, r))
   empDraft.value = [...map.values()]
+  if (isMultiAlloc.value) {
+    syncLineAllocWorkers(false)
+    if (empDraft.value.length > prevDraftCount.value) fillAllLinesEqual()
+    prevDraftCount.value = empDraft.value.length
+  }
 }
 
 const clearEmpDraft = async () => {
   empDraft.value = []
+  if (isMultiAlloc.value) lineAlloc.value = {}
   await syncEmpTableSelection()
 }
 
@@ -352,11 +538,64 @@ const onOpen = async () => {
     empName: w.empName,
     deptName: w.deptName,
   }))
+  prevDraftCount.value = empDraft.value.length
+  if (isMultiAlloc.value) {
+    const next: Record<string, AllocWorker[]> = {}
+    for (const line of props.allocLines || []) {
+      const src = props.lineWorkers?.[line.key] || []
+      next[line.key] = src.map((w) => ({
+        empNo: w.empNo,
+        empName: w.empName,
+        deptName: w.deptName,
+        ratio: num(w.ratio),
+        planQty: num(w.planQty),
+      }))
+    }
+    lineAlloc.value = next
+    syncLineAllocWorkers(false)
+  } else {
+    lineAlloc.value = {}
+  }
   if (!empDeptList.value.length) await loadEmpDepts()
   await loadEmployees()
 }
 
 const confirm = () => {
+  if (isMultiAlloc.value) {
+    if (!empDraft.value.length) {
+      $baseMessage('请先选择人员', 'warning', 'hey')
+      return
+    }
+    const over = (props.allocLines || []).some((l) => lineOverAssign(l.key))
+    if (over) {
+      $baseMessage('存在超量分配，请调整数量', 'warning', 'hey')
+      return
+    }
+    const hasQty = (props.allocLines || []).some((l) =>
+      (lineAlloc.value[l.key] || []).some((w) => num(w.planQty) > 0)
+    )
+    if (!hasQty) {
+      $baseMessage('请填写各工单数量，或点击「各工单平均填满」', 'warning', 'hey')
+      return
+    }
+    emit(
+      'confirmAlloc',
+      (props.allocLines || []).map((line) => ({
+        key: line.key,
+        workers: (lineAlloc.value[line.key] || [])
+          .filter((w) => num(w.planQty) > 0)
+          .map((w) => ({
+            empNo: w.empNo,
+            empName: w.empName,
+            deptName: w.deptName,
+            ratio: num(w.ratio),
+            planQty: num(w.planQty),
+          })),
+      }))
+    )
+    emit('update:modelValue', false)
+    return
+  }
   emit(
     'confirm',
     empDraft.value.map((r) => ({
@@ -396,6 +635,16 @@ watch(
     --el-button-border-color: #2e7d5a;
     --el-button-hover-bg-color: #246b4c;
     --el-button-hover-border-color: #246b4c;
+  }
+}
+
+.emp-picker-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+
+  &.is-multi-alloc .emp-picker {
+    height: 420px;
   }
 }
 
@@ -541,6 +790,128 @@ watch(
     flex: 1;
     min-height: 0;
     padding: 0 10px 12px;
+  }
+}
+
+.emp-picker__alloc {
+  border: 1px solid var(--emp-line);
+  border-radius: 10px;
+  background: #fbfdfb;
+  overflow: hidden;
+
+  &-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--emp-line);
+    background: #f3faf6;
+
+    strong {
+      display: block;
+      font-size: 13px;
+      color: #2a3a32;
+    }
+
+    span {
+      font-size: 12px;
+      color: #8a9b90;
+    }
+  }
+
+  &-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  &-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 10px;
+    padding: 10px 12px 12px;
+    max-height: 220px;
+    overflow: auto;
+  }
+}
+
+.emp-alloc-wo {
+  border: 1px solid #dce8e0;
+  border-radius: 8px;
+  background: #fff;
+  padding: 8px 10px;
+
+  &__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: #8a9b90;
+
+    b {
+      color: #2e7d5a;
+      font-size: 13px;
+    }
+
+    em {
+      font-style: normal;
+      color: #2a3a32;
+      font-weight: 600;
+    }
+  }
+
+  &__wage em {
+    color: #2e7d5a;
+  }
+
+  &__empty {
+    font-size: 12px;
+    color: #9aaba0;
+    padding: 4px 0;
+  }
+
+  &__rows {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  &__row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 88px 88px 56px;
+    gap: 6px;
+    align-items: end;
+    font-size: 11px;
+    color: #8a9b90;
+
+    label {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    :deep(.el-input-number) {
+      width: 100%;
+    }
+  }
+
+  &__who {
+    font-size: 12px;
+    color: #2a3a32;
+    font-weight: 600;
+    padding-bottom: 4px;
+  }
+
+  &__sub {
+    font-size: 12px;
+    color: #2e7d5a;
+    font-weight: 700;
+    text-align: right;
+    padding-bottom: 4px;
   }
 }
 
