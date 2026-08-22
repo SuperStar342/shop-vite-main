@@ -3,7 +3,7 @@
     <header class="nd-hero">
       <div>
         <h1>普通派工</h1>
-        <p>多工单选工序，人员挂在工序行上；同工序可合并后由一人或多人数按未派量比例拆分</p>
+        <p>多工单选工序；单价不同按工费份额拆量；支持一键派工（默认本车间 2 人）</p>
       </div>
       <nav class="nd-steps" aria-label="派工步骤">
         <button
@@ -218,6 +218,9 @@
           <span>已选 {{ selectedWoNos.length }} 张工单 · {{ selectedLines.length }} 道工序</span>
           <div>
             <el-button @click="clearSelection">清空</el-button>
+            <el-button :loading="oneClickLoading" :disabled="!selectedWoNos.length" @click="oneClickDispatch">
+              一键派工
+            </el-button>
             <el-button type="primary" :disabled="!selectedLines.length" @click="wizardStep = 1">
               下一步：选择人员
             </el-button>
@@ -253,7 +256,16 @@
             <span class="nd-hint">比例与数量联动：改比例自动算数量，改数量自动回写比例</span>
           </div>
           <div class="nd-assign-pane__head-right">
-            <span class="nd-hint">{{ mergeSameProcess ? '同工序合并：数量按各工单未派量比例拆分' : '各工序独立指派' }}</span>
+            <span class="nd-hint">
+              {{
+                mergeSameProcess
+                  ? '同工序合并：按工费份额拆到各工单（单价不同更公平）'
+                  : '各工序独立指派'
+              }}
+            </span>
+            <el-button size="small" type="primary" plain :loading="oneClickLoading" @click="oneClickDispatch">
+              一键派工
+            </el-button>
             <el-button size="small" type="primary" plain @click="applyEqualAll">全部平均</el-button>
           </div>
         </header>
@@ -284,7 +296,7 @@
               <template v-if="row.kind !== 'wo-head'">
                 <div class="nd-up-cell">
                   <span>{{ row.upText }}</span>
-                  <small v-if="row.upMixed">各工单不同，按行计费</small>
+                  <small v-if="row.upMixed">各工单单价不同，按工费份额拆量</small>
                 </div>
               </template>
             </template>
@@ -446,11 +458,12 @@
 <script lang="ts" setup>
 import { Plus, Refresh } from '@element-plus/icons-vue'
 import {
+  getQuickDispatchEmployees,
   getQuickDispatchPreview,
   getQuickDispatchProcesses,
   submitQuickDispatch,
 } from '/@/api/procurement/quickDispatch'
-import { fmtNum, num, splitWorkersByRemain, type AllocWorker } from '/@/utils/dispatchAlloc'
+import { fmtNum, num, splitWorkersByWage, type AllocWorker } from '/@/utils/dispatchAlloc'
 import EmpPickerDialog from './EmpPickerDialog.vue'
 
 defineOptions({ name: 'NormalDispatch' })
@@ -469,6 +482,7 @@ const wizardStep = ref(0)
 const loading = ref(false)
 const prcLoading = ref(false)
 const saving = ref(false)
+const oneClickLoading = ref(false)
 const mergeSameProcess = ref(true)
 const pickTab = ref<'current' | 'batch' | 'picked'>('batch')
 const assignView = ref<'wo' | 'process'>('process')
@@ -624,7 +638,7 @@ const assignRows = computed(() => {
       const workers = assignMap.value[key] || []
       const assignedQty = workers.reduce((s, w) => s + num(w.planQty), 0)
       const wage = summarizeWageFields(lines)
-      const split = splitWorkersByRemain(workers, lines)
+      const split = splitWorkersByWage(workers, lines)
       const qtyMap = new Map(split.map(({ line, workers: ws }) => [lineKey(line), ws.reduce((s, w) => s + num(w.planQty), 0)]))
       const estWage = assignedQty > 0 ? wage.estWageByQty(qtyMap, assignedQty) : wage.estWageByQty(null, remainQty)
       return {
@@ -678,7 +692,7 @@ const assignRows = computed(() => {
 const lineSplitMap = computed(() => {
   const map = new Map<string, AllocWorker[]>()
   for (const row of assignRows.value) {
-    const splits = splitWorkersByRemain(row.workers, row.lines)
+    const splits = splitWorkersByWage(row.workers, row.lines)
     for (const { line, workers } of splits) {
       map.set(lineKey(line), workers)
     }
@@ -985,6 +999,86 @@ const applyEqualTask = (taskKey: string) => {
 const applyEqualAll = () => {
   for (const row of assignRows.value) {
     if (row.workers?.length) applyEqualTask(row.taskKey)
+  }
+}
+
+/** 一键派工：默认本车间 2 人，工序未选则全选已选工单待派工序，按工费公平均分 */
+const ONE_CLICK_EMP_COUNT = 2
+
+const selectAllLinesForSelectedWos = async () => {
+  prcLoading.value = true
+  try {
+    for (const woNo of selectedWoNos.value) {
+      const wo = allWorkOrders.value.find((w) => w.woNo === woNo)
+      if (wo) await ensureWoLines(wo)
+    }
+    const ids: string[] = []
+    for (const woNo of selectedWoNos.value) {
+      for (const line of linesByWo.value[woNo] || []) {
+        if (num(line.remainQty) > 0) ids.push(lineKey(line))
+      }
+    }
+    checkedLeafIds.value = ids
+  } finally {
+    prcLoading.value = false
+  }
+}
+
+const oneClickDispatch = async () => {
+  if (!selectedWoNos.value.length) {
+    $baseMessage('请先勾选工单', 'warning', 'hey')
+    return
+  }
+  oneClickLoading.value = true
+  try {
+    if (!selectedLines.value.length) await selectAllLinesForSelectedWos()
+    await nextTick()
+    if (!selectedLines.value.length) {
+      $baseMessage('所选工单没有可派工序', 'warning', 'hey')
+      return
+    }
+
+    const deptId = preferredDeptId.value
+    const rows = await getQuickDispatchEmployees({
+      deptId: deptId != null && deptId !== '' ? deptId : undefined,
+    })
+    const emps = (rows || []).filter((r: any) => r?.empNo).slice(0, ONE_CLICK_EMP_COUNT)
+    if (!emps.length) {
+      $baseMessage(deptId != null ? '本车间暂无人员，请手动选人' : '暂无人员可分配，请手动选人', 'warning', 'hey')
+      wizardStep.value = 1
+      return
+    }
+    if (emps.length < ONE_CLICK_EMP_COUNT) {
+      $baseMessage(`本车间仅 ${emps.length} 人，已按现有人数分配`, 'warning', 'hey')
+    }
+
+    const next: Record<string, AllocWorker[]> = {}
+    const n = emps.length
+    const each = Math.floor(100 / n)
+    for (const row of assignRows.value) {
+      next[row.taskKey] = emps.map((e: any, i: number) => ({
+        empNo: e.empNo,
+        empName: e.empName,
+        deptName: e.deptName,
+        ratio: i === n - 1 ? 100 - each * (n - 1) : each,
+        planQty: 0,
+      }))
+    }
+    assignMap.value = next
+    await nextTick()
+    for (const row of assignRows.value) applyEqualTask(row.taskKey)
+
+    if (canGoConfirm.value) {
+      wizardStep.value = 2
+      $baseMessage(`一键派工完成（${emps.map((e: any) => e.empName || e.empNo).join('、')}），请确认提交`, 'success', 'hey')
+    } else {
+      wizardStep.value = 1
+      $baseMessage('已自动分配，请检查数量后确认', 'success', 'hey')
+    }
+  } catch (e: any) {
+    $baseMessage(e?.message || '一键派工失败', 'error', 'hey')
+  } finally {
+    oneClickLoading.value = false
   }
 }
 

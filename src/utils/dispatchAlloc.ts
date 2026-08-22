@@ -11,74 +11,7 @@ export const fmtNum = (v: any) => {
 
 export type AllocWorker = { empNo: string; empName?: string; deptName?: string; ratio?: number; planQty: number }
 
-/**
- * 把一组工人的总量，按目标 remain 拆到各行（按未派量比例）。
- * workers.planQty 为合并行上的「合计派量」；返回每行对应的 workers（planQty 已拆分）。
- */
-export const splitWorkersByRemain = <T extends { remainQty?: any }>(
-  workers: AllocWorker[],
-  lines: T[]
-): { line: T; workers: AllocWorker[] }[] => {
-  const list = (workers || []).filter((w) => w?.empNo && num(w.planQty) > 0)
-  if (!list.length || !lines?.length) {
-    return (lines || []).map((line) => ({ line, workers: [] as AllocWorker[] }))
-  }
-
-  const remains = lines.map((l) => Math.max(0, num(l.remainQty)))
-  const totalRemain = remains.reduce((s, n) => s + n, 0)
-  if (totalRemain <= 0) {
-    return lines.map((line) => ({ line, workers: [] as AllocWorker[] }))
-  }
-
-  return lines.map((line, idx) => {
-    const remain = remains[idx]
-    const preferInteger = list.every((w) => Math.abs(num(w.planQty) - Math.round(num(w.planQty))) < 0.000001)
-    const lineWorkers = list
-      .map((w) => {
-        const exact = (num(w.planQty) * remain) / totalRemain
-        const planQty = preferInteger ? Math.floor(exact) : Number(exact.toFixed(2))
-        return {
-          empNo: w.empNo,
-          empName: w.empName,
-          deptName: w.deptName,
-          ratio: num(w.ratio),
-          planQty,
-          _frac: exact - Math.floor(exact),
-        }
-      })
-      .filter((w) => num(w.planQty) > 0 || preferInteger)
-
-    if (preferInteger) {
-      // 余数按小数部分回补到各工人，使本行合计尽量贴近 round(合计 * remain/total)
-      const targetSum = Math.round(
-        (list.reduce((s, w) => s + num(w.planQty), 0) * remain) / totalRemain
-      )
-      let assigned = lineWorkers.reduce((s, w) => s + num(w.planQty), 0)
-      const ordered = [...lineWorkers].sort((a, b) => b._frac - a._frac)
-      let i = 0
-      while (assigned < targetSum && ordered.length) {
-        ordered[i % ordered.length].planQty += 1
-        assigned += 1
-        i += 1
-      }
-    }
-
-    return {
-      line,
-      workers: lineWorkers
-        .filter((w) => num(w.planQty) > 0)
-        .map(({ empNo, empName, deptName, ratio, planQty }) => ({
-          empNo,
-          empName,
-          deptName,
-          ratio,
-          planQty,
-        })),
-    }
-  })
-}
-
-/** 按权重把整数总量分给 N 人 */
+/** 按权重把总量分给 N 人（优先整数） */
 export const distributeByWeights = (total: number, weights: number[]) => {
   const n = weights.length
   if (!n || total <= 0) return weights.map(() => 0)
@@ -110,4 +43,124 @@ export const distributeByWeights = (total: number, weights: number[]) => {
       }
     })
   return parts.map((p) => p.floor)
+}
+
+const normalizeToSum = (parts: number[], target: number, preferInteger: boolean) => {
+  const n = parts.length
+  if (!n) return parts
+  if (preferInteger) {
+    const floors = parts.map((p) => Math.max(0, Math.floor(p)))
+    let left = Math.round(target) - floors.reduce((s, v) => s + v, 0)
+    const ordered = parts
+      .map((p, i) => ({ i, frac: p - Math.floor(p) }))
+      .sort((a, b) => b.frac - a.frac)
+    let k = 0
+    while (left > 0 && ordered.length) {
+      floors[ordered[k % ordered.length].i] += 1
+      left -= 1
+      k += 1
+    }
+    // 若超了（极少），从最大项扣
+    while (left < 0) {
+      const idx = floors.indexOf(Math.max(...floors))
+      if (idx < 0 || floors[idx] <= 0) break
+      floors[idx] -= 1
+      left += 1
+    }
+    return floors
+  }
+  const sum = parts.reduce((s, v) => s + v, 0)
+  if (sum <= 0) return distributeByWeights(target, parts.map(() => 1))
+  let assigned = 0
+  return parts.map((p, i) => {
+    if (i === n - 1) return Number((target - assigned).toFixed(2))
+    const q = Number(((target * p) / sum).toFixed(2))
+    assigned += q
+    return q
+  })
+}
+
+/**
+ * 按未派量比例拆分（单价相同时与按工费拆分等价）。
+ */
+export const splitWorkersByRemain = <T extends { remainQty?: any }>(
+  workers: AllocWorker[],
+  lines: T[]
+): { line: T; workers: AllocWorker[] }[] =>
+  splitWorkersByWage(
+    workers,
+    lines.map((l) => ({ ...l, machiningUp: 1 }))
+  )
+
+/**
+ * 按工费份额拆到各工单行（方案 A）：
+ * 1) 先按未派量把「合计派量」摊到各行
+ * 2) 以 planQty 为权重定每人工费目标
+ * 3) 逐行按「剩余目标工费」比例切分该行数量，使 Σ(qty×单价) 尽量接近目标工费
+ * 单价全部相同退化为按未派量比例。
+ */
+export const splitWorkersByWage = <T extends { remainQty?: any; machiningUp?: any }>(
+  workers: AllocWorker[],
+  lines: T[]
+): { line: T; workers: AllocWorker[] }[] => {
+  const list = (workers || []).filter((w) => w?.empNo && num(w.planQty) > 0)
+  if (!list.length || !lines?.length) {
+    return (lines || []).map((line) => ({ line, workers: [] as AllocWorker[] }))
+  }
+
+  const remains = lines.map((l) => Math.max(0, num(l.remainQty)))
+  const ups = lines.map((l) => {
+    const u = num(l.machiningUp)
+    return u > 0 ? u : 1
+  })
+  const totalRemain = remains.reduce((s, n) => s + n, 0)
+  const totalAssign = list.reduce((s, w) => s + num(w.planQty), 0)
+  if (totalRemain <= 0 || totalAssign <= 0) {
+    return lines.map((line) => ({ line, workers: [] as AllocWorker[] }))
+  }
+
+  const preferInteger = list.every((w) => Math.abs(num(w.planQty) - Math.round(num(w.planQty))) < 0.000001)
+  const assignTotal = Math.min(totalAssign, totalRemain)
+  // 各行先摊派量（按未派量权重）
+  const lineQtys = distributeByWeights(assignTotal, remains)
+
+  const lineWages = lineQtys.map((q, j) => q * ups[j])
+  const totalWage = lineWages.reduce((s, n) => s + n, 0)
+  const weights = list.map((w) => Math.max(0, num(w.planQty)))
+  const wSum = weights.reduce((s, n) => s + n, 0) || list.length
+  const remTarget = list.map((_, i) => (totalWage * weights[i]) / wSum)
+
+  const matrix: number[][] = lines.map(() => list.map(() => 0))
+
+  for (let j = 0; j < lines.length; j++) {
+    const qj = lineQtys[j]
+    if (qj <= 0) continue
+    const up = ups[j]
+    const tSum = remTarget.reduce((s, n) => s + Math.max(0, n), 0)
+    let raw: number[]
+    if (tSum <= 0.000001) {
+      raw = distributeByWeights(qj, list.map(() => 1)).map((n) => Number(n))
+    } else {
+      // 该行工费按剩余目标比例切，再换算数量
+      raw = remTarget.map((t) => (qj * Math.max(0, t)) / tSum)
+    }
+    const qtys = normalizeToSum(raw, qj, preferInteger)
+    qtys.forEach((q, i) => {
+      matrix[j][i] = q
+      remTarget[i] = Math.max(0, remTarget[i] - q * up)
+    })
+  }
+
+  return lines.map((line, j) => ({
+    line,
+    workers: list
+      .map((w, i) => ({
+        empNo: w.empNo,
+        empName: w.empName,
+        deptName: w.deptName,
+        ratio: num(w.ratio),
+        planQty: matrix[j][i],
+      }))
+      .filter((w) => num(w.planQty) > 0),
+  }))
 }
