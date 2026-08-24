@@ -36,14 +36,23 @@
           @keyup.enter="onWoSearchEnter"
         />
         <div v-loading="loading" class="nd-wo-list">
-          <label
-            v-for="wo in filteredWorkOrders"
+          <article
+            v-for="(wo, idx) in filteredWorkOrders"
             :key="wo.woNo"
             class="nd-wo-card"
-            :class="{ 'is-checked': selectedWoSet.has(wo.woNo), 'is-active': activeWoNo === wo.woNo }"
+            :class="{
+              'is-checked': selectedWoSet.has(wo.woNo),
+              'is-active': activeWoNo === wo.woNo,
+            }"
+            :style="{ '--wo-accent': woColors[idx % woColors.length] }"
+            role="button"
+            tabindex="0"
+            @click="onWoCardClick(wo)"
+            @keydown.enter.prevent="onWoCardClick(wo)"
+            @keydown.space.prevent="onWoCardClick(wo)"
           >
-            <el-checkbox :model-value="selectedWoSet.has(wo.woNo)" @change="(v: any) => toggleWo(wo, !!v)" @click.stop />
-            <div class="nd-wo-card__body" @click="activeWoNo = wo.woNo">
+            <div class="nd-wo-card__accent" aria-hidden="true" />
+            <div class="nd-wo-card__body">
               <div class="nd-wo-card__top">
                 <b>{{ wo.woNo }}</b>
                 <el-tag v-if="selectedWoSet.has(wo.woNo)" effect="plain" size="small" type="success">已选</el-tag>
@@ -57,7 +66,8 @@
                 :wt-qty="wo.wtQty"
               />
             </div>
-          </label>
+            <span v-if="selectedWoSet.has(wo.woNo)" class="nd-wo-card__check" aria-hidden="true">✓</span>
+          </article>
           <el-empty v-if="!filteredWorkOrders.length && !loading" description="暂无可派工单" />
         </div>
       </aside>
@@ -124,10 +134,17 @@
           </template>
 
           <template v-else-if="pickTab === 'batch'">
-            <el-table :data="batchProcessGroups" border height="100%" row-key="key" @expand-change="() => {}">
+            <el-table
+              :data="batchProcessGroups"
+              border
+              height="100%"
+              row-key="key"
+              :row-class-name="batchProcessRowClass"
+              @expand-change="() => {}"
+            >
               <el-table-column type="expand">
                 <template #default="{ row }">
-                  <div class="nd-expand">
+                  <div class="nd-expand" :class="{ 'is-multi': row.lines.length > 1 }">
                     <div
                       v-for="line in row.lines"
                       :key="lineKey(line)"
@@ -165,17 +182,29 @@
                   />
                 </template>
               </el-table-column>
-              <el-table-column label="工序编号/名称" min-width="160">
+              <el-table-column label="工序编号/名称" min-width="200">
                 <template #default="{ row }">
-                  {{ row.prcCode }} {{ row.prcName }}
-                  <el-tag
-                    class="nd-cover-tag"
-                    effect="plain"
-                    size="small"
-                    :type="row.coverCount === selectedWoNos.length ? 'success' : row.coverCount > 0 ? 'warning' : 'danger'"
-                  >
-                    {{ row.coverCount }}/{{ selectedWoNos.length || 0 }}
-                  </el-tag>
+                  <div class="nd-batch-prc">
+                    <div class="nd-batch-prc__name">
+                      <span>{{ row.prcCode }} {{ row.prcName }}</span>
+                      <el-tag
+                        class="nd-scope-tag"
+                        effect="plain"
+                        size="small"
+                        :type="row.lines.length > 1 ? 'warning' : 'info'"
+                      >
+                        {{ row.lines.length > 1 ? `多工单 · ${row.lines.length}` : '单工单' }}
+                      </el-tag>
+                    </div>
+                    <el-tag
+                      class="nd-cover-tag"
+                      effect="plain"
+                      size="small"
+                      :type="row.coverCount === selectedWoNos.length ? 'success' : row.coverCount > 0 ? 'warning' : 'danger'"
+                    >
+                      已勾选 {{ row.coverCount }}/{{ selectedWoNos.length || 0 }}
+                    </el-tag>
+                  </div>
                 </template>
               </el-table-column>
               <el-table-column label="工序类型" min-width="110" prop="mrName" show-overflow-tooltip />
@@ -191,8 +220,12 @@
               <el-table-column label="加工工时" width="110" align="right">
                 <template #default="{ row }">{{ row.timeText }}</template>
               </el-table-column>
-              <el-table-column label="包含工单数" width="100" align="center">
-                <template #default="{ row }">{{ row.lines.length }}</template>
+              <el-table-column label="工单范围" width="110" align="center">
+                <template #default="{ row }">
+                  <span class="nd-wo-scope" :class="row.lines.length > 1 ? 'is-multi' : 'is-single'">
+                    {{ row.lines.length > 1 ? `${row.lines.length} 张工单` : '1 张工单' }}
+                  </span>
+                </template>
               </el-table-column>
               <el-table-column label="派工状态/数量" width="148" align="right">
                 <template #default="{ row }">
@@ -209,6 +242,8 @@
               <span><i class="is-none" />未派工</span>
               <span><i class="is-partial" />部分派工</span>
               <span><i class="is-done" />已派工</span>
+              <span><i class="is-single" />单工单工序</span>
+              <span><i class="is-multi" />多工单工序</span>
               <span><i class="is-all" />所有已选工单都包含此工序</span>
               <span><i class="is-part" />部分工单包含此工序</span>
             </div>
@@ -349,19 +384,36 @@
               </template>
               <template v-else-if="row.kind === 'process-head'">
                 <div class="nd-prc-cell nd-prc-cell--head">
-                  <span>{{ row.prcCode }} {{ row.prcName }}</span>
-                  <small>{{ row.mrName || '' }} · 含 {{ row.woCount }} 张工单</small>
+                  <div class="nd-prc-cell__title">
+                    <span>{{ row.prcCode }} {{ row.prcName }}</span>
+                    <el-tag class="nd-scope-tag" effect="plain" size="small" type="warning">
+                      多工单 · {{ row.woCount }}
+                    </el-tag>
+                  </div>
+                  <small>{{ row.mrName || '' }} · 含 {{ row.woCount }} 张工单，可统一选人或分单配置</small>
                 </div>
               </template>
               <template v-else-if="row.kind === 'line-sub'">
                 <div class="nd-wo-under-prc">
                   <el-tag effect="plain" size="small" type="info">{{ row.woText }}</el-tag>
-                  <small>本工单工序</small>
+                  <small>单工单工序</small>
                 </div>
               </template>
               <template v-else>
                 <div class="nd-prc-cell">
-                  <span>{{ row.prcCode }} {{ row.prcName }}</span>
+                  <div class="nd-prc-cell__title">
+                    <span>{{ row.prcCode }} {{ row.prcName }}</span>
+                    <el-tag
+                      v-if="row.lines?.length > 1"
+                      class="nd-scope-tag"
+                      effect="plain"
+                      size="small"
+                      type="warning"
+                    >
+                      多工单 · {{ row.lines.length }}
+                    </el-tag>
+                    <el-tag v-else class="nd-scope-tag" effect="plain" size="small" type="info">单工单</el-tag>
+                  </div>
                   <small v-if="row.woText">{{ row.woText }}</small>
                 </div>
               </template>
@@ -1169,9 +1221,14 @@ const assignSpanMethod = ({ row, columnIndex }: any) => {
 
 const assignRowClassName = ({ row }: { row: any }) => {
   if (row.kind === 'line-sub') return 'is-wo-sub-row'
-  if (row.kind === 'process-head') return 'is-process-head-row'
-  return ''
+  if (row.kind === 'process-head') return 'is-process-head-row is-multi-prc-row'
+  if (row.lines?.length > 1) return 'is-multi-prc-row'
+  return 'is-single-prc-row'
 }
+
+/** 批量工序表行样式：单工单 / 多工单区分 */
+const batchProcessRowClass = ({ row }: { row: any }) =>
+  row.lines?.length > 1 ? 'is-multi-prc-row' : 'is-single-prc-row'
 
 const assignedTaskCount = computed(() => assignRows.value.filter((r) => num(r.assignedQty) > 0).length)
 
@@ -1593,6 +1650,20 @@ const toggleWo = async (wo: any, checked: boolean) => {
   }
 }
 
+/** 点击工单卡片：未选则选中；已选则切为当前；当前已选再点则取消 */
+const onWoCardClick = (wo: any) => {
+  const selected = selectedWoSet.value.has(wo.woNo)
+  if (!selected) {
+    void toggleWo(wo, true)
+    return
+  }
+  if (activeWoNo.value !== wo.woNo) {
+    activeWoNo.value = wo.woNo
+    return
+  }
+  void toggleWo(wo, false)
+}
+
 const setLineChecked = (line: any, checked: boolean) => {
   const id = lineKey(line)
   const set = new Set(checkedLeafIds.value)
@@ -1966,11 +2037,13 @@ const onWorkerQtyChange = (taskKey: string) => {
   }
 }
 
+
 const removeWorker = (taskKey: string, empNo: string) => {
   const list = (assignMap.value[taskKey] || []).filter((w) => w.empNo !== empNo)
   assignMap.value = { ...assignMap.value, [taskKey]: list }
   if (list.length) applyEqualTask(taskKey)
 }
+
 
 /** 纯选人确认（无配比区）：写入当前任务并默认平均数量 */
 const onEmpPickerConfirm = (emps: { empNo: string; empName?: string; deptName?: string }[]) => {
@@ -2142,6 +2215,7 @@ onMounted(() => {
   }
   loadPreview()
 })
+
 </script>
 
 <style lang="scss" scoped>
@@ -2264,22 +2338,47 @@ onMounted(() => {
 }
 
 .nd-wo-card {
+  --wo-accent: var(--nd-green);
+  position: relative;
   display: flex;
-  gap: 8px;
-  align-items: flex-start;
-  padding: 10px;
-  margin-bottom: 8px;
-  border: 1px solid #e5eee8;
-  border-radius: 8px;
+  gap: 0;
+  align-items: stretch;
+  padding: 0;
+  margin-bottom: 10px;
+  border: 1px solid #dfeae3;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(42, 58, 50, 0.04);
   cursor: pointer;
+  outline: none;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
 
-  &.is-checked {
-    border-color: #9dceb3;
-    background: #f3faf6;
+  &:hover {
+    border-color: color-mix(in srgb, var(--wo-accent) 45%, #dfeae3);
+    box-shadow: 0 4px 12px rgba(42, 58, 50, 0.08);
+    transform: translateY(-1px);
   }
 
-  &.is-active {
-    box-shadow: inset 3px 0 0 var(--nd-green);
+  &:focus-visible {
+    border-color: var(--wo-accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--wo-accent) 22%, transparent);
+  }
+
+  &__accent {
+    width: 4px;
+    flex-shrink: 0;
+    border-radius: 10px 0 0 10px;
+    background: color-mix(in srgb, var(--wo-accent) 55%, #c8d9cf);
+  }
+
+  &__body {
+    flex: 1;
+    min-width: 0;
+    padding: 12px 36px 12px 12px;
   }
 
   &__top {
@@ -2287,14 +2386,62 @@ onMounted(() => {
     align-items: center;
     justify-content: space-between;
     gap: 8px;
+
+    b {
+      font-size: 13px;
+      color: var(--nd-ink);
+      letter-spacing: 0.02em;
+    }
+  }
+
+  &__check {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--nd-green);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
   }
 
   p {
-    margin: 4px 0;
+    margin: 6px 0 8px;
     font-size: 12px;
     color: var(--nd-muted);
+    line-height: 1.4;
   }
 
+  &.is-checked {
+    border-color: color-mix(in srgb, var(--nd-green) 55%, #dfeae3);
+    background: linear-gradient(135deg, #f4fbf7 0%, #eef8f2 100%);
+    box-shadow: 0 2px 8px rgba(46, 125, 90, 0.12);
+
+    .nd-wo-card__accent {
+      background: var(--nd-green);
+    }
+
+    .nd-wo-card__top b {
+      color: var(--nd-green);
+    }
+  }
+
+  &.is-active {
+    border-color: var(--nd-green);
+    box-shadow:
+      0 0 0 2px color-mix(in srgb, var(--nd-green) 18%, transparent),
+      0 4px 12px rgba(46, 125, 90, 0.14);
+  }
+
+  &.is-checked.is-active {
+    background: linear-gradient(135deg, #ecf8f1 0%, #e4f4eb 100%);
+  }
 }
 
 .nd-prc-pane__head {
@@ -2329,6 +2476,64 @@ onMounted(() => {
   flex: 1;
   min-height: 0;
   padding: 8px 12px;
+
+  :deep(.is-single-prc-row > td) {
+    background: #fff;
+  }
+
+  :deep(.is-multi-prc-row > td) {
+    background: #fffaf3;
+  }
+
+  :deep(.is-multi-prc-row > td:first-child) {
+    box-shadow: inset 3px 0 0 #f59e0b;
+  }
+
+  :deep(.is-single-prc-row > td:first-child) {
+    box-shadow: inset 3px 0 0 #94a3b8;
+  }
+}
+
+.nd-batch-prc {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+
+  &__name {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+}
+
+.nd-scope-tag {
+  flex-shrink: 0;
+}
+
+.nd-wo-scope {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+
+  &.is-single {
+    color: #475569;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+  }
+
+  &.is-multi {
+    color: #c2410c;
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+  }
 }
 
 .nd-prc-pane__foot,
@@ -2349,6 +2554,11 @@ onMounted(() => {
   flex-direction: column;
   gap: 8px;
   padding: 4px 12px 8px 48px;
+
+  &.is-multi {
+    background: linear-gradient(90deg, #fff7ed 0%, transparent 60%);
+    border-radius: 6px;
+  }
 
   &__row {
     display: flex;
@@ -2378,12 +2588,13 @@ onMounted(() => {
 }
 
 .nd-cover-tag {
-  margin-left: 6px;
+  margin-left: 0;
 }
 
 .nd-legend {
   display: flex;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 12px 16px;
   padding: 6px 4px 0;
   font-size: 12px;
   color: var(--nd-muted);
@@ -2405,8 +2616,13 @@ onMounted(() => {
     }
 
     &.is-part,
-    &.is-partial {
+    &.is-partial,
+    &.is-multi {
       background: #ea580c;
+    }
+
+    &.is-single {
+      background: #64748b;
     }
   }
 }
@@ -2534,7 +2750,15 @@ onMounted(() => {
   }
 
   :deep(.is-process-head-row > td) {
-    background: #f3faf6;
+    background: #fff7ed;
+  }
+
+  :deep(.is-multi-prc-row > td:first-child) {
+    box-shadow: inset 3px 0 0 #f59e0b;
+  }
+
+  :deep(.is-single-prc-row > td:first-child) {
+    box-shadow: inset 3px 0 0 #94a3b8;
   }
 
   footer .is-bad,
@@ -2554,7 +2778,14 @@ onMounted(() => {
   flex-direction: column;
   gap: 2px;
 
-  &--head span {
+  &__title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+
+  &--head .nd-prc-cell__title span {
     font-weight: 600;
     color: var(--nd-ink);
   }
