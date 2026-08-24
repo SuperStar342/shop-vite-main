@@ -527,14 +527,11 @@
               派工预览
             </h2>
             <p>
-              共 {{ confirmSummary.taskCount }} 个派工任务，预计完成 {{ fmtNum(confirmSummary.planQty) }} 件
+              共 {{ filteredConfirmSummary.taskCount }} 个派工任务，预计完成 {{ fmtNum(filteredConfirmSummary.planQty) }} 件
             </p>
           </div>
           <div class="nd-preview__hero-actions">
             <el-button :icon="ArrowLeft" @click="wizardStep = 1">返回编辑</el-button>
-            <el-button :icon="Promotion" :loading="saving" type="primary" :disabled="!canSubmit" @click="submit">
-              确认派工
-            </el-button>
           </div>
         </header>
 
@@ -556,9 +553,68 @@
             <div class="nd-preview__panel-tools">
               <el-select v-model="confirmGroupBy" size="small" style="width: 132px">
                 <el-option label="按工单" value="wo" />
+                <el-option label="按工序" value="process" />
               </el-select>
-              <el-button :icon="Filter" size="small">筛选</el-button>
-              <el-button :icon="Download" size="small">导出</el-button>
+              <el-popover placement="bottom-end" trigger="click" :width="340">
+                <template #reference>
+                  <el-button size="small" :type="confirmFilterActive ? 'primary' : 'default'" plain>
+                    <el-icon><Filter /></el-icon>
+                    筛选
+                    <em v-if="confirmFilterActive" class="nd-preview-filter-badge">{{ confirmFilterActive }}</em>
+                  </el-button>
+                </template>
+                <div class="nd-preview-filter">
+                  <header class="nd-preview-filter__head">
+                    <strong>筛选条件</strong>
+                    <el-button link type="primary" :disabled="!confirmFilterActive" @click="resetConfirmFilter">
+                      重置
+                    </el-button>
+                  </header>
+                  <el-form label-width="72px" size="small">
+                    <el-form-item label="关键词">
+                      <el-input
+                        v-model.trim="confirmFilter.keyword"
+                        clearable
+                        placeholder="工单 / 工序 / 品名"
+                      />
+                    </el-form-item>
+                    <el-form-item label="工单">
+                      <el-select v-model="confirmFilter.woNo" clearable filterable placeholder="全部工单">
+                        <el-option v-for="wo in confirmWoOptions" :key="wo" :label="wo" :value="wo" />
+                      </el-select>
+                    </el-form-item>
+                    <el-form-item label="工序">
+                      <el-select v-model="confirmFilter.prcKey" clearable filterable placeholder="全部工序">
+                        <el-option
+                          v-for="opt in confirmPrcOptions"
+                          :key="opt.value"
+                          :label="opt.label"
+                          :value="opt.value"
+                        />
+                      </el-select>
+                    </el-form-item>
+                    <el-form-item label="人员">
+                      <el-select v-model="confirmFilter.empNo" clearable filterable placeholder="全部人员">
+                        <el-option
+                          v-for="opt in confirmWorkerOptions"
+                          :key="opt.empNo"
+                          :label="opt.label"
+                          :value="opt.empNo"
+                        />
+                      </el-select>
+                    </el-form-item>
+                    <el-form-item label="派工状态">
+                      <el-checkbox v-model="confirmFilter.onlyPartial">仅显示未派满</el-checkbox>
+                    </el-form-item>
+                  </el-form>
+                  <footer class="nd-preview-filter__foot">
+                    当前显示 {{ filteredConfirmItems.length }} / {{ confirmItems.length }} 条
+                  </footer>
+                </div>
+              </el-popover>
+              <el-button :icon="Download" size="small" :disabled="!filteredConfirmItems.length" @click="exportConfirmPreview">
+                导出
+              </el-button>
             </div>
           </header>
 
@@ -574,21 +630,30 @@
                   <th class="is-qty">派工数量 / 计划数量</th>
                   <th>人员分配</th>
                   <th class="is-num">预计工时</th>
+                  <th class="is-num">总工价</th>
                   <th class="is-op">操作</th>
                 </tr>
               </thead>
-              <tbody v-for="group in confirmGroups" :key="group.woNo">
+              <tbody v-if="!displayConfirmGroups.length">
+                <tr>
+                  <td class="nd-preview-table__empty" colspan="10">
+                    <el-empty :image-size="72" description="无匹配派工任务，请调整筛选条件" />
+                  </td>
+                </tr>
+              </tbody>
+              <tbody v-for="group in displayConfirmGroups" :key="group.groupKey">
                 <tr class="nd-preview-table__group">
-                  <td colspan="9">
+                  <td colspan="10">
                     <div class="nd-preview-group">
                       <div class="nd-preview-group__main">
-                        <b>{{ group.woNo }}</b>
-                        <span>{{ group.goodsName || '-' }}</span>
+                        <b>{{ group.title }}</b>
+                        <span v-if="group.subtitle">{{ group.subtitle }}</span>
                         <el-tag effect="plain" size="small" type="info">{{ group.taskCount }} 个任务</el-tag>
                       </div>
                       <div class="nd-preview-group__sub">
                         小计: {{ fmtNum(group.assignedQty) }} / {{ fmtNum(group.planQty) }}
                         <em>{{ fmtWorkSeconds(group.estTimeSec) }}</em>
+                        <strong>¥{{ fmtNum(group.estWage) }}</strong>
                       </div>
                     </div>
                   </td>
@@ -611,7 +676,7 @@
                         :color="'#2e7d5a'"
                         :percentage="row.qtyPercent"
                         :show-text="false"
-                        :stroke-width="8"
+                        :stroke-width="12"
                       />
                       <span>{{ fmtNum(row.assignedQty) }} / {{ fmtNum(row.planQty) }}</span>
                     </div>
@@ -619,7 +684,7 @@
                   <td>
                     <div class="nd-preview-workers">
                       <span v-for="w in row.workers" :key="w.empNo" class="nd-preview-worker">
-                        <el-avatar :size="22">{{ workerInitial(w.empName || w.empNo) }}</el-avatar>
+                        <el-avatar :size="30">{{ workerInitial(w.empName || w.empNo) }}</el-avatar>
                         <em>{{ w.empName || w.empNo }}</em>
                         <b>{{ fmtNum(w.planQty) }}</b>
                       </span>
@@ -629,6 +694,7 @@
                     </div>
                   </td>
                   <td class="is-num is-ok">{{ row.estTimeText }}</td>
+                  <td class="is-num is-wage">¥{{ fmtNum(row.estWage) }}</td>
                   <td class="is-op">
                     <el-button link type="primary" @click="wizardStep = 1">···</el-button>
                   </td>
@@ -640,26 +706,24 @@
           <footer class="nd-preview__summary">
             <div class="nd-preview__summary-left">
               <b>合计</b>
-              <span>{{ confirmSummary.woCount }} 张工单</span>
-              <span>{{ confirmSummary.prcCount }} 道工序</span>
-              <span>{{ confirmSummary.taskCount }} 个派工任务</span>
+              <span>{{ filteredConfirmSummary.woCount }} 张工单</span>
+              <span>{{ filteredConfirmSummary.prcCount }} 道工序</span>
+              <span>{{ filteredConfirmSummary.taskCount }} 个派工任务</span>
             </div>
             <div class="nd-preview__summary-right">
-              <span>派工数量 <b>{{ fmtNum(confirmSummary.assignedQty) }} / {{ fmtNum(confirmSummary.planQty) }}</b></span>
-              <span>预计工时 <b>{{ fmtWorkSeconds(confirmSummary.estTimeSec) }}</b></span>
-              <span>涉及人员 <b>{{ confirmSummary.workerCount }} 人</b></span>
+              <span>派工数量 <b>{{ fmtNum(filteredConfirmSummary.assignedQty) }} / {{ fmtNum(filteredConfirmSummary.planQty) }}</b></span>
+              <span>预计工时 <b>{{ fmtWorkSeconds(filteredConfirmSummary.estTimeSec) }}</b></span>
+              <span>总工价 <b>¥{{ fmtNum(filteredConfirmSummary.estWage) }}</b></span>
+              <span>涉及人员 <b>{{ filteredConfirmSummary.workerCount }} 人</b></span>
             </div>
           </footer>
         </div>
 
         <footer class="nd-preview__foot">
           <el-button @click="wizardStep = 0">取消</el-button>
-          <div class="nd-preview__foot-right">
-            <el-button disabled>保存为模板</el-button>
-            <el-button :icon="Promotion" :loading="saving" type="primary" :disabled="!canSubmit" @click="submit">
-              确认派工
-            </el-button>
-          </div>
+          <el-button :icon="Promotion" :loading="saving" type="primary" :disabled="!canSubmit" @click="submit">
+            确认派工
+          </el-button>
         </footer>
       </section>
     </div>
@@ -762,7 +826,14 @@ const stepItems = [
 const woColors = ['#3b82f6', '#2e7d5a', '#ea580c', '#7c3aed', '#0891b2']
 
 const wizardStep = ref(0)
-const confirmGroupBy = ref('wo')
+const confirmGroupBy = ref<'wo' | 'process'>('wo')
+const confirmFilter = reactive({
+  keyword: '',
+  woNo: '',
+  prcKey: '',
+  empNo: '',
+  onlyPartial: false,
+})
 const loading = ref(false)
 const prcLoading = ref(false)
 const saving = ref(false)
@@ -1135,61 +1206,200 @@ const confirmItems = computed(() =>
     .filter((r) => r.workers.length)
 )
 
-const confirmGroups = computed(() => {
-  const map = new Map<string, {
-    woNo: string
-    goodsName: string
-    items: typeof confirmItems.value
-  }>()
+const filteredConfirmItems = computed(() => {
+  const kw = confirmFilter.keyword.trim().toLowerCase()
+  return confirmItems.value.filter((item) => {
+    if (confirmFilter.woNo && item.woNo !== confirmFilter.woNo) return false
+    if (confirmFilter.prcKey && `${item.prcCode}|${item.prcName}` !== confirmFilter.prcKey) return false
+    if (confirmFilter.empNo && !item.workers.some((w) => w.empNo === confirmFilter.empNo)) return false
+    if (confirmFilter.onlyPartial && item.assignedQty >= item.planQty - 0.000001) return false
+    if (kw) {
+      const hay = `${item.woNo}${item.goodsName}${item.prcCode}${item.prcName}${item.mrName}`.toLowerCase()
+      if (!hay.includes(kw)) return false
+    }
+    return true
+  })
+})
+
+const confirmWoOptions = computed(() => [...new Set(confirmItems.value.map((i) => i.woNo))])
+
+const confirmPrcOptions = computed(() => {
+  const map = new Map<string, string>()
   for (const item of confirmItems.value) {
+    const key = `${item.prcCode}|${item.prcName}`
+    map.set(key, `${item.prcCode} ${item.prcName}`.trim())
+  }
+  return [...map.entries()].map(([value, label]) => ({ value, label }))
+})
+
+const confirmWorkerOptions = computed(() => {
+  const map = new Map<string, string>()
+  for (const item of confirmItems.value) {
+    for (const w of item.workers) {
+      if (!map.has(w.empNo)) map.set(w.empNo, w.empName || w.empNo)
+    }
+  }
+  return [...map.entries()].map(([empNo, label]) => ({ empNo, label }))
+})
+
+const confirmFilterActive = computed(() => {
+  let n = 0
+  if (confirmFilter.keyword.trim()) n++
+  if (confirmFilter.woNo) n++
+  if (confirmFilter.prcKey) n++
+  if (confirmFilter.empNo) n++
+  if (confirmFilter.onlyPartial) n++
+  return n
+})
+
+const resetConfirmFilter = () => {
+  confirmFilter.keyword = ''
+  confirmFilter.woNo = ''
+  confirmFilter.prcKey = ''
+  confirmFilter.empNo = ''
+  confirmFilter.onlyPartial = false
+}
+
+const buildConfirmGroupStats = (items: typeof confirmItems.value) => ({
+  taskCount: items.length,
+  assignedQty: items.reduce((s, i) => s + i.assignedQty, 0),
+  planQty: items.reduce((s, i) => s + i.planQty, 0),
+  estTimeSec: items.reduce((s, i) => s + i.estTimeSec, 0),
+  estWage: items.reduce((s, i) => s + i.estWage, 0),
+})
+
+const displayConfirmGroups = computed(() => {
+  const items = filteredConfirmItems.value
+  if (confirmGroupBy.value === 'process') {
+    const map = new Map<string, { groupKey: string; title: string; subtitle: string; items: typeof items }>()
+    for (const item of items) {
+      const pk = `${item.mrCode || ''}|${item.prcCode || ''}`
+      const hit = map.get(pk)
+      if (hit) {
+        hit.items.push(item)
+        if (!hit.subtitle.includes(item.woNo)) {
+          hit.subtitle = hit.subtitle ? `${hit.subtitle}、${item.woNo}` : item.woNo
+        }
+      } else {
+        map.set(pk, {
+          groupKey: pk,
+          title: `${item.prcCode} ${item.prcName}`.trim(),
+          subtitle: item.woNo,
+          items: [item],
+        })
+      }
+    }
+    return [...map.values()].map((g) => ({ ...g, ...buildConfirmGroupStats(g.items) }))
+  }
+  const map = new Map<string, { groupKey: string; title: string; subtitle: string; items: typeof items }>()
+  for (const item of items) {
     const hit = map.get(item.woNo)
     if (hit) {
       hit.items.push(item)
     } else {
-      map.set(item.woNo, { woNo: item.woNo, goodsName: item.goodsName, items: [item] })
+      map.set(item.woNo, {
+        groupKey: item.woNo,
+        title: item.woNo,
+        subtitle: item.goodsName || '',
+        items: [item],
+      })
     }
   }
-  return [...map.values()].map((g) => ({
-    ...g,
-    taskCount: g.items.length,
-    assignedQty: g.items.reduce((s, i) => s + i.assignedQty, 0),
-    planQty: g.items.reduce((s, i) => s + i.planQty, 0),
-    estTimeSec: g.items.reduce((s, i) => s + i.estTimeSec, 0),
-  }))
+  return [...map.values()].map((g) => ({ ...g, ...buildConfirmGroupStats(g.items) }))
 })
 
-const confirmSummary = computed(() => ({
-  taskCount: confirmItems.value.length,
-  woCount: confirmGroups.value.length,
-  prcCount: new Set(confirmItems.value.map((i) => `${i.mrCode || ''}|${i.prcCode || ''}`)).size,
-  assignedQty: confirmItems.value.reduce((s, i) => s + i.assignedQty, 0),
-  planQty: confirmItems.value.reduce((s, i) => s + i.planQty, 0),
-  estTimeSec: confirmItems.value.reduce((s, i) => s + i.estTimeSec, 0),
-  workerCount: uniqueWorkerCount.value,
-}))
+const buildConfirmSummary = (items: typeof confirmItems.value) => {
+  const workerSet = new Set<string>()
+  for (const item of items) {
+    for (const w of item.workers) workerSet.add(w.empNo)
+  }
+  return {
+    taskCount: items.length,
+    woCount: new Set(items.map((i) => i.woNo)).size,
+    prcCount: new Set(items.map((i) => `${i.mrCode || ''}|${i.prcCode || ''}`)).size,
+    assignedQty: items.reduce((s, i) => s + i.assignedQty, 0),
+    planQty: items.reduce((s, i) => s + i.planQty, 0),
+    estTimeSec: items.reduce((s, i) => s + i.estTimeSec, 0),
+    estWage: items.reduce((s, i) => s + i.estWage, 0),
+    workerCount: workerSet.size,
+  }
+}
+
+const filteredConfirmSummary = computed(() => buildConfirmSummary(filteredConfirmItems.value))
+
+const exportConfirmPreview = () => {
+  const rows = filteredConfirmItems.value
+  if (!rows.length) {
+    $baseMessage('没有可导出的数据', 'warning', 'hey')
+    return
+  }
+  const headers = [
+    '工单号',
+    '品名',
+    '工序编号',
+    '工序名称',
+    '工序类型',
+    '计薪方式',
+    '加工单价',
+    '加工工时',
+    '派工数量',
+    '计划数量',
+    '人员分配',
+    '预计工时',
+    '总工价',
+  ]
+  const body = rows.map((r) => [
+    r.woNo,
+    r.goodsName,
+    r.prcCode,
+    r.prcName,
+    r.mrName,
+    r.wageTypeText,
+    fmtNum(r.machiningUp),
+    r.machiningTimeText,
+    fmtNum(r.assignedQty),
+    fmtNum(r.planQty),
+    r.workers.map((w) => `${w.empName || w.empNo}:${fmtNum(w.planQty)}`).join(';'),
+    r.estTimeText,
+    fmtNum(r.estWage),
+  ])
+  const csv = [headers, ...body]
+    .map((row) => row.map((cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(','))
+    .join('\n')
+  const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `派工预览_${new Date().toISOString().slice(0, 10)}.csv`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+  $baseMessage(`已导出 ${rows.length} 条派工明细`, 'success', 'hey')
+}
 
 const confirmKpiCards = computed(() => [
-  { key: 'task', label: '派工任务数', value: String(confirmSummary.value.taskCount), icon: TrendCharts, tone: 'green' },
-  { key: 'wo', label: '涉及工单', value: String(confirmSummary.value.woCount), icon: Document, tone: 'blue' },
-  { key: 'prc', label: '涉及工序', value: String(confirmSummary.value.prcCount), icon: Box, tone: 'purple' },
+  { key: 'task', label: '派工任务数', value: String(filteredConfirmSummary.value.taskCount), icon: TrendCharts, tone: 'green' },
+  { key: 'wo', label: '涉及工单', value: String(filteredConfirmSummary.value.woCount), icon: Document, tone: 'blue' },
+  { key: 'prc', label: '涉及工序', value: String(filteredConfirmSummary.value.prcCount), icon: Box, tone: 'purple' },
   {
     key: 'qty',
     label: '派工总数量',
-    value: `${fmtNum(confirmSummary.value.assignedQty)} 件`,
+    value: `${fmtNum(filteredConfirmSummary.value.assignedQty)} 件`,
     icon: Box,
     tone: 'orange',
   },
   {
     key: 'time',
     label: '预计工时',
-    value: fmtWorkSeconds(confirmSummary.value.estTimeSec),
+    value: fmtWorkSeconds(filteredConfirmSummary.value.estTimeSec),
     icon: Clock,
     tone: 'cyan',
   },
   {
     key: 'worker',
     label: '参与人员',
-    value: `${confirmSummary.value.workerCount} 人`,
+    value: `${filteredConfirmSummary.value.workerCount} 人`,
     icon: User,
     tone: 'indigo',
   },
@@ -2521,11 +2731,6 @@ onMounted(() => {
     border-radius: 10px;
     background: #fff;
   }
-
-  &__foot-right {
-    display: flex;
-    gap: 8px;
-  }
 }
 
 .nd-preview-kpi {
@@ -2626,7 +2831,12 @@ onMounted(() => {
   }
 
   .is-qty {
-    min-width: 148px;
+    min-width: 96px;
+  }
+
+  .is-wage {
+    color: #c2410c;
+    font-weight: 600;
   }
 
   .is-op {
@@ -2638,6 +2848,11 @@ onMounted(() => {
     padding: 0;
     background: #f7faf8;
     border-bottom: 1px solid #dce8e0;
+  }
+
+  &__empty {
+    padding: 24px 12px;
+    text-align: center;
   }
 }
 
@@ -2680,6 +2895,12 @@ onMounted(() => {
       color: var(--nd-green);
       font-weight: 600;
     }
+
+    strong {
+      margin-left: 10px;
+      color: #c2410c;
+      font-weight: 700;
+    }
   }
 }
 
@@ -2692,12 +2913,20 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  min-width: 120px;
+  max-width: 84px;
 
   span {
-    font-size: 12px;
+    font-size: 11px;
     color: var(--nd-muted);
     font-variant-numeric: tabular-nums;
+  }
+
+  :deep(.el-progress-bar__outer) {
+    border-radius: 6px;
+  }
+
+  :deep(.el-progress-bar__inner) {
+    border-radius: 6px;
   }
 }
 
@@ -2705,37 +2934,97 @@ onMounted(() => {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
+  min-width: 160px;
 }
 
 .nd-preview-worker {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 8px 2px 2px;
+  gap: 6px;
+  padding: 4px 10px 4px 4px;
   border-radius: 999px;
-  background: #f0f5f2;
-  font-size: 12px;
+  background: #e8f4ec;
+  border: 1px solid #c5dfd0;
+  font-size: 13px;
+  box-shadow: 0 1px 2px rgb(46 125 90 / 8%);
+
+  :deep(.el-avatar) {
+    font-size: 14px;
+    font-weight: 700;
+    background: #2e7d5a;
+    color: #fff;
+  }
 
   em {
     font-style: normal;
+    font-size: 13px;
+    font-weight: 600;
     color: var(--nd-ink);
   }
 
   b {
     color: var(--nd-green);
+    font-size: 13px;
+    font-weight: 700;
     font-variant-numeric: tabular-nums;
   }
 }
 
 .nd-preview-worker-add {
-  width: 24px;
-  height: 24px;
-  border: 1px dashed #b8cfc0;
+  width: 30px;
+  height: 30px;
+  border: 1px dashed #9dceb3;
   border-radius: 50%;
   background: #fff;
   color: var(--nd-green);
+  font-size: 16px;
+  font-weight: 600;
   cursor: pointer;
+  line-height: 1;
+}
+
+.nd-preview-filter {
+  &__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+
+    strong {
+      font-size: 14px;
+      color: var(--nd-ink);
+    }
+  }
+
+  &__foot {
+    margin-top: 4px;
+    padding-top: 8px;
+    border-top: 1px solid #edf2ee;
+    font-size: 12px;
+    color: var(--nd-muted);
+    text-align: right;
+  }
+
+  :deep(.el-select) {
+    width: 100%;
+  }
+}
+
+.nd-preview-filter-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  margin-left: 4px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--nd-green);
+  color: #fff;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 600;
   line-height: 1;
 }
 
