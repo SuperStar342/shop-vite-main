@@ -22,6 +22,10 @@ import {
   resolveDispatchStatus,
 } from '/@/utils/dispatchAlloc'
 
+/**
+ * 数量状态展示：ERP 派工进度（dispatch）或本次分配进度（alloc）。
+ * primary/secondary 随 mode 切换为 已派/计划 或 已分/未派。
+ */
 const props = withDefaults(
   defineProps<{
     mode?: 'dispatch' | 'alloc'

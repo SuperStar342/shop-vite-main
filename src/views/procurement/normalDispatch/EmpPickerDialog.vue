@@ -229,6 +229,7 @@ import {
 } from '/@/utils/dispatchAlloc'
 import { filterDeptsByKeyword, filterEmpsByKeyword, isPinyinLikeKeyword } from '/@/utils/empMatch'
 
+/** 弹窗分配区的一行：对应一张工单下的某道工序（或一键派工的配比模板行） */
 export type EmpAllocLine = {
   key: string
   woNo: string
@@ -239,13 +240,22 @@ export type EmpAllocLine = {
   prcName?: string
 }
 
+/**
+ * 人员选择弹窗。
+ * - 无 allocLines：仅勾选人员，emit confirm
+ * - 有 allocLines：勾选 + 按工单配比，emit confirmAlloc
+ * - batchTemplate：一键派工配比模板模式（比例确认后由父组件按各工序未派量重算）
+ */
 defineOptions({ name: 'EmpPickerDialog' })
 
 const props = defineProps<{
   modelValue: boolean
   preferredDeptId?: number | string | null
+  /** 打开时预勾选的人员 */
   selected?: { empNo: string; empName?: string; deptName?: string }[]
+  /** 需要配比的工单/工序行；有值则进入分配模式 */
   allocLines?: EmpAllocLine[]
+  /** 各行已有配比（用于回显） */
   lineWorkers?: Record<string, AllocWorker[]>
   dialogTitle?: string
   /** 一键派工配比模板模式 */
@@ -254,7 +264,9 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:modelValue': [boolean]
+  /** 仅选人（无配比区） */
   confirm: [{ empNo: string; empName?: string; deptName?: string }[]]
+  /** 带比例/数量的按行分配结果 */
   confirmAlloc: [{ key: string; workers: AllocWorker[] }[]]
 }>()
 
@@ -263,14 +275,19 @@ const empLoading = ref(false)
 const onlyDept = ref(true)
 const empKeyword = ref('')
 const empDeptId = ref<number | string | undefined>()
+/** 左侧导航：all | workshop | 具体 deptId */
 const empNavKey = ref<'all' | 'workshop' | string>('all')
 const empDeptList = ref<any[]>([])
 const empPageNo = ref(1)
 const empPageSize = ref(20)
+/** 程序同步表格勾选时置 true，避免 selection-change 回写草稿 */
 const empSelecting = ref(false)
 const employees = ref<any[]>([])
+/** 跨页保留的已选人员草稿 */
 const empDraft = ref<any[]>([])
+/** 分配模式下：lineKey → 该行工人配比 */
 const lineAlloc = ref<Record<string, AllocWorker[]>>({})
+/** 用于判断是否「新增勾选」以便自动平均填满 */
 const prevDraftCount = ref(0)
 
 const isAllocMode = computed(() => (props.allocLines?.length || 0) > 0)
@@ -317,6 +334,7 @@ const lineOverAssign = (key: string) => {
   return lineAssignedQty(key) - num(line.remainQty) > 0.000001
 }
 
+/** 勾选变化后同步各行工人列表；fillEqual 时按未派量平均填满 */
 const syncLineAllocWorkers = (fillEqual = false) => {
   if (!isAllocMode.value) return
   const next: Record<string, AllocWorker[]> = {}
@@ -367,6 +385,7 @@ const fillAllLinesEqual = () => {
   }
 }
 
+/** 把第一张工单的比例同步到其余工单，并按各自未派量重算数量 */
 const syncRatiosAcrossLines = () => {
   const first = props.allocLines?.[0]
   if (!first?.key) return
@@ -507,6 +526,10 @@ const syncEmpTableSelection = async () => {
   empSelecting.value = false
 }
 
+/**
+ * 表格勾选变化：保留其他页已选，合并当前页勾选。
+ * 分配模式下新增人员会自动对各行平均填满。
+ */
 const onEmpDraftChange = (rows: any[]) => {
   if (empSelecting.value) return
   const pageIds = new Set(pagedEmployees.value.map((r) => r.empNo))
@@ -563,6 +586,7 @@ const loadEmployees = async () => {
   }
 }
 
+/** 打开弹窗：恢复草稿、回显配比、加载部门与人员 */
 const onOpen = async () => {
   empPageNo.value = 1
   empNavKey.value = onlyDept.value && props.preferredDeptId != null ? 'workshop' : 'all'
@@ -594,6 +618,11 @@ const onOpen = async () => {
   await loadEmployees()
 }
 
+/**
+ * 确定：
+ * - 分配模式：校验超量/数量后 emit confirmAlloc
+ * - 纯选人：emit confirm
+ */
 const confirm = () => {
   if (isAllocMode.value) {
     if (!empDraft.value.length) {

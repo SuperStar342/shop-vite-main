@@ -1,3 +1,7 @@
+/**
+ * BOR（工单工序）字段归一化与工价/工时估算。
+ * 兼容接口大小写与历史字段别名，供普通/快捷派工页面使用。
+ */
 import { fmtNum, num } from '/@/utils/dispatchAlloc'
 
 /** 从接口行中按别名取字段（兼容大小写/旧字段） */
@@ -107,6 +111,7 @@ export const estimateBorWorkSeconds = (line: any) => {
   return time * times
 }
 
+/** 预计工时展示（秒；为 0 显示 -） */
 export const fmtWorkSeconds = (sec: number) => {
   if (!sec || sec <= 0) return '-'
   return `${fmtNum(sec)}秒`

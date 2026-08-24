@@ -788,10 +788,16 @@ import {
 import DispatchQtyCell from './DispatchQtyCell.vue'
 import EmpPickerDialog, { type EmpAllocLine } from './EmpPickerDialog.vue'
 
+/**
+ * 普通派工三步向导：
+ * 1) 勾选工单与工序  2) 指派人员/数量  3) 预览确认提交
+ * 核心状态在 assignMap：taskKey → 工人配比列表。
+ */
 defineOptions({ name: 'NormalDispatch' })
 
 const route = useRoute()
 
+// ---------- 向导与筛选状态 ----------
 const stepItems = [
   { key: 'pick', label: '选择工单与工序' },
   { key: 'assign', label: '指派人员与数量' },
@@ -801,7 +807,9 @@ const stepItems = [
 const woColors = ['#3b82f6', '#2e7d5a', '#ea580c', '#7c3aed', '#0891b2']
 
 const wizardStep = ref(0)
+/** 预览页分组：按工单 / 按工序 */
 const confirmGroupBy = ref<'wo' | 'process'>('wo')
+/** 预览页筛选条件（与顶部 KPI 同步） */
 const confirmFilter = reactive({
   keyword: '',
   woNo: '',
@@ -818,6 +826,7 @@ const smartLimit = ref(2)
 const smartDays = ref(30)
 const smartPreview = ref<any[]>([])
 const smartPreviewTried = ref(false)
+/** true=同工序合并为一行分配；false=每张工单工序独立分配（精细派工） */
 const mergeSameProcess = ref(false)
 const pickTab = ref<'current' | 'batch' | 'picked'>('batch')
 const assignView = ref<'wo' | 'process'>('process')
@@ -828,30 +837,42 @@ const queryWoNo = ref('')
 const queryMoNo = ref('')
 const activeWoNo = ref('')
 const allWorkOrders = ref<any[]>([])
+/** 工单号 → 工序行缓存（按需加载） */
 const linesByWo = ref<Record<string, any[]>>({})
 const selectedWoSet = ref<Set<string>>(new Set())
+/** 已勾选工序行的 lineKey 列表 */
 const checkedLeafIds = ref<string[]>([])
-/** taskKey → workers（合并时为工序键，非合并为行键） */
+
+/**
+ * 一键派工专用标记：
+ * - editingTaskKey === ONE_CLICK_MODE 时弹窗进入「配比模板」模式
+ * - allocLines 使用 ONE_CLICK_TEMPLATE_KEY，确认后按模板写入未派工序
+ */
 const ONE_CLICK_MODE = '__oneclick__'
 const ONE_CLICK_TEMPLATE_KEY = '__oneclick_template__'
 
+/** taskKey → workers；合并时为工序键(processKey)，非合并为行键(lineKey) */
 const assignMap = ref<Record<string, AllocWorker[]>>({})
-/** 一键派工配比模板（再次打开时回显） */
+/** 一键派工上次配比模板（再次打开弹窗时回显） */
 const oneClickTemplateWorkers = ref<AllocWorker[]>([])
 const empDialog = ref(false)
+/** 当前编辑的任务键；一键派工时为 ONE_CLICK_MODE */
 const editingTaskKey = ref('')
+/** 传给选人弹窗的分配行；有值则进入 alloc 模式 */
 const editingAllocLines = ref<EmpAllocLine[]>([])
 const currentTableRef = ref<any>(null)
 const syncingCurrentTable = ref(false)
 
+/** 工序行唯一键（与后端 lineMatchKey 一致） */
 const lineKey = borLineKey
-
+/** 同工艺同工序合并键（忽略工单） */
 const processKey = (row: any) => `${row.mrCode || ''}|${row.prcCode || ''}`
-
+/** 当前模式下写入 assignMap 使用的键 */
 const taskKeyOf = (line: any) => (mergeSameProcess.value ? processKey(line) : lineKey(line))
 
 const summarizeWageFields = summarizeBorWageFields
 
+// ---------- Step1：工单 / 工序选择 ----------
 const selectedWoNos = computed(() => [...selectedWoSet.value])
 
 const filteredWorkOrders = computed(() => {
@@ -870,6 +891,7 @@ const activeWoLines = computed(() => {
     .map((l) => ({ ...l, __key: lineKey(l) }))
 })
 
+/** 当前已勾选且仍有未派量的工序行（后续分配 / 提交的数据源） */
 const selectedLines = computed(() => {
   const map = new Map<string, any>()
   for (const lines of Object.values(linesByWo.value)) {
@@ -924,7 +946,8 @@ const batchProcessGroups = computed(() => {
   return [...groups.values()].sort((a, b) => String(a.prcCode).localeCompare(String(b.prcCode)))
 })
 
-/** 可编辑任务行（合并或逐行） */
+// ---------- Step2：分配任务行（合并 / 逐行） ----------
+/** 可编辑任务行：mergeSameProcess 时按工序汇总，否则一工单一行 */
 const assignRows = computed(() => {
   if (mergeSameProcess.value) {
     const grouped = new Map<string, any[]>()
@@ -994,6 +1017,10 @@ const assignRows = computed(() => {
   })
 })
 
+/**
+ * 将合并任务上的工人份额按工费拆回各工单工序行。
+ * 提交与预览都以「单工序行」为准，故合并模式下必须先拆分。
+ */
 const lineSplitMap = computed(() => {
   const map = new Map<string, AllocWorker[]>()
   for (const row of assignRows.value) {
@@ -1153,6 +1180,8 @@ const estimatedWageTotal = computed(() => {
   return total
 })
 
+// ---------- Step3：派工预览（明细 / 筛选 / KPI） ----------
+/** 已分配工人的工序行，供预览表与提交使用 */
 const confirmItems = computed(() =>
   selectedLines.value
     .map((line) => {
@@ -1246,6 +1275,7 @@ const buildConfirmGroupStats = (items: typeof confirmItems.value) => ({
   estWage: items.reduce((s, i) => s + i.estWage, 0),
 })
 
+/** 预览表分组数据（工单或工序）+ 组内小计 */
 const displayConfirmGroups = computed(() => {
   const items = filteredConfirmItems.value
   if (confirmGroupBy.value === 'process') {
@@ -1356,6 +1386,7 @@ const exportConfirmPreview = () => {
   $baseMessage(`已导出 ${rows.length} 条派工明细`, 'success', 'hey')
 }
 
+/** 顶部 KPI：承接原表格底部汇总（任务/数量/工时/工价/人员） */
 const confirmKpiCards = computed(() => {
   const s = filteredConfirmSummary.value
   return [
@@ -1407,8 +1438,10 @@ const canGoConfirm = computed(
 
 const canSubmit = computed(() => confirmItems.value.length > 0 && !hasOverAssign.value)
 
+// ---------- 选人弹窗 / 一键派工 ----------
 const isOneClickMode = computed(() => editingTaskKey.value === ONE_CLICK_MODE)
 
+/** 无工人或已派数量为 0 → 视为未派，可被一键派工覆盖 */
 const isTaskUnassigned = (taskKey: string) => {
   const ws = assignMap.value[taskKey] || []
   return !ws.length || !ws.some((w) => num(w.planQty) > 0)
@@ -1416,6 +1449,7 @@ const isTaskUnassigned = (taskKey: string) => {
 
 const unassignedAssignRows = computed(() => assignRows.value.filter((r) => isTaskUnassigned(r.taskKey)))
 
+/** 弹窗右侧/表格回显的已选人员 */
 const empDialogSelected = computed(() => {
   if (isOneClickMode.value) {
     return oneClickTemplateWorkers.value.map((w) => ({
@@ -1591,6 +1625,7 @@ const clearSelection = () => {
   oneClickTemplateWorkers.value = []
 }
 
+/** 单任务行选人（合并模式仅选人，非合并进入单工单配比） */
 const openEmpFor = (taskKey: string) => {
   editingTaskKey.value = taskKey
   if (mergeSameProcess.value) {
@@ -1604,6 +1639,7 @@ const openEmpFor = (taskKey: string) => {
   empDialog.value = true
 }
 
+/** 工序头选人：同工序下各工单一起进入多行配比 */
 const openEmpForProcess = (pk: string) => {
   const line = selectedLines.value.find((l) => processKey(l) === pk)
   if (!line) return
@@ -1612,6 +1648,10 @@ const openEmpForProcess = (pk: string) => {
   empDialog.value = true
 }
 
+/**
+ * 一键派工：弹出配比模板。
+ * allocLines 仅作 UI 预览（数量按样例行未派量），真正写入在 confirm 时按各未派工序重算。
+ */
 const openOneClickDispatch = () => {
   if (!selectedLines.value.length) {
     $baseMessage('请先选择工序', 'warning', 'hey')
@@ -1639,11 +1679,13 @@ const openOneClickDispatch = () => {
   empDialog.value = true
 }
 
+/** 任务行可分配上限 = 未派量 */
 const taskCap = (taskKey: string) => {
   const row = assignRows.value.find((r) => r.taskKey === taskKey)
   return num(row?.remainQty)
 }
 
+/** 触发 assignMap 浅拷贝，保证表格响应式刷新 */
 const touchTask = (taskKey: string) => {
   assignMap.value = { ...assignMap.value, [taskKey]: [...(assignMap.value[taskKey] || [])] }
 }
@@ -1779,6 +1821,10 @@ const previewSmartSuggest = async () => {
   }
 }
 
+/**
+ * 将人员批量写入全部任务（智能派工会覆盖已有分配）。
+ * byScore=true 按推荐得分占比；否则平均。
+ */
 const applyEmpsToAllTasks = async (
   emps: any[],
   successMsg: string,
@@ -1808,7 +1854,10 @@ const applyEmpsToAllTasks = async (
   $baseMessage(successMsg, 'success', 'hey')
 }
 
-/** 将模板工人按配比写入各未派工序 */
+/**
+ * 一键派工确认：仅写入未派工序，已派任务保留。
+ * 模板中的 planQty 仅作弹窗预览；此处按各任务 remainQty × ratio 重算。
+ */
 const applyOneClickFromTemplate = (template: AllocWorker[]) => {
   const unassigned = unassignedAssignRows.value
   if (!template.length || !unassigned.length) return 0
@@ -1903,6 +1952,7 @@ const removeWorker = (taskKey: string, empNo: string) => {
   if (list.length) applyEqualTask(taskKey)
 }
 
+/** 纯选人确认（无配比区）：写入当前任务并默认平均数量 */
 const onEmpPickerConfirm = (emps: { empNo: string; empName?: string; deptName?: string }[]) => {
   editingAllocLines.value = []
   const key = editingTaskKey.value
@@ -1926,6 +1976,11 @@ const onEmpPickerConfirm = (emps: { empNo: string; empName?: string; deptName?: 
   applyEqualTask(key)
 }
 
+/**
+ * 带配比确认：
+ * - 一键派工 → 按模板批量写未派工序
+ * - 否则 → 按弹窗返回的各工单配比写回 assignMap
+ */
 const onEmpPickerConfirmAlloc = (lines: { key: string; workers: AllocWorker[] }[]) => {
   if (editingTaskKey.value === ONE_CLICK_MODE) {
     const templateLine = lines.find((l) => l.key === ONE_CLICK_TEMPLATE_KEY) || lines[0]
@@ -1948,6 +2003,7 @@ const onEmpPickerConfirmAlloc = (lines: { key: string; workers: AllocWorker[] }[
   $baseMessage('人员分配已更新，请核对比例与数量后确认派工', 'success', 'hey')
 }
 
+/** 加载可派工工单列表（制令/工单号筛选） */
 const loadPreview = async () => {
   loading.value = true
   try {
@@ -1974,6 +2030,10 @@ const onWoSearchEnter = () => {
   }
 }
 
+/**
+ * 提交派工：以拆分后的单工序行 + 工人数量调用后端。
+ * 合并模式下 lineSplitMap 已按工费份额拆到各工单。
+ */
 const submit = async () => {
   if (!canSubmit.value) return
   const mo =

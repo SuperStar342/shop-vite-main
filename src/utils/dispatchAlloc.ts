@@ -1,17 +1,26 @@
+/**
+ * 派工分配工具：比例↔数量联动、按工费拆分到工单行、派工状态文案。
+ * 普通派工 / 快捷派工共用。
+ */
 /** 数值安全转换 */
 export const num = (v: any) => {
   const n = Number(v)
   return Number.isFinite(n) ? n : 0
 }
 
+/** 展示用数字格式（去多余小数 0） */
 export const fmtNum = (v: any) => {
   const n = num(v)
   return Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/\.?0+$/, '')
 }
 
+/** 任务行上的工人份额：ratio 为占未派量的百分比，planQty 为本次派量 */
 export type AllocWorker = { empNo: string; empName?: string; deptName?: string; ratio?: number; planQty: number }
 
-/** 按权重把总量分给 N 人（优先整数） */
+/**
+ * 按权重把总量分给 N 人。
+ * 总量为整数时用「最大余数法」保证每人份数为整数且合计精确。
+ */
 export const distributeByWeights = (total: number, weights: number[]) => {
   const n = weights.length
   if (!n || total <= 0) return weights.map(() => 0)
@@ -238,6 +247,7 @@ export const redistributeWorkersByRatio = (workers: AllocWorker[], cap: number) 
   }
 }
 
+/** 按已填数量反推比例（合计约 100%），与 redistributeWorkersByRatio 双向联动 */
 export const syncWorkersRatioFromQty = (workers: AllocWorker[], cap: number) => {
   const list = workers || []
   if (!list.length) return
@@ -263,6 +273,7 @@ export const syncWorkersRatioFromQty = (workers: AllocWorker[], cap: number) => 
   })
 }
 
+/** 平均分配比例并按 cap 写入每人 planQty */
 export const applyEqualWorkers = (workers: AllocWorker[], cap: number) => {
   const list = workers || []
   const n = list.length
