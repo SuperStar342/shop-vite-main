@@ -24,7 +24,7 @@ import {
 
 /**
  * 数量状态展示：ERP 派工进度（dispatch）或本次分配进度（alloc）。
- * dispatch：已派 / 计划；alloc：本次已分 / 未派量。
+ * dispatch：ERP 已派 / 计划；alloc：本次已分 / 可派剩余（未派量）。
  */
 const props = withDefaults(
   defineProps<{

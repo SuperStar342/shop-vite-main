@@ -134,6 +134,30 @@
           </template>
 
           <template v-else-if="pickTab === 'batch'">
+            <div class="nd-batch-bar">
+              <span class="nd-batch-bar__tip">
+                已勾选 {{ batchCheckedCount }} / {{ batchSelectableCount }} 道工序
+              </span>
+              <div class="nd-batch-bar__actions">
+                <el-button
+                  size="small"
+                  type="primary"
+                  plain
+                  :disabled="!batchSelectableCount"
+                  @click="selectAllBatchProcesses"
+                >
+                  全选
+                </el-button>
+                <el-button
+                  size="small"
+                  plain
+                  :disabled="!batchCheckedCount"
+                  @click="clearBatchProcesses"
+                >
+                  取消全选
+                </el-button>
+              </div>
+            </div>
             <el-table
               :data="batchProcessGroups"
               border
@@ -669,7 +693,7 @@
                   <th>计薪方式</th>
                   <th class="is-num">加工单价</th>
                   <th class="is-num">加工工时</th>
-                  <th class="is-qty">派工状态 / 数量</th>
+                  <th class="is-qty">本次派工 / 可派剩余</th>
                   <th>人员分配</th>
                   <th class="is-num">预计工时</th>
                   <th class="is-num">总工价</th>
@@ -693,7 +717,7 @@
                         <el-tag effect="plain" size="small" type="info">{{ group.taskCount }} 个任务</el-tag>
                       </div>
                       <div class="nd-preview-group__sub">
-                        小计: {{ fmtNum(group.assignedQty) }} / {{ fmtNum(group.planQty) }}
+                        小计: {{ fmtNum(group.assignedQty) }} / {{ fmtNum(group.remainQty) }}
                         <em>{{ fmtWorkSeconds(group.estTimeSec) }}</em>
                         <strong>¥{{ fmtNum(group.estWage) }}</strong>
                       </div>
@@ -719,7 +743,7 @@
                         align="left"
                         size="sm"
                         :assigned-qty="row.assignedQty"
-                        :remain-qty="row.planQty"
+                        :remain-qty="row.remainQty"
                       />
                       <el-progress
                         :color="'#2e7d5a'"
@@ -1007,6 +1031,39 @@ const batchProcessGroups = computed(() => {
   return [...groups.values()].sort((a, b) => String(a.prcCode).localeCompare(String(b.prcCode)))
 })
 
+/** 批量工序可选行数（已选工单下全部待派工序） */
+const batchSelectableIds = computed(() => {
+  const ids: string[] = []
+  for (const g of batchProcessGroups.value) {
+    for (const line of g.lines || []) ids.push(lineKey(line))
+  }
+  return ids
+})
+
+const batchSelectableCount = computed(() => batchSelectableIds.value.length)
+
+const batchCheckedCount = computed(() => {
+  const set = new Set(batchSelectableIds.value)
+  return checkedLeafIds.value.filter((id) => set.has(id)).length
+})
+
+/** 批量工序：全选当前列表全部待派工序 */
+const selectAllBatchProcesses = () => {
+  if (!batchSelectableIds.value.length) {
+    $baseMessage('暂无可选工序，请先勾选工单', 'warning', 'hey')
+    return
+  }
+  const set = new Set(checkedLeafIds.value)
+  for (const id of batchSelectableIds.value) set.add(id)
+  checkedLeafIds.value = [...set]
+}
+
+/** 批量工序：取消勾选当前列表工序（不影响其他来源勾选） */
+const clearBatchProcesses = () => {
+  const drop = new Set(batchSelectableIds.value)
+  checkedLeafIds.value = checkedLeafIds.value.filter((id) => !drop.has(id))
+}
+
 /** 批量工序组：汇总多工单的 ERP 派工状态 */
 const groupDispatchStatus = (lines: any[]) => {
   if (!lines?.length) return '未派工'
@@ -1258,12 +1315,17 @@ const estimatedWageTotal = computed(() => {
 })
 
 // ---------- Step3：派工预览（明细 / 筛选 / KPI） ----------
-/** 已分配工人的工序行，供预览表与提交使用 */
+/**
+ * 已分配工人的工序行，供预览表与提交使用。
+ * 数量口径：本次已派 / 可派剩余（remainQty），与分配页一致；
+ * 不与 ERP 计划量对比，避免部分已派工单造成「未派满」误判。
+ */
 const confirmItems = computed(() =>
   selectedLines.value
     .map((line) => {
       const workers = lineSplitMap.value.get(lineKey(line)) || []
       const assignedQty = workers.reduce((s, w) => s + num(w.planQty), 0)
+      const remainQty = num(line.remainQty)
       const planQty = num(line.woQty)
       const estTimeSec = estimateBorWorkSeconds(line)
       const wo = allWorkOrders.value.find((w) => w.woNo === line.woNo)
@@ -1281,8 +1343,9 @@ const confirmItems = computed(() =>
         estTimeSec,
         estTimeText: fmtWorkSeconds(estTimeSec),
         assignedQty,
+        remainQty,
         planQty,
-        qtyPercent: planQty > 0 ? Math.min(100, Math.round((assignedQty / planQty) * 100)) : 0,
+        qtyPercent: remainQty > 0 ? Math.min(100, Math.round((assignedQty / remainQty) * 100)) : 0,
         workers,
         estWage: estimateBorWage(line, assignedQty),
       }
@@ -1296,7 +1359,7 @@ const filteredConfirmItems = computed(() => {
     if (confirmFilter.woNo && item.woNo !== confirmFilter.woNo) return false
     if (confirmFilter.prcKey && `${item.prcCode}|${item.prcName}` !== confirmFilter.prcKey) return false
     if (confirmFilter.empNo && !item.workers.some((w) => w.empNo === confirmFilter.empNo)) return false
-    if (confirmFilter.onlyPartial && item.assignedQty >= item.planQty - 0.000001) return false
+    if (confirmFilter.onlyPartial && item.assignedQty >= item.remainQty - 0.000001) return false
     if (kw) {
       const hay = `${item.woNo}${item.goodsName}${item.prcCode}${item.prcName}${item.mrName}`.toLowerCase()
       if (!hay.includes(kw)) return false
@@ -1347,6 +1410,7 @@ const resetConfirmFilter = () => {
 const buildConfirmGroupStats = (items: typeof confirmItems.value) => ({
   taskCount: items.length,
   assignedQty: items.reduce((s, i) => s + i.assignedQty, 0),
+  remainQty: items.reduce((s, i) => s + i.remainQty, 0),
   planQty: items.reduce((s, i) => s + i.planQty, 0),
   estTimeSec: items.reduce((s, i) => s + i.estTimeSec, 0),
   estWage: items.reduce((s, i) => s + i.estWage, 0),
@@ -1403,6 +1467,7 @@ const buildConfirmSummary = (items: typeof confirmItems.value) => {
     woCount: new Set(items.map((i) => i.woNo)).size,
     prcCount: new Set(items.map((i) => `${i.mrCode || ''}|${i.prcCode || ''}`)).size,
     assignedQty: items.reduce((s, i) => s + i.assignedQty, 0),
+    remainQty: items.reduce((s, i) => s + i.remainQty, 0),
     planQty: items.reduce((s, i) => s + i.planQty, 0),
     estTimeSec: items.reduce((s, i) => s + i.estTimeSec, 0),
     estWage: items.reduce((s, i) => s + i.estWage, 0),
@@ -1428,6 +1493,7 @@ const exportConfirmPreview = () => {
     '加工单价',
     '加工工时',
     '派工数量',
+    '可派剩余',
     '计划数量',
     '人员分配',
     '预计工时',
@@ -1443,6 +1509,7 @@ const exportConfirmPreview = () => {
     fmtNum(r.machiningUp),
     r.machiningTimeText,
     fmtNum(r.assignedQty),
+    fmtNum(r.remainQty),
     fmtNum(r.planQty),
     r.workers.map((w) => `${w.empName || w.empNo}:${fmtNum(w.planQty)}`).join(';'),
     r.estTimeText,
@@ -1478,8 +1545,8 @@ const confirmKpiCards = computed(() => {
     {
       key: 'qty',
       label: '派工数量',
-      value: `${fmtNum(s.assignedQty)} / ${fmtNum(s.planQty)}`,
-      sub: '已派 / 计划',
+      value: `${fmtNum(s.assignedQty)} / ${fmtNum(s.remainQty)}`,
+      sub: '本次已派 / 可派剩余',
       icon: Box,
       tone: 'orange',
     },
@@ -2476,6 +2543,8 @@ onMounted(() => {
   flex: 1;
   min-height: 0;
   padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
 
   :deep(.is-single-prc-row > td) {
     background: #fff;
@@ -2491,6 +2560,34 @@ onMounted(() => {
 
   :deep(.is-single-prc-row > td:first-child) {
     box-shadow: inset 3px 0 0 #94a3b8;
+  }
+
+  > .el-table {
+    flex: 1;
+    min-height: 0;
+  }
+}
+
+.nd-batch-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  border: 1px solid #e5eee8;
+  border-radius: 8px;
+  background: #f7faf8;
+
+  &__tip {
+    font-size: 12px;
+    color: var(--nd-muted);
+  }
+
+  &__actions {
+    display: flex;
+    gap: 8px;
   }
 }
 
