@@ -3,7 +3,7 @@
     <header class="nd-hero">
       <div>
         <h1>普通派工</h1>
-        <p>多工单选工序；单价不同按工费份额拆量；选人窗口可一键派工</p>
+        <p>多工单选工序；先选择人员，再一键派工批量应用到全部工序</p>
       </div>
       <nav class="nd-steps" aria-label="派工步骤">
         <button
@@ -320,7 +320,19 @@
             <el-button size="small" type="primary" plain :disabled="!selectedLines.length" @click="openEmpPickerGlobal">
               选择人员
             </el-button>
+            <el-button
+              size="small"
+              type="success"
+              plain
+              :disabled="!pickedWorkers.length || !selectedLines.length"
+              @click="applyOneClickDispatch"
+            >
+              一键派工
+            </el-button>
             <el-button size="small" type="primary" plain @click="applyEqualAll">全部平均</el-button>
+            <span v-if="pickedWorkers.length" class="nd-picked-workers">
+              已选 {{ pickedWorkers.length }} 人：{{ pickedWorkersLabel }}
+            </span>
           </div>
         </header>
 
@@ -555,12 +567,10 @@
       :alloc-lines="editingAllocLines"
       :dialog-title="empDialogTitle"
       :line-workers="editingLineWorkers"
-      :one-clickable="wizardStep === 1 && selectedLines.length > 0"
       :preferred-dept-id="preferredDeptId"
       :selected="empDialogSelected"
       @confirm="onEmpPickerConfirm"
       @confirm-alloc="onEmpPickerConfirmAlloc"
-      @one-click="onEmpPickerOneClick"
     />
 
     <el-dialog v-model="smartDialog" title="智能派工" width="520px" append-to-body destroy-on-close>
@@ -659,6 +669,8 @@ const selectedWoSet = ref<Set<string>>(new Set())
 const checkedLeafIds = ref<string[]>([])
 /** taskKey → workers（合并时为工序键，非合并为行键） */
 const assignMap = ref<Record<string, AllocWorker[]>>({})
+/** 全局已选工人（选择人员后用于一键派工） */
+const pickedWorkers = ref<{ empNo: string; empName?: string; deptName?: string }[]>([])
 const empDialog = ref(false)
 const editingTaskKey = ref('')
 const editingAllocLines = ref<EmpAllocLine[]>([])
@@ -1000,6 +1012,10 @@ const canGoConfirm = computed(
 
 const canSubmit = computed(() => confirmItems.value.length > 0 && !hasOverAssign.value)
 
+const pickedWorkersLabel = computed(() =>
+  pickedWorkers.value.map((w) => w.empName || w.empNo).join('、')
+)
+
 const empDialogSelected = computed(() => {
   const lines = editingAllocLines.value
   if (lines.length > 0) {
@@ -1018,15 +1034,11 @@ const empDialogSelected = computed(() => {
     return [...union.values()]
   }
   if (!editingTaskKey.value) {
-    const union = new Map<string, { empNo: string; empName?: string; deptName?: string }>()
-    for (const line of selectedLines.value) {
-      for (const w of assignMap.value[lineKey(line)] || []) {
-        if (!union.has(w.empNo)) {
-          union.set(w.empNo, { empNo: w.empNo, empName: w.empName, deptName: w.deptName })
-        }
-      }
-    }
-    return [...union.values()]
+    return pickedWorkers.value.map((w) => ({
+      empNo: w.empNo,
+      empName: w.empName,
+      deptName: w.deptName,
+    }))
   }
   const list = assignMap.value[editingTaskKey.value] || []
   return list.map((w) => ({ empNo: w.empNo, empName: w.empName, deptName: w.deptName }))
@@ -1043,7 +1055,7 @@ const empDialogTitle = computed(() => {
     return `选择人员 · ${l.prcCode || ''} ${l.prcName || ''}（${lines.length} 张工单）`.trim()
   }
   if (!editingTaskKey.value) {
-    return `选择人员 · 全部 ${selectedLines.value.length} 道工序`
+    return `选择人员 · 一键派工（${selectedLines.value.length} 道工序）`
   }
   return '选择人员'
 })
@@ -1078,21 +1090,6 @@ const buildEditingAllocLines = (line: any): EmpAllocLine[] => {
   const group = selectedLines.value.filter((l) => processKey(l) === pk)
   return group.map(buildAllocLine)
 }
-
-/** 一键派工：按当前任务行（合并/逐行）生成可编辑分配行 */
-const buildOneClickAllocLines = (): EmpAllocLine[] =>
-  assignRows.value.map((row) => {
-    const sample = row.lines?.[0]
-    return {
-      key: row.taskKey,
-      woNo: row.woText || sample?.woNo || '',
-      remainQty: num(row.remainQty),
-      planQty: num(row.planQty),
-      machiningUp: num(sample?.machiningUp),
-      prcCode: row.prcCode,
-      prcName: row.prcName,
-    }
-  })
 
 const goStep = (idx: number) => {
   if (idx === 0) wizardStep.value = 0
@@ -1179,6 +1176,7 @@ const clearSelection = () => {
   checkedLeafIds.value = []
   selectedWoSet.value = new Set()
   assignMap.value = {}
+  pickedWorkers.value = []
 }
 
 const openEmpFor = (taskKey: string) => {
@@ -1352,7 +1350,12 @@ const previewSmartSuggest = async () => {
   }
 }
 
-const applyEmpsToAllTasks = async (emps: any[], successMsg: string, byScore = false) => {
+const applyEmpsToAllTasks = async (
+  emps: any[],
+  successMsg: string,
+  byScore = false,
+  advanceStep = true
+) => {
   if (!emps.length) return
   const ratios = byScore ? ratiosFromScores(emps) : equalRatios(emps.length)
   const next: Record<string, AllocWorker[]> = {}
@@ -1372,13 +1375,27 @@ const applyEmpsToAllTasks = async (emps: any[], successMsg: string, byScore = fa
     else applyEqualTask(row.taskKey)
   }
   smartDialog.value = false
-  if (canGoConfirm.value) {
-    wizardStep.value = 2
-    $baseMessage(successMsg, 'success', 'hey')
-  } else {
-    wizardStep.value = 1
-    $baseMessage('已自动分配，请检查数量后确认', 'success', 'hey')
+  wizardStep.value = advanceStep && canGoConfirm.value ? 2 : 1
+  $baseMessage(successMsg, 'success', 'hey')
+}
+
+/** 将已选工人平均分配到全部工序 */
+const applyOneClickDispatch = async () => {
+  if (!selectedLines.value.length) {
+    $baseMessage('请先选择工序', 'warning', 'hey')
+    return
   }
+  if (!pickedWorkers.value.length) {
+    $baseMessage('请先点击「选择人员」勾选工人', 'warning', 'hey')
+    return
+  }
+  const names = pickedWorkersLabel.value
+  await applyEmpsToAllTasks(
+    pickedWorkers.value,
+    `一键派工完成（${names}），各工序已平均分配，请核对比例与数量`,
+    false,
+    false
+  )
 }
 
 const applySmartDispatch = async () => {
@@ -1448,29 +1465,17 @@ const removeWorker = (taskKey: string, empNo: string) => {
   if (list.length) applyEqualTask(taskKey)
 }
 
-const onEmpPickerConfirmAlloc = (lines: { key: string; workers: AllocWorker[] }[]) => {
-  const next = { ...assignMap.value }
-  for (const { key, workers } of lines) {
-    next[key] = workers
-  }
-  assignMap.value = next
-  editingAllocLines.value = []
-  editingTaskKey.value = ''
-  $baseMessage('人员分配已更新，请核对比例与数量后确认派工', 'success', 'hey')
-}
-
-const onEmpPickerOneClick = (
-  emps: { empNo: string; empName?: string; deptName?: string }[]
-) => {
-  if (!emps.length || !selectedLines.value.length) return
-  editingTaskKey.value = ''
-  editingAllocLines.value = buildOneClickAllocLines()
-}
-
 const onEmpPickerConfirm = (emps: { empNo: string; empName?: string; deptName?: string }[]) => {
   editingAllocLines.value = []
   const key = editingTaskKey.value
-  if (!key) return
+  if (!key) {
+    pickedWorkers.value = emps.map((e) => ({
+      empNo: e.empNo,
+      empName: e.empName,
+      deptName: e.deptName,
+    }))
+    return
+  }
   const prev = new Map((assignMap.value[key] || []).map((w) => [w.empNo, w]))
   const n = emps.length
   assignMap.value = {
@@ -1488,6 +1493,17 @@ const onEmpPickerConfirm = (emps: { empNo: string; empName?: string; deptName?: 
   }
   if (!n) return
   applyEqualTask(key)
+}
+
+const onEmpPickerConfirmAlloc = (lines: { key: string; workers: AllocWorker[] }[]) => {
+  const next = { ...assignMap.value }
+  for (const { key, workers } of lines) {
+    next[key] = workers
+  }
+  assignMap.value = next
+  editingAllocLines.value = []
+  editingTaskKey.value = ''
+  $baseMessage('人员分配已更新，请核对比例与数量后确认派工', 'success', 'hey')
 }
 
 const loadPreview = async () => {
@@ -1973,6 +1989,15 @@ onMounted(() => {
   .nd-hint {
     font-size: 12px;
     color: var(--nd-muted);
+  }
+
+  .nd-picked-workers {
+    max-width: 320px;
+    font-size: 12px;
+    color: #2e7d5a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   :deep(.el-table) {

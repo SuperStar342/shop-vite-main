@@ -118,9 +118,6 @@
           <strong>已选 {{ empDraft.length }} 人</strong>
           <el-button link type="primary" :disabled="!empDraft.length" @click="clearEmpDraft">清空</el-button>
         </header>
-        <p v-if="oneClickable" class="emp-picker__tray-tip">
-          一键派工：将已选人员应用到全部工序并平均预填，可在下方调整各工人比例与数量后点确定
-        </p>
         <el-scrollbar class="emp-picker__tray-scroll">
           <article v-for="row in empDraft" :key="row.empNo" class="emp-tray-card">
             <span class="emp-avatar">{{ empInitial(row.empName || row.empNo) }}</span>
@@ -214,9 +211,6 @@
 
     <template #footer>
       <el-button @click="emit('update:modelValue', false)">取消</el-button>
-      <el-button v-if="oneClickable" :disabled="!empDraft.length" type="success" plain @click="oneClickApply">
-        一键派工
-      </el-button>
       <el-button type="primary" @click="confirm">确定</el-button>
     </template>
   </el-dialog>
@@ -254,14 +248,12 @@ const props = defineProps<{
   allocLines?: EmpAllocLine[]
   lineWorkers?: Record<string, AllocWorker[]>
   dialogTitle?: string
-  oneClickable?: boolean
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [boolean]
   confirm: [{ empNo: string; empName?: string; deptName?: string }[]]
   confirmAlloc: [{ key: string; workers: AllocWorker[] }[]]
-  oneClick: [{ empNo: string; empName?: string; deptName?: string }[]]
 }>()
 
 const empTableRef = ref<any>(null)
@@ -596,26 +588,6 @@ const onOpen = async () => {
   await loadEmployees()
 }
 
-const oneClickApply = () => {
-  if (!empDraft.value.length) {
-    $baseMessage('请先勾选人员', 'warning', 'hey')
-    return
-  }
-  if (isAllocMode.value) {
-    fillAllLinesEqual()
-    $baseMessage('已按平均分配预填，请核对后确定', 'success', 'hey')
-    return
-  }
-  emit(
-    'oneClick',
-    empDraft.value.map((r) => ({
-      empNo: r.empNo,
-      empName: r.empName,
-      deptName: r.deptName,
-    }))
-  )
-}
-
 const confirm = () => {
   if (isAllocMode.value) {
     if (!empDraft.value.length) {
@@ -672,19 +644,6 @@ watch(
   () => {
     empPageNo.value = 1
     syncEmpTableSelection()
-  }
-)
-
-/** 一键派工：弹窗已打开时由父级注入 allocLines，进入分配区并平均预填 */
-watch(
-  () => [props.modelValue, props.allocLines?.length ?? 0] as const,
-  ([open, len], old) => {
-    if (!open || !len) return
-    const wasOpen = old?.[0] === true
-    const hadAlloc = (old?.[1] ?? 0) > 0
-    if (wasOpen && !hadAlloc) {
-      nextTick(() => syncLineAllocWorkers(true))
-    }
   }
 )
 </script>
