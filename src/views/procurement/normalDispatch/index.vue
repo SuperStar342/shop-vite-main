@@ -200,6 +200,7 @@
                     :plan-qty="row.planSum"
                     :remain-qty="row.remainSum"
                     :status="groupDispatchStatus(row.lines)"
+                    :wt-qty="row.wtSum"
                   />
                 </template>
               </el-table-column>
@@ -616,7 +617,7 @@
                   <th>计薪方式</th>
                   <th class="is-num">加工单价</th>
                   <th class="is-num">加工工时</th>
-                  <th class="is-qty">派工数量 / 计划数量</th>
+                  <th class="is-qty">派工状态 / 数量</th>
                   <th>人员分配</th>
                   <th class="is-num">预计工时</th>
                   <th class="is-num">总工价</th>
@@ -661,13 +662,19 @@
                   <td class="is-num">{{ row.machiningTimeText }}</td>
                   <td class="is-qty">
                     <div class="nd-preview-qty">
+                      <DispatchQtyCell
+                        mode="alloc"
+                        align="left"
+                        size="sm"
+                        :assigned-qty="row.assignedQty"
+                        :remain-qty="row.planQty"
+                      />
                       <el-progress
                         :color="'#2e7d5a'"
                         :percentage="row.qtyPercent"
                         :show-text="false"
                         :stroke-width="12"
                       />
-                      <span>{{ fmtNum(row.assignedQty) }} / {{ fmtNum(row.planQty) }}</span>
                     </div>
                   </td>
                   <td>
@@ -931,11 +938,13 @@ const batchProcessGroups = computed(() => {
         lines: [] as any[],
         remainSum: 0,
         planSum: 0,
+        wtSum: 0,
         coverCount: 0,
       }
       g.lines.push(line)
       g.remainSum += num(line.remainQty)
       g.planSum += num(line.woQty)
+      g.wtSum += num(line.wtQty)
       groups.set(key, g)
     }
   }
@@ -945,6 +954,15 @@ const batchProcessGroups = computed(() => {
   }
   return [...groups.values()].sort((a, b) => String(a.prcCode).localeCompare(String(b.prcCode)))
 })
+
+/** 批量工序组：汇总多工单的 ERP 派工状态 */
+const groupDispatchStatus = (lines: any[]) => {
+  if (!lines?.length) return '未派工'
+  const statuses = lines.map((l) => resolveDispatchStatus(l.remainQty, l.woQty, l.wtQty))
+  if (statuses.every((s) => s === '已派工')) return '已派工'
+  if (statuses.every((s) => s === '未派工')) return '未派工'
+  return '部分派工'
+}
 
 // ---------- Step2：分配任务行（合并 / 逐行） ----------
 /** 可编辑任务行：mergeSameProcess 时按工序汇总，否则一工单一行 */
@@ -1112,6 +1130,8 @@ const assignDisplayRows = computed(() => {
         prcName: sample.prcName,
         mrName: sample.mrName,
         woCount: groupRows.length,
+        planQty: groupRows.reduce((s, r) => s + num(r.planQty), 0),
+        wtQty: groupRows.reduce((s, r) => s + num(r.wtQty), 0),
         remainQty: groupRows.reduce((s, r) => s + num(r.remainQty), 0),
         assignedQty: groupRows.reduce((s, r) => s + num(r.assignedQty), 0),
         estWage: groupRows.reduce((s, r) => s + num(r.estWage), 0),
@@ -3009,7 +3029,8 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  max-width: 84px;
+  min-width: 108px;
+  max-width: 132px;
 
   span {
     font-size: 11px;

@@ -24,7 +24,7 @@ import {
 
 /**
  * 数量状态展示：ERP 派工进度（dispatch）或本次分配进度（alloc）。
- * primary/secondary 随 mode 切换为 已派/计划 或 已分/未派。
+ * dispatch：已派 / 计划；alloc：本次已分 / 未派量。
  */
 const props = withDefaults(
   defineProps<{
@@ -55,8 +55,17 @@ const statusKind = computed(() =>
   props.mode === 'alloc' ? allocStatusKind(statusText.value) : dispatchStatusKind(statusText.value)
 )
 
+/** ERP 已派数量：优先 wtQty，否则由计划量 - 未派量推算 */
+const dispatchedQty = computed(() => {
+  if (props.wtQty != null && props.wtQty !== '') return num(props.wtQty)
+  const plan = num(props.planQty)
+  const remain = num(props.remainQty)
+  if (plan > 0) return Math.max(0, plan - remain)
+  return 0
+})
+
 const primaryQty = computed(() =>
-  props.mode === 'alloc' ? num(props.assignedQty) : num(props.remainQty)
+  props.mode === 'alloc' ? num(props.assignedQty) : dispatchedQty.value
 )
 
 const secondaryQty = computed(() =>
