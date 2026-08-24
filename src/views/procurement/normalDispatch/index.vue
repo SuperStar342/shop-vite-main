@@ -1,6 +1,6 @@
 <template>
   <div class="nd-page auto-height-container">
-    <header class="nd-hero">
+    <header v-show="wizardStep !== 2" class="nd-hero">
       <div>
         <h1>普通派工</h1>
         <p>多工单选工序；先选择人员，再一键派工批量应用到全部工序</p>
@@ -517,47 +517,149 @@
       </section>
     </div>
 
-    <!-- Step 3: 确认 -->
+    <!-- Step 3: 派工预览 -->
     <div v-show="wizardStep === 2" class="nd-step nd-step--confirm">
-      <section class="nd-confirm">
-        <header>
-          <strong>确认派工内容</strong>
-          <el-tag effect="plain" type="success">将生成 1 张派工单</el-tag>
+      <section class="nd-preview">
+        <header class="nd-preview__hero">
+          <div class="nd-preview__hero-text">
+            <h2>
+              <el-icon class="nd-preview__hero-icon"><Document /></el-icon>
+              派工预览
+            </h2>
+            <p>
+              共 {{ confirmSummary.taskCount }} 个派工任务，预计完成 {{ fmtNum(confirmSummary.planQty) }} 件
+            </p>
+          </div>
+          <div class="nd-preview__hero-actions">
+            <el-button :icon="ArrowLeft" @click="wizardStep = 1">返回编辑</el-button>
+            <el-button :icon="Promotion" :loading="saving" type="primary" :disabled="!canSubmit" @click="submit">
+              确认派工
+            </el-button>
+          </div>
         </header>
-        <div class="nd-kpi">
-          <div><em>工单</em><b>{{ selectedWoNos.length }}</b></div>
-          <div><em>工序行</em><b>{{ selectedLines.length }}</b></div>
-          <div><em>人员</em><b>{{ uniqueWorkerCount }}</b></div>
-          <div><em>派量</em><b>{{ fmtNum(assignedTotalQty) }}</b></div>
-          <div><em>预估工费</em><b>{{ fmtNum(estimatedWageTotal) }}</b></div>
+
+        <div class="nd-preview__kpi">
+          <article v-for="card in confirmKpiCards" :key="card.key" class="nd-preview-kpi">
+            <span class="nd-preview-kpi__icon" :class="`is-${card.tone}`">
+              <el-icon><component :is="card.icon" /></el-icon>
+            </span>
+            <div>
+              <em>{{ card.label }}</em>
+              <strong>{{ card.value }}</strong>
+            </div>
+          </article>
         </div>
-        <el-table :data="confirmItems" border max-height="420">
-          <el-table-column label="工单" width="120" prop="woNo" />
-          <el-table-column label="工序" min-width="140">
-            <template #default="{ row }">{{ row.prcCode }} {{ row.prcName }}</template>
-          </el-table-column>
-          <el-table-column label="计薪" width="72" align="center" prop="wageTypeText" />
-          <el-table-column label="加工单价" width="90" align="right">
-            <template #default="{ row }">{{ fmtNum(row.machiningUp) }}</template>
-          </el-table-column>
-          <el-table-column label="加工工时" width="100" align="right" prop="timeText" />
-          <el-table-column label="人员分配" min-width="200">
-            <template #default="{ row }">
-              <span v-for="w in row.workers" :key="w.empNo" class="nd-chip nd-chip--sm">
-                {{ w.empName || w.empNo }} {{ fmtNum(w.planQty) }}
-              </span>
-            </template>
-          </el-table-column>
-          <el-table-column label="派量" width="90" align="right">
-            <template #default="{ row }">{{ fmtNum(row.qty) }}</template>
-          </el-table-column>
-          <el-table-column label="预估工费" width="100" align="right">
-            <template #default="{ row }">{{ fmtNum(row.estWage) }}</template>
-          </el-table-column>
-        </el-table>
-        <footer>
-          <el-button @click="wizardStep = 1">上一步</el-button>
-          <el-button type="primary" :loading="saving" :disabled="!canSubmit" @click="submit">提交派工</el-button>
+
+        <div class="nd-preview__panel">
+          <header class="nd-preview__panel-head">
+            <strong>派工任务明细</strong>
+            <div class="nd-preview__panel-tools">
+              <el-select v-model="confirmGroupBy" size="small" style="width: 132px">
+                <el-option label="按工单" value="wo" />
+              </el-select>
+              <el-button :icon="Filter" size="small">筛选</el-button>
+              <el-button :icon="Download" size="small">导出</el-button>
+            </div>
+          </header>
+
+          <div class="nd-preview-table-wrap">
+            <table class="nd-preview-table">
+              <thead>
+                <tr>
+                  <th>工单 / 工序</th>
+                  <th>工序类型</th>
+                  <th>计薪方式</th>
+                  <th class="is-num">加工单价</th>
+                  <th class="is-num">加工工时</th>
+                  <th class="is-qty">派工数量 / 计划数量</th>
+                  <th>人员分配</th>
+                  <th class="is-num">预计工时</th>
+                  <th class="is-op">操作</th>
+                </tr>
+              </thead>
+              <tbody v-for="group in confirmGroups" :key="group.woNo">
+                <tr class="nd-preview-table__group">
+                  <td colspan="9">
+                    <div class="nd-preview-group">
+                      <div class="nd-preview-group__main">
+                        <b>{{ group.woNo }}</b>
+                        <span>{{ group.goodsName || '-' }}</span>
+                        <el-tag effect="plain" size="small" type="info">{{ group.taskCount }} 个任务</el-tag>
+                      </div>
+                      <div class="nd-preview-group__sub">
+                        小计: {{ fmtNum(group.assignedQty) }} / {{ fmtNum(group.planQty) }}
+                        <em>{{ fmtWorkSeconds(group.estTimeSec) }}</em>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+                <tr v-for="row in group.items" :key="row.key">
+                  <td>
+                    <div class="nd-preview-prc">
+                      <b>{{ row.prcCode }} {{ row.prcName }}</b>
+                    </div>
+                  </td>
+                  <td>
+                    <el-tag effect="plain" round size="small" type="success">{{ row.mrName || '-' }}</el-tag>
+                  </td>
+                  <td>{{ row.wageTypeText }}</td>
+                  <td class="is-num">{{ fmtNum(row.machiningUp) }}</td>
+                  <td class="is-num">{{ row.machiningTimeText }}</td>
+                  <td class="is-qty">
+                    <div class="nd-preview-qty">
+                      <el-progress
+                        :color="'#2e7d5a'"
+                        :percentage="row.qtyPercent"
+                        :show-text="false"
+                        :stroke-width="8"
+                      />
+                      <span>{{ fmtNum(row.assignedQty) }} / {{ fmtNum(row.planQty) }}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="nd-preview-workers">
+                      <span v-for="w in row.workers" :key="w.empNo" class="nd-preview-worker">
+                        <el-avatar :size="22">{{ workerInitial(w.empName || w.empNo) }}</el-avatar>
+                        <em>{{ w.empName || w.empNo }}</em>
+                        <b>{{ fmtNum(w.planQty) }}</b>
+                      </span>
+                      <button class="nd-preview-worker-add" type="button" title="调整人员" @click="wizardStep = 1">
+                        +
+                      </button>
+                    </div>
+                  </td>
+                  <td class="is-num is-ok">{{ row.estTimeText }}</td>
+                  <td class="is-op">
+                    <el-button link type="primary" @click="wizardStep = 1">···</el-button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <footer class="nd-preview__summary">
+            <div class="nd-preview__summary-left">
+              <b>合计</b>
+              <span>{{ confirmSummary.woCount }} 张工单</span>
+              <span>{{ confirmSummary.prcCount }} 道工序</span>
+              <span>{{ confirmSummary.taskCount }} 个派工任务</span>
+            </div>
+            <div class="nd-preview__summary-right">
+              <span>派工数量 <b>{{ fmtNum(confirmSummary.assignedQty) }} / {{ fmtNum(confirmSummary.planQty) }}</b></span>
+              <span>预计工时 <b>{{ fmtWorkSeconds(confirmSummary.estTimeSec) }}</b></span>
+              <span>涉及人员 <b>{{ confirmSummary.workerCount }} 人</b></span>
+            </div>
+          </footer>
+        </div>
+
+        <footer class="nd-preview__foot">
+          <el-button @click="wizardStep = 0">取消</el-button>
+          <div class="nd-preview__foot-right">
+            <el-button disabled>保存为模板</el-button>
+            <el-button :icon="Promotion" :loading="saving" type="primary" :disabled="!canSubmit" @click="submit">
+              确认派工
+            </el-button>
+          </div>
         </footer>
       </section>
     </div>
@@ -604,7 +706,20 @@
 </template>
 
 <script lang="ts" setup>
-import { Plus, QuestionFilled, Refresh } from '@element-plus/icons-vue'
+import {
+  ArrowLeft,
+  Box,
+  Clock,
+  Document,
+  Download,
+  Filter,
+  Plus,
+  Promotion,
+  QuestionFilled,
+  Refresh,
+  TrendCharts,
+  User,
+} from '@element-plus/icons-vue'
 import {
   getQuickDispatchEmployees,
   getQuickDispatchPreview,
@@ -625,7 +740,9 @@ import {
 import {
   borLineKey,
   estimateBorWage,
+  estimateBorWorkSeconds,
   fmtMachiningTime,
+  fmtWorkSeconds,
   summarizeBorWageFields,
   wageTypeLabel,
 } from '/@/utils/dispatchBor'
@@ -645,6 +762,7 @@ const stepItems = [
 const woColors = ['#3b82f6', '#2e7d5a', '#ea580c', '#7c3aed', '#0891b2']
 
 const wizardStep = ref(0)
+const confirmGroupBy = ref('wo')
 const loading = ref(false)
 const prcLoading = ref(false)
 const saving = ref(false)
@@ -990,21 +1108,94 @@ const confirmItems = computed(() =>
   selectedLines.value
     .map((line) => {
       const workers = lineSplitMap.value.get(lineKey(line)) || []
-      const qty = workers.reduce((s, w) => s + num(w.planQty), 0)
+      const assignedQty = workers.reduce((s, w) => s + num(w.planQty), 0)
+      const planQty = num(line.woQty)
+      const estTimeSec = estimateBorWorkSeconds(line)
+      const wo = allWorkOrders.value.find((w) => w.woNo === line.woNo)
       return {
+        key: lineKey(line),
         woNo: line.woNo,
+        goodsName: wo?.goodsName || line.goodsName || '',
+        mrName: line.mrName,
+        mrCode: line.mrCode,
         prcCode: line.prcCode,
         prcName: line.prcName,
         wageTypeText: wageTypeLabel(line.pWageType),
         machiningUp: num(line.machiningUp),
-        timeText: fmtMachiningTime(line.machiningTime, line.timeUnit),
+        machiningTimeText: fmtMachiningTime(line.machiningTime, line.timeUnit),
+        estTimeSec,
+        estTimeText: fmtWorkSeconds(estTimeSec),
+        assignedQty,
+        planQty,
+        qtyPercent: planQty > 0 ? Math.min(100, Math.round((assignedQty / planQty) * 100)) : 0,
         workers,
-        qty,
-        estWage: estimateBorWage(line, qty),
+        estWage: estimateBorWage(line, assignedQty),
       }
     })
     .filter((r) => r.workers.length)
 )
+
+const confirmGroups = computed(() => {
+  const map = new Map<string, {
+    woNo: string
+    goodsName: string
+    items: typeof confirmItems.value
+  }>()
+  for (const item of confirmItems.value) {
+    const hit = map.get(item.woNo)
+    if (hit) {
+      hit.items.push(item)
+    } else {
+      map.set(item.woNo, { woNo: item.woNo, goodsName: item.goodsName, items: [item] })
+    }
+  }
+  return [...map.values()].map((g) => ({
+    ...g,
+    taskCount: g.items.length,
+    assignedQty: g.items.reduce((s, i) => s + i.assignedQty, 0),
+    planQty: g.items.reduce((s, i) => s + i.planQty, 0),
+    estTimeSec: g.items.reduce((s, i) => s + i.estTimeSec, 0),
+  }))
+})
+
+const confirmSummary = computed(() => ({
+  taskCount: confirmItems.value.length,
+  woCount: confirmGroups.value.length,
+  prcCount: new Set(confirmItems.value.map((i) => `${i.mrCode || ''}|${i.prcCode || ''}`)).size,
+  assignedQty: confirmItems.value.reduce((s, i) => s + i.assignedQty, 0),
+  planQty: confirmItems.value.reduce((s, i) => s + i.planQty, 0),
+  estTimeSec: confirmItems.value.reduce((s, i) => s + i.estTimeSec, 0),
+  workerCount: uniqueWorkerCount.value,
+}))
+
+const confirmKpiCards = computed(() => [
+  { key: 'task', label: '派工任务数', value: String(confirmSummary.value.taskCount), icon: TrendCharts, tone: 'green' },
+  { key: 'wo', label: '涉及工单', value: String(confirmSummary.value.woCount), icon: Document, tone: 'blue' },
+  { key: 'prc', label: '涉及工序', value: String(confirmSummary.value.prcCount), icon: Box, tone: 'purple' },
+  {
+    key: 'qty',
+    label: '派工总数量',
+    value: `${fmtNum(confirmSummary.value.assignedQty)} 件`,
+    icon: Box,
+    tone: 'orange',
+  },
+  {
+    key: 'time',
+    label: '预计工时',
+    value: fmtWorkSeconds(confirmSummary.value.estTimeSec),
+    icon: Clock,
+    tone: 'cyan',
+  },
+  {
+    key: 'worker',
+    label: '参与人员',
+    value: `${confirmSummary.value.workerCount} 人`,
+    icon: User,
+    tone: 'indigo',
+  },
+])
+
+const workerInitial = (name: string) => String(name || '?').trim().slice(0, 1) || '?'
 
 const canGoConfirm = computed(
   () => assignedTaskCount.value > 0 && assignedTotalQty.value > 0 && !hasOverAssign.value
@@ -1707,8 +1898,7 @@ onMounted(() => {
 .nd-wo-pane,
 .nd-prc-pane,
 .nd-assign-pane,
-.nd-side-summary,
-.nd-confirm {
+.nd-side-summary {
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -1811,8 +2001,7 @@ onMounted(() => {
 }
 
 .nd-prc-pane__foot,
-.nd-assign-pane footer,
-.nd-confirm footer {
+.nd-assign-pane footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2217,15 +2406,337 @@ onMounted(() => {
   min-height: 0;
 }
 
-.nd-confirm {
-  padding: 12px;
+.nd-preview {
+  display: flex;
+  flex-direction: column;
   gap: 12px;
+  min-height: 0;
+  flex: 1;
 
-  > header {
+  &__hero {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 16px;
+    border: 1px solid var(--nd-line);
+    border-radius: 10px;
+    background: #fff;
+  }
+
+  &__hero-text {
+    h2 {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0;
+      font-size: 18px;
+      color: var(--nd-ink);
+    }
+
+    p {
+      margin: 6px 0 0;
+      font-size: 13px;
+      color: var(--nd-muted);
+    }
+  }
+
+  &__hero-icon {
+    color: var(--nd-green);
+    font-size: 20px;
+  }
+
+  &__hero-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  &__kpi {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  &__panel {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--nd-line);
+    border-radius: 10px;
+    background: #fff;
+    overflow: hidden;
+  }
+
+  &__panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    border-bottom: 1px solid #e8f0eb;
+    font-size: 14px;
+  }
+
+  &__panel-tools {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &__summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 10px 14px;
+    border-top: 1px solid #e8f0eb;
+    background: #f3faf6;
+    font-size: 12px;
+    color: var(--nd-muted);
+
+    b {
+      color: var(--nd-green);
+      font-size: 13px;
+    }
+  }
+
+  &__summary-left,
+  &__summary-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  &__foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--nd-line);
+    border-radius: 10px;
+    background: #fff;
+  }
+
+  &__foot-right {
+    display: flex;
+    gap: 8px;
+  }
+}
+
+.nd-preview-kpi {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--nd-line);
+  border-radius: 10px;
+  background: #fff;
+  min-width: 0;
+
+  em {
+    display: block;
+    font-style: normal;
+    font-size: 12px;
+    color: var(--nd-muted);
+  }
+
+  strong {
+    display: block;
+    margin-top: 4px;
+    font-size: 18px;
+    color: var(--nd-ink);
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    font-size: 18px;
+
+    &.is-green {
+      background: #e8f4ec;
+      color: #2e7d5a;
+    }
+    &.is-blue {
+      background: #e8f0ff;
+      color: #3b82f6;
+    }
+    &.is-purple {
+      background: #f0e8ff;
+      color: #7c3aed;
+    }
+    &.is-orange {
+      background: #fff3e8;
+      color: #ea580c;
+    }
+    &.is-cyan {
+      background: #e8f7fa;
+      color: #0891b2;
+    }
+    &.is-indigo {
+      background: #e8ecff;
+      color: #4f46e5;
+    }
+  }
+}
+
+.nd-preview-table-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.nd-preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+
+  th,
+  td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #edf2ee;
+    text-align: left;
+    vertical-align: middle;
+  }
+
+  th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #f7faf8;
+    font-size: 12px;
+    font-weight: 600;
+    color: #6b7f74;
+    white-space: nowrap;
+  }
+
+  .is-num {
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .is-qty {
+    min-width: 148px;
+  }
+
+  .is-op {
+    width: 56px;
+    text-align: center;
+  }
+
+  &__group td {
+    padding: 0;
+    background: #f7faf8;
+    border-bottom: 1px solid #dce8e0;
+  }
+}
+
+.nd-preview-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+
+  &__main {
     display: flex;
     align-items: center;
     gap: 10px;
+    min-width: 0;
+
+    b {
+      color: var(--nd-green);
+      font-size: 14px;
+    }
+
+    span {
+      color: var(--nd-muted);
+      font-size: 12px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
   }
+
+  &__sub {
+    flex-shrink: 0;
+    font-size: 12px;
+    color: var(--nd-muted);
+    font-variant-numeric: tabular-nums;
+
+    em {
+      margin-left: 10px;
+      font-style: normal;
+      color: var(--nd-green);
+      font-weight: 600;
+    }
+  }
+}
+
+.nd-preview-prc b {
+  font-weight: 600;
+  color: var(--nd-ink);
+}
+
+.nd-preview-qty {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 120px;
+
+  span {
+    font-size: 12px;
+    color: var(--nd-muted);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.nd-preview-workers {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.nd-preview-worker {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px 2px 2px;
+  border-radius: 999px;
+  background: #f0f5f2;
+  font-size: 12px;
+
+  em {
+    font-style: normal;
+    color: var(--nd-ink);
+  }
+
+  b {
+    color: var(--nd-green);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.nd-preview-worker-add {
+  width: 24px;
+  height: 24px;
+  border: 1px dashed #b8cfc0;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--nd-green);
+  cursor: pointer;
+  line-height: 1;
 }
 
 .nd-smart-tip {
@@ -2278,34 +2789,14 @@ onMounted(() => {
   }
 }
 
-.nd-kpi {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 8px;
-
-  div {
-    padding: 10px;
-    border-radius: 8px;
-    background: #f3faf6;
-  }
-
-  em {
-    display: block;
-    font-style: normal;
-    font-size: 12px;
-    color: var(--nd-muted);
-  }
-
-  b {
-    font-size: 18px;
-    color: var(--nd-green);
-  }
-}
-
 @media (max-width: 1100px) {
   .nd-step--pick,
   .nd-step--assign {
     grid-template-columns: 1fr;
+  }
+
+  .nd-preview__kpi {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .nd-hero {

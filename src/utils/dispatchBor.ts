@@ -89,6 +89,29 @@ export const fmtMachiningTime = (time: any, unit?: any) => {
   return `${fmtNum(t)}${timeUnitLabel(u)}`
 }
 
+/** 将加工工时换算为秒 */
+export const toWorkSeconds = (time: any, unit?: any) => {
+  const t = num(time)
+  if (t <= 0) return 0
+  const u = String(unit ?? '').trim().toUpperCase()
+  if (u === 'H') return t * 3600
+  if (u === 'M') return t * 60
+  if (u === 'D') return t * 86400
+  return t
+}
+
+/** 工序标准预计工时（秒）= 加工工时 × 加工次数 */
+export const estimateBorWorkSeconds = (line: any) => {
+  const time = toWorkSeconds(line?.machiningTime, line?.timeUnit)
+  const times = num(line?.machiningTimes) || 1
+  return time * times
+}
+
+export const fmtWorkSeconds = (sec: number) => {
+  if (!sec || sec <= 0) return '-'
+  return `${fmtNum(sec)}秒`
+}
+
 const uniqueTexts = (values: string[]) => [...new Set(values.filter(Boolean))]
 
 /** 合并多行时的工价摘要（单价/计薪/工时不混写为单一值） */
