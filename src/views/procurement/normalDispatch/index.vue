@@ -3,7 +3,7 @@
     <header v-show="wizardStep !== 2" class="nd-hero">
       <div>
         <h1>普通派工</h1>
-        <p>多工单选工序；先选择人员，再一键派工批量应用到全部工序</p>
+        <p>多工单选工序；一键派工可批量设置人员配比，自动写入未派工序</p>
       </div>
       <nav class="nd-steps" aria-label="派工步骤">
         <button
@@ -317,22 +317,10 @@
             <el-button size="small" type="success" plain :loading="smartLoading" @click="openSmartDialog">
               智能派工
             </el-button>
-            <el-button size="small" type="primary" plain :disabled="!selectedLines.length" @click="openEmpPickerGlobal">
-              选择人员
-            </el-button>
-            <el-button
-              size="small"
-              type="success"
-              plain
-              :disabled="!pickedWorkers.length || !selectedLines.length"
-              @click="applyOneClickDispatch"
-            >
+            <el-button size="small" type="success" plain :disabled="!selectedLines.length" @click="openOneClickDispatch">
               一键派工
             </el-button>
             <el-button size="small" type="primary" plain @click="applyEqualAll">全部平均</el-button>
-            <span v-if="pickedWorkers.length" class="nd-picked-workers">
-              已选 {{ pickedWorkers.length }} 人：{{ pickedWorkersLabel }}
-            </span>
           </div>
         </header>
 
@@ -543,6 +531,7 @@
             <div>
               <em>{{ card.label }}</em>
               <strong>{{ card.value }}</strong>
+              <small v-if="card.sub">{{ card.sub }}</small>
             </div>
           </article>
         </div>
@@ -702,21 +691,6 @@
               </tbody>
             </table>
           </div>
-
-          <footer class="nd-preview__summary">
-            <div class="nd-preview__summary-left">
-              <b>合计</b>
-              <span>{{ filteredConfirmSummary.woCount }} 张工单</span>
-              <span>{{ filteredConfirmSummary.prcCount }} 道工序</span>
-              <span>{{ filteredConfirmSummary.taskCount }} 个派工任务</span>
-            </div>
-            <div class="nd-preview__summary-right">
-              <span>派工数量 <b>{{ fmtNum(filteredConfirmSummary.assignedQty) }} / {{ fmtNum(filteredConfirmSummary.planQty) }}</b></span>
-              <span>预计工时 <b>{{ fmtWorkSeconds(filteredConfirmSummary.estTimeSec) }}</b></span>
-              <span>总工价 <b>¥{{ fmtNum(filteredConfirmSummary.estWage) }}</b></span>
-              <span>涉及人员 <b>{{ filteredConfirmSummary.workerCount }} 人</b></span>
-            </div>
-          </footer>
         </div>
 
         <footer class="nd-preview__foot">
@@ -731,6 +705,7 @@
     <EmpPickerDialog
       v-model="empDialog"
       :alloc-lines="editingAllocLines"
+      :batch-template="isOneClickMode"
       :dialog-title="empDialogTitle"
       :line-workers="editingLineWorkers"
       :preferred-dept-id="preferredDeptId"
@@ -857,9 +832,12 @@ const linesByWo = ref<Record<string, any[]>>({})
 const selectedWoSet = ref<Set<string>>(new Set())
 const checkedLeafIds = ref<string[]>([])
 /** taskKey → workers（合并时为工序键，非合并为行键） */
+const ONE_CLICK_MODE = '__oneclick__'
+const ONE_CLICK_TEMPLATE_KEY = '__oneclick_template__'
+
 const assignMap = ref<Record<string, AllocWorker[]>>({})
-/** 全局已选工人（选择人员后用于一键派工） */
-const pickedWorkers = ref<{ empNo: string; empName?: string; deptName?: string }[]>([])
+/** 一键派工配比模板（再次打开时回显） */
+const oneClickTemplateWorkers = ref<AllocWorker[]>([])
 const empDialog = ref(false)
 const editingTaskKey = ref('')
 const editingAllocLines = ref<EmpAllocLine[]>([])
@@ -1378,32 +1356,48 @@ const exportConfirmPreview = () => {
   $baseMessage(`已导出 ${rows.length} 条派工明细`, 'success', 'hey')
 }
 
-const confirmKpiCards = computed(() => [
-  { key: 'task', label: '派工任务数', value: String(filteredConfirmSummary.value.taskCount), icon: TrendCharts, tone: 'green' },
-  { key: 'wo', label: '涉及工单', value: String(filteredConfirmSummary.value.woCount), icon: Document, tone: 'blue' },
-  { key: 'prc', label: '涉及工序', value: String(filteredConfirmSummary.value.prcCount), icon: Box, tone: 'purple' },
-  {
-    key: 'qty',
-    label: '派工总数量',
-    value: `${fmtNum(filteredConfirmSummary.value.assignedQty)} 件`,
-    icon: Box,
-    tone: 'orange',
-  },
-  {
-    key: 'time',
-    label: '预计工时',
-    value: fmtWorkSeconds(filteredConfirmSummary.value.estTimeSec),
-    icon: Clock,
-    tone: 'cyan',
-  },
-  {
-    key: 'worker',
-    label: '参与人员',
-    value: `${filteredConfirmSummary.value.workerCount} 人`,
-    icon: User,
-    tone: 'indigo',
-  },
-])
+const confirmKpiCards = computed(() => {
+  const s = filteredConfirmSummary.value
+  return [
+    {
+      key: 'task',
+      label: '派工任务',
+      value: `${s.taskCount} 个`,
+      sub: `${s.woCount} 张工单 · ${s.prcCount} 道工序`,
+      icon: TrendCharts,
+      tone: 'green',
+    },
+    {
+      key: 'qty',
+      label: '派工数量',
+      value: `${fmtNum(s.assignedQty)} / ${fmtNum(s.planQty)}`,
+      sub: '已派 / 计划',
+      icon: Box,
+      tone: 'orange',
+    },
+    {
+      key: 'time',
+      label: '预计工时',
+      value: fmtWorkSeconds(s.estTimeSec),
+      icon: Clock,
+      tone: 'cyan',
+    },
+    {
+      key: 'wage',
+      label: '总工价',
+      value: `¥${fmtNum(s.estWage)}`,
+      icon: Document,
+      tone: 'amber',
+    },
+    {
+      key: 'worker',
+      label: '涉及人员',
+      value: `${s.workerCount} 人`,
+      icon: User,
+      tone: 'indigo',
+    },
+  ]
+})
 
 const workerInitial = (name: string) => String(name || '?').trim().slice(0, 1) || '?'
 
@@ -1413,11 +1407,23 @@ const canGoConfirm = computed(
 
 const canSubmit = computed(() => confirmItems.value.length > 0 && !hasOverAssign.value)
 
-const pickedWorkersLabel = computed(() =>
-  pickedWorkers.value.map((w) => w.empName || w.empNo).join('、')
-)
+const isOneClickMode = computed(() => editingTaskKey.value === ONE_CLICK_MODE)
+
+const isTaskUnassigned = (taskKey: string) => {
+  const ws = assignMap.value[taskKey] || []
+  return !ws.length || !ws.some((w) => num(w.planQty) > 0)
+}
+
+const unassignedAssignRows = computed(() => assignRows.value.filter((r) => isTaskUnassigned(r.taskKey)))
 
 const empDialogSelected = computed(() => {
+  if (isOneClickMode.value) {
+    return oneClickTemplateWorkers.value.map((w) => ({
+      empNo: w.empNo,
+      empName: w.empName,
+      deptName: w.deptName,
+    }))
+  }
   const lines = editingAllocLines.value
   if (lines.length > 0) {
     if (lines.length === 1) {
@@ -1434,18 +1440,15 @@ const empDialogSelected = computed(() => {
     }
     return [...union.values()]
   }
-  if (!editingTaskKey.value) {
-    return pickedWorkers.value.map((w) => ({
-      empNo: w.empNo,
-      empName: w.empName,
-      deptName: w.deptName,
-    }))
-  }
   const list = assignMap.value[editingTaskKey.value] || []
   return list.map((w) => ({ empNo: w.empNo, empName: w.empName, deptName: w.deptName }))
 })
 
 const empDialogTitle = computed(() => {
+  if (isOneClickMode.value) {
+    const n = unassignedAssignRows.value.length
+    return `一键派工 · 人员配比（${n} 道未派工序）`
+  }
   const lines = editingAllocLines.value
   if (lines.length === 1) {
     const l = lines[0]
@@ -1455,13 +1458,21 @@ const empDialogTitle = computed(() => {
     const l = lines[0]
     return `选择人员 · ${l.prcCode || ''} ${l.prcName || ''}（${lines.length} 张工单）`.trim()
   }
-  if (!editingTaskKey.value) {
-    return `选择人员 · 一键派工（${selectedLines.value.length} 道工序）`
-  }
   return '选择人员'
 })
 
 const editingLineWorkers = computed(() => {
+  if (isOneClickMode.value && editingAllocLines.value.length) {
+    return {
+      [ONE_CLICK_TEMPLATE_KEY]: oneClickTemplateWorkers.value.map((w) => ({
+        empNo: w.empNo,
+        empName: w.empName,
+        deptName: w.deptName,
+        ratio: num(w.ratio),
+        planQty: num(w.planQty),
+      })),
+    }
+  }
   if (!editingAllocLines.value.length) return undefined
   const map: Record<string, AllocWorker[]> = {}
   for (const line of editingAllocLines.value) {
@@ -1577,7 +1588,7 @@ const clearSelection = () => {
   checkedLeafIds.value = []
   selectedWoSet.value = new Set()
   assignMap.value = {}
-  pickedWorkers.value = []
+  oneClickTemplateWorkers.value = []
 }
 
 const openEmpFor = (taskKey: string) => {
@@ -1601,13 +1612,30 @@ const openEmpForProcess = (pk: string) => {
   empDialog.value = true
 }
 
-const openEmpPickerGlobal = () => {
+const openOneClickDispatch = () => {
   if (!selectedLines.value.length) {
     $baseMessage('请先选择工序', 'warning', 'hey')
     return
   }
-  editingTaskKey.value = ''
-  editingAllocLines.value = []
+  const unassigned = unassignedAssignRows.value
+  if (!unassigned.length) {
+    $baseMessage('所有工序已分配人员', 'info', 'hey')
+    return
+  }
+  const sample = unassigned[0]
+  editingTaskKey.value = ONE_CLICK_MODE
+  editingAllocLines.value = [
+    {
+      key: ONE_CLICK_TEMPLATE_KEY,
+      woNo: `将应用到 ${unassigned.length} 道未派工序`,
+      remainQty: num(sample.remainQty),
+      planQty: num(sample.planQty),
+      machiningUp: num(sample.machiningUp),
+      prcCode: unassigned.length > 1 ? '配比模板' : String(sample.prcCode || ''),
+      prcName:
+        unassigned.length > 1 ? '确认后按各工序未派量写入' : String(sample.prcName || ''),
+    },
+  ]
   empDialog.value = true
 }
 
@@ -1780,23 +1808,32 @@ const applyEmpsToAllTasks = async (
   $baseMessage(successMsg, 'success', 'hey')
 }
 
-/** 将已选工人平均分配到全部工序 */
-const applyOneClickDispatch = async () => {
-  if (!selectedLines.value.length) {
-    $baseMessage('请先选择工序', 'warning', 'hey')
-    return
+/** 将模板工人按配比写入各未派工序 */
+const applyOneClickFromTemplate = (template: AllocWorker[]) => {
+  const unassigned = unassignedAssignRows.value
+  if (!template.length || !unassigned.length) return 0
+  const next = { ...assignMap.value }
+  for (const row of unassigned) {
+    const cap = num(row.remainQty)
+    const workers = template.map((w) => ({
+      empNo: w.empNo,
+      empName: w.empName,
+      deptName: w.deptName,
+      ratio: num(w.ratio),
+      planQty: 0,
+    }))
+    redistributeWorkersByRatio(workers, cap)
+    next[row.taskKey] = workers
   }
-  if (!pickedWorkers.value.length) {
-    $baseMessage('请先点击「选择人员」勾选工人', 'warning', 'hey')
-    return
-  }
-  const names = pickedWorkersLabel.value
-  await applyEmpsToAllTasks(
-    pickedWorkers.value,
-    `一键派工完成（${names}），各工序已平均分配，请核对比例与数量`,
-    false,
-    false
-  )
+  assignMap.value = next
+  oneClickTemplateWorkers.value = template.map((w) => ({
+    empNo: w.empNo,
+    empName: w.empName,
+    deptName: w.deptName,
+    ratio: num(w.ratio),
+    planQty: num(w.planQty),
+  }))
+  return unassigned.length
 }
 
 const applySmartDispatch = async () => {
@@ -1869,14 +1906,7 @@ const removeWorker = (taskKey: string, empNo: string) => {
 const onEmpPickerConfirm = (emps: { empNo: string; empName?: string; deptName?: string }[]) => {
   editingAllocLines.value = []
   const key = editingTaskKey.value
-  if (!key) {
-    pickedWorkers.value = emps.map((e) => ({
-      empNo: e.empNo,
-      empName: e.empName,
-      deptName: e.deptName,
-    }))
-    return
-  }
+  if (!key || key === ONE_CLICK_MODE) return
   const prev = new Map((assignMap.value[key] || []).map((w) => [w.empNo, w]))
   const n = emps.length
   assignMap.value = {
@@ -1897,6 +1927,17 @@ const onEmpPickerConfirm = (emps: { empNo: string; empName?: string; deptName?: 
 }
 
 const onEmpPickerConfirmAlloc = (lines: { key: string; workers: AllocWorker[] }[]) => {
+  if (editingTaskKey.value === ONE_CLICK_MODE) {
+    const templateLine = lines.find((l) => l.key === ONE_CLICK_TEMPLATE_KEY) || lines[0]
+    const template = templateLine?.workers || []
+    if (!template.length) return
+    const count = applyOneClickFromTemplate(template)
+    editingAllocLines.value = []
+    editingTaskKey.value = ''
+    const names = template.map((w) => w.empName || w.empNo).join('、')
+    $baseMessage(`一键派工完成（${names}），已批量写入 ${count} 道未派工序`, 'success', 'hey')
+    return
+  }
   const next = { ...assignMap.value }
   for (const { key, workers } of lines) {
     next[key] = workers
@@ -2664,7 +2705,7 @@ onMounted(() => {
 
   &__kpi {
     display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 10px;
   }
 
@@ -2693,24 +2734,6 @@ onMounted(() => {
     display: flex;
     align-items: center;
     gap: 8px;
-  }
-
-  &__summary {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    flex-wrap: wrap;
-    padding: 10px 14px;
-    border-top: 1px solid #e8f0eb;
-    background: #f3faf6;
-    font-size: 12px;
-    color: var(--nd-muted);
-
-    b {
-      color: var(--nd-green);
-      font-size: 13px;
-    }
   }
 
   &__summary-left,
@@ -2753,9 +2776,18 @@ onMounted(() => {
   strong {
     display: block;
     margin-top: 4px;
-    font-size: 18px;
+    font-size: 17px;
     color: var(--nd-ink);
     font-variant-numeric: tabular-nums;
+    line-height: 1.2;
+  }
+
+  small {
+    display: block;
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--nd-muted);
+    line-height: 1.3;
   }
 
   &__icon {
@@ -2790,6 +2822,10 @@ onMounted(() => {
     &.is-indigo {
       background: #e8ecff;
       color: #4f46e5;
+    }
+    &.is-amber {
+      background: #fff4e5;
+      color: #d97706;
     }
   }
 }
@@ -2952,8 +2988,8 @@ onMounted(() => {
   :deep(.el-avatar) {
     font-size: 14px;
     font-weight: 700;
-    background: #2e7d5a;
-    color: #fff;
+    background: #e3f1ea;
+    color: #1f6b47;
   }
 
   em {
@@ -3085,7 +3121,7 @@ onMounted(() => {
   }
 
   .nd-preview__kpi {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .nd-hero {

@@ -141,7 +141,7 @@
           </div>
           <div class="emp-picker__alloc-actions">
             <el-button size="small" :disabled="!empDraft.length" @click="fillAllLinesEqual">
-              {{ isMultiAlloc ? '各工单平均填满' : '平均填满' }}
+              {{ batchTemplate ? '平均填满模板' : isMultiAlloc ? '各工单平均填满' : '平均填满' }}
             </el-button>
             <el-button
               v-if="isMultiAlloc"
@@ -248,6 +248,8 @@ const props = defineProps<{
   allocLines?: EmpAllocLine[]
   lineWorkers?: Record<string, AllocWorker[]>
   dialogTitle?: string
+  /** 一键派工配比模板模式 */
+  batchTemplate?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -284,16 +286,20 @@ const allocTitle = computed(() => {
 
 const allocHeadTitle = computed(() => {
   if (!isAllocMode.value) return ''
+  if (props.batchTemplate) return '配比模板 · 设置人员比例与数量'
   if (isMultiAlloc.value) return `按工单分配 · ${allocTitle.value}`
   const line = props.allocLines![0]
   return `本工单 · ${line.woNo} · ${allocTitle.value}`
 })
 
-const allocHeadHint = computed(() =>
-  isMultiAlloc.value
+const allocHeadHint = computed(() => {
+  if (props.batchTemplate) {
+    return '下方比例将作为模板；确认后按各未派工序的未派量重新计算数量并批量写入'
+  }
+  return isMultiAlloc.value
     ? '人员同步到各工单；每张工单单独填比例/数量（单价×数量=工费）'
     : '比例与数量联动；工费 = 单价 × 数量'
-)
+})
 
 const lineEstWage = (key: string) => {
   const line = props.allocLines?.find((l) => l.key === key)
