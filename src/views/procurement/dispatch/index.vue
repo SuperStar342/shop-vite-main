@@ -1,5 +1,5 @@
 <template>
-  <div v-table-copy class="dispatch-container auto-height-container">
+  <div class="dispatch-container auto-height-container">
     <vab-query-form>
       <vab-query-form-left-panel :span="24">
         <el-form inline :model="queryForm" @submit.prevent>
@@ -182,96 +182,18 @@
             <template v-if="checkedMasters.length"> · 已选 {{ checkedMasters.length }}</template>
           </em>
         </div>
-        <div class="table-wrap">
-          <el-table
+        <div ref="masterWrapRef" v-loading="listLoading" class="vtable-wrap">
+          <ListTable
             ref="masterTableRef"
-            v-loading="listLoading"
-            border
-            highlight-current-row
-            height="100%"
-            :data="masterList"
-            row-key="wtNo"
-            @row-click="handleMasterClick"
-            @selection-change="onMasterSelectionChange"
-          >
-            <el-table-column type="selection" width="42" :selectable="masterSelectable" />
-            <el-table-column v-if="visible('wtNo')" label="派工单号" min-width="168" prop="wtNo" show-overflow-tooltip />
-            <el-table-column v-if="visible('oriType')" label="单据来源" min-width="100" prop="oriType" show-overflow-tooltip />
-            <el-table-column v-if="visible('wtDate')" label="派工日期" min-width="110" prop="wtDate" show-overflow-tooltip />
-            <el-table-column v-if="visible('wsCode')" label="车间代号" min-width="90" prop="wsCode" />
-            <el-table-column v-if="visible('wsName')" label="车间名称" min-width="130" prop="wsName" show-overflow-tooltip />
-            <el-table-column v-if="visible('deptCode')" label="部门代号" min-width="90" prop="deptCode" />
-            <el-table-column v-if="visible('deptName')" label="部门名称" min-width="130" prop="deptName" show-overflow-tooltip />
-            <el-table-column v-if="visible('prcGrpCode')" label="工序组代号" min-width="110" prop="prcGrpCode" show-overflow-tooltip />
-            <el-table-column v-if="visible('prcGrpName')" label="工序组名称" min-width="120" prop="prcGrpName" show-overflow-tooltip />
-            <el-table-column v-if="visible('tpcPrcCode')" label="代表工序代号" min-width="120" prop="tpcPrcCode" />
-            <el-table-column v-if="visible('tpcPrcName')" label="代表工序名称" min-width="120" prop="tpcPrcName" show-overflow-tooltip />
-            <el-table-column v-if="visible('finishFlag')" align="center" label="完成状态" min-width="100" prop="finishFlag">
-              <template #default="{ row }">
-                <el-tag size="small" effect="plain" :type="tagType(row.finishFlag)">{{ row.finishFlag || '-' }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column v-if="visible('cFlag')" align="center" label="审核状态" min-width="90" prop="cFlag">
-              <template #default="{ row }">
-                <el-tag size="small" effect="plain" :type="tagType(row.cFlag)">{{ row.cFlag || '-' }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column v-if="visible('creator')" label="建立人" min-width="80" prop="creator" />
-            <el-table-column v-if="visible('approver')" label="审核人" min-width="80" prop="approver" />
-            <el-table-column v-if="visible('ifClose')" align="center" label="结案状态" min-width="90" prop="ifClose" />
-            <el-table-column v-if="visible('closer')" label="结案人" min-width="80" prop="closer" />
-            <el-table-column v-if="visible('closeDate')" label="结案日期" min-width="120" prop="closeDate" show-overflow-tooltip />
-            <el-table-column v-if="visible('ifCancel')" align="center" label="是否已作废" min-width="100" prop="ifCancel" />
-            <el-table-column v-if="visible('dataOri')" label="数据来源" min-width="100" prop="dataOri" />
-            <el-table-column v-if="visible('oriNo')" label="来源单号" min-width="130" prop="oriNo" show-overflow-tooltip />
-            <el-table-column v-if="visible('moNo')" label="制令号" min-width="150" prop="moNo" show-overflow-tooltip />
-            <el-table-column v-if="visible('ordNo')" label="订单号" min-width="130" prop="ordNo" show-overflow-tooltip />
-            <el-table-column v-if="visible('custOrdNo')" label="客户订单号" min-width="130" prop="custOrdNo" show-overflow-tooltip />
-            <el-table-column v-if="visible('quickQuery')" label="速查码" min-width="110" prop="quickQuery" show-overflow-tooltip />
-            <el-table-column v-if="visible('clrCode')" label="颜色编号" min-width="90" prop="clrCode" />
-            <el-table-column v-if="visible('clrName')" label="颜色" min-width="90" prop="clrName" />
-            <el-table-column v-if="visible('remark')" label="备注" min-width="140" prop="remark" show-overflow-tooltip />
-            <el-table-column align="center" fixed="right" label="操作" width="168">
-              <template #default="{ row }">
-                <el-button
-                  v-if="!isAudited(row)"
-                  link
-                  type="primary"
-                  :disabled="!!approveBlockReason(row)"
-                  @click.stop="runApprove([row])"
-                >
-                  审核
-                </el-button>
-                <el-button
-                  v-else
-                  link
-                  type="warning"
-                  :disabled="!!unapproveBlockReason(row)"
-                  @click.stop="runUnapprove([row])"
-                >
-                  反审核
-                </el-button>
-                <el-tooltip
-                  :content="deleteBlockReason(row) || '删除未开工派工单'"
-                  placement="left"
-                >
-                  <span>
-                    <el-button
-                      link
-                      type="danger"
-                      :disabled="!!deleteBlockReason(row)"
-                      @click.stop="openDeleteConfirm([row])"
-                    >
-                      删除
-                    </el-button>
-                  </span>
-                </el-tooltip>
-              </template>
-            </el-table-column>
-            <template #empty>
-              <el-empty description="暂无派工单" />
-            </template>
-          </el-table>
+            :options="masterOptions"
+            :records="masterList"
+            :height="masterHeight"
+            @on-checkbox-state-change="onMasterCheckboxChange"
+            @on-click-cell="onMasterClickCell"
+            @on-selected-cell="(args: any) => onCopyTrack(args, masterTableRef)"
+            @on-contextmenu-cell="(args: any) => onCopyContextMenu(args, masterTableRef)"
+            @on-initialized="() => masterLayout.handleTableReady()"
+          />
         </div>
         <vab-pagination
           :current-page="queryForm.pageNo"
@@ -296,43 +218,18 @@
             }}
           </em>
         </div>
-        <div class="table-wrap">
-          <el-table
-            v-loading="itemLoading"
-            border
-            highlight-current-row
-            height="100%"
-            :data="itemList"
-            :row-key="itemRowKey"
-            @row-click="handleItemClick"
-            @selection-change="onItemSelectionChange"
-          >
-            <el-table-column type="selection" width="42" />
-            <el-table-column label="制令号" min-width="150" prop="moNo" show-overflow-tooltip />
-            <el-table-column label="品号" min-width="110" prop="goodsCode" show-overflow-tooltip />
-            <el-table-column label="品名" min-width="160" prop="goodsName" show-overflow-tooltip />
-            <el-table-column label="货品类型" min-width="90" prop="goodsType" />
-            <el-table-column label="规格尺寸" min-width="120" prop="sizeDesc" show-overflow-tooltip />
-            <el-table-column label="标准单位" min-width="90" prop="unitCode" />
-            <el-table-column label="制程名称" min-width="110" prop="mrName" show-overflow-tooltip />
-            <el-table-column align="center" label="加工顺序" min-width="90" prop="machiningSNo" />
-            <el-table-column label="工序代号" min-width="90" prop="prcCode" />
-            <el-table-column label="工序名称" min-width="100" prop="prcName" show-overflow-tooltip />
-            <el-table-column label="工单BOR序号" min-width="120" prop="woBorSno" />
-            <el-table-column align="right" label="加工单价" min-width="90">
-              <template #default="{ row }">{{ fmtNum(row.machiningUp) }}</template>
-            </el-table-column>
-            <el-table-column align="right" label="派工数量" min-width="90">
-              <template #default="{ row }">{{ fmtNum(row.wtQty) }}</template>
-            </el-table-column>
-            <el-table-column align="right" label="完工数量" min-width="90">
-              <template #default="{ row }">{{ fmtNum(row.fnQty) }}</template>
-            </el-table-column>
-            <el-table-column label="工单号" min-width="120" prop="woNo" show-overflow-tooltip />
-            <template #empty>
-              <el-empty :description="selectedWt ? '暂无工序明细' : '请先选择派工单'" />
-            </template>
-          </el-table>
+        <div ref="itemWrapRef" v-loading="itemLoading" class="vtable-wrap">
+          <ListTable
+            ref="itemTableRef"
+            :options="itemOptions"
+            :records="itemList"
+            :height="itemHeight"
+            @on-checkbox-state-change="onItemCheckboxChange"
+            @on-click-cell="onItemClickCell"
+            @on-selected-cell="(args: any) => onCopyTrack(args, itemTableRef)"
+            @on-contextmenu-cell="(args: any) => onCopyContextMenu(args, itemTableRef)"
+            @on-initialized="() => itemLayout.handleTableReady()"
+          />
         </div>
       </div>
 
@@ -343,54 +240,17 @@
           <span>人员派工</span>
           <em>{{ selectedItem ? `${workerList.length} 人` : '点选工序明细' }}</em>
         </div>
-        <div class="table-wrap">
-          <el-table
-            v-loading="workerLoading"
-            border
-            height="100%"
-            :data="workerList"
-            :row-key="workerRowKey"
-          >
-            <el-table-column v-if="visibleWorker('empNo')" label="工号" min-width="110" prop="empNo" />
-            <el-table-column v-if="visibleWorker('empName')" label="姓名" min-width="90" prop="empName" />
-            <el-table-column v-if="visibleWorker('deptCode')" label="实际生产部门代号" min-width="140" prop="deptCode" />
-            <el-table-column v-if="visibleWorker('deptName')" label="实际生产部门名称" min-width="150" prop="deptName" show-overflow-tooltip />
-            <el-table-column v-if="visibleWorker('planQty')" align="right" label="计划加工数量" min-width="120">
-              <template #default="{ row }">{{ fmtNum(row.planQty) }}</template>
-            </el-table-column>
-            <el-table-column v-if="visibleWorker('progress')" label="完工进度" min-width="140">
-              <template #default="{ row }">
-                <el-progress
-                  :percentage="progressOf(row)"
-                  :stroke-width="8"
-                  :status="progressOf(row) >= 100 ? 'success' : undefined"
-                />
-              </template>
-            </el-table-column>
-            <el-table-column v-if="visibleWorker('workGpName')" label="加工小组" min-width="110" prop="workGpName" show-overflow-tooltip />
-            <el-table-column v-if="visibleWorker('assistEmpNo')" label="辅助人员工号" min-width="120" prop="assistEmpNo" />
-            <el-table-column v-if="visibleWorker('assistEmpName')" label="辅助人员姓名" min-width="120" prop="assistEmpName" />
-            <el-table-column v-if="visibleWorker('assistRate')" align="right" label="辅助补贴比例 (%)" min-width="140">
-              <template #default="{ row }">{{ fmtNum(row.assistRate) }}</template>
-            </el-table-column>
-            <el-table-column v-if="visibleWorker('fnQty')" align="right" label="已完工数量" min-width="110">
-              <template #default="{ row }">{{ fmtNum(row.fnQty) }}</template>
-            </el-table-column>
-            <el-table-column v-if="visibleWorker('fnStatus')" align="center" label="已完工状态" min-width="110">
-              <template #default="{ row }">
-                <el-tag size="small" effect="plain" :type="progressOf(row) >= 100 ? 'success' : 'info'">
-                  {{ progressOf(row) >= 100 ? '已完工' : '进行中' }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column v-if="visibleWorker('fnStdTime')" align="right" label="完工标准工时" min-width="130">
-              <template #default="{ row }">{{ fmtNum(row.fnStdTime, 4) }}</template>
-            </el-table-column>
-            <el-table-column v-if="visibleWorker('remark')" label="备注" min-width="140" prop="remark" show-overflow-tooltip />
-            <template #empty>
-              <el-empty :description="selectedItem ? '暂无人员派工' : '请先选择工序明细'" />
-            </template>
-          </el-table>
+        <div ref="workerWrapRef" v-loading="workerLoading" class="vtable-wrap">
+          <ListTable
+            ref="workerTableRef"
+            :options="workerOptions"
+            :records="workerList"
+            :height="workerHeight"
+            @on-click-cell="(args: any) => onCopyTrack(args, workerTableRef)"
+            @on-selected-cell="(args: any) => onCopyTrack(args, workerTableRef)"
+            @on-contextmenu-cell="(args: any) => onCopyContextMenu(args, workerTableRef)"
+            @on-initialized="() => workerLayout.handleTableReady()"
+          />
         </div>
       </div>
 
@@ -504,6 +364,7 @@
 
 <script lang="ts" setup>
 import { CircleCheck, Delete, Refresh, Search, WarningFilled } from '@element-plus/icons-vue'
+import { ListTable } from '@visactor/vue-vtable'
 import {
   approveWt,
   closeWt,
@@ -515,12 +376,29 @@ import {
 } from '/@/api/procurement/dispatch'
 import { $baseMessage } from '/@/hooks'
 import { useListColumns } from '/@/hooks/useListColumns'
+import { useVTableLayout } from '/@/hooks/useVTableLayout'
 import { sortNewestFirst } from '/@/utils/bladeAdapter'
+import { handleVTableContextMenuCell, trackVTableCellForCopy } from '/@/utils/tableCopy'
 
 defineOptions({ name: 'DispatchManagement' })
 
 const { visible } = useListColumns('dispatch')
 const { visible: visibleWorker } = useListColumns('dispatchWorker')
+
+const masterTableRef = ref<any>(null)
+const itemTableRef = ref<any>(null)
+const workerTableRef = ref<any>(null)
+const masterWrapRef = ref<HTMLElement | null>(null)
+const itemWrapRef = ref<HTMLElement | null>(null)
+const workerWrapRef = ref<HTMLElement | null>(null)
+
+const masterLayout = useVTableLayout(masterTableRef, masterWrapRef, { minHeight: 88 })
+const itemLayout = useVTableLayout(itemTableRef, itemWrapRef, { minHeight: 88 })
+const workerLayout = useVTableLayout(workerTableRef, workerWrapRef, { minHeight: 88 })
+
+const masterHeight = computed(() => Math.max(88, masterLayout.tableHeight.value || 88))
+const itemHeight = computed(() => Math.max(88, itemLayout.tableHeight.value || 88))
+const workerHeight = computed(() => Math.max(88, workerLayout.tableHeight.value || 88))
 
 const queryForm = reactive({
   pageNo: 1,
@@ -545,7 +423,6 @@ const selectedWt = ref<any>(null)
 const selectedItem = ref<any>(null)
 const checkedItems = ref<any[]>([])
 const checkedMasters = ref<any[]>([])
-const masterTableRef = ref<any>(null)
 const workersByItem = reactive<Record<string, any[]>>({})
 
 const paneRatios = reactive([4, 4, 3, 3])
@@ -677,8 +554,6 @@ const closeBlockReason = (row: any) => {
   return ''
 }
 
-const masterSelectable = () => true
-
 const selectedFnQty = computed(() =>
   selectedWt.value?.wtNo && itemList.value[0]?.wtNo === selectedWt.value.wtNo
     ? itemTotals.value.fnQty
@@ -713,8 +588,295 @@ const selectedCanClose = computed(() => !selectedCloseReason.value)
 const itemRowKey = (row: any) =>
   `${row.wtNo}-${row.sNo}-${row.woNo}-${row.moNo}-${row.goodsId}-${row.prcCode}`
 
-const workerRowKey = (row: any) =>
-  `${row.empNo}-${row.moNo}-${row.goodsId}-${row.prcCode}-${row.woNo}`
+const baseTableOpts = {
+  hover: { highlightMode: 'row' as const },
+  select: { highlightMode: 'cell' as const },
+  keyboardOptions: { copySelected: true },
+  columnResizeMode: 'all' as const,
+  dragHeaderMode: 'column' as const,
+  widthMode: 'standard' as const,
+  autoFillWidth: false,
+  defaultColWidth: 110,
+  defaultRowHeight: 28,
+  defaultHeaderRowHeight: 30,
+  theme: {
+    headerStyle: {
+      bgColor: '#f4f8f5',
+      fontSize: 12,
+      fontWeight: 'bold',
+      color: '#4a5d73',
+      borderColor: '#d9e4ef',
+      padding: [4, 8, 4, 8],
+    },
+    bodyStyle: {
+      fontSize: 12,
+      color: '#303133',
+      borderColor: '#e8eef4',
+      padding: [2, 8, 2, 8],
+    },
+    frameStyle: { borderColor: '#d9e4ef' },
+    selectionStyle: { cellBgColor: 'rgba(46, 125, 90, 0.18)', cellBorderColor: '#2e7d5a', cellBorderLineWidth: 2 },
+  },
+}
+
+const col = (field: string, title: string, width = 110, extra: Record<string, any> = {}) => ({
+  field,
+  title,
+  width,
+  fieldFormat: (r: any) => (r?.[field] == null || r?.[field] === '' ? '' : String(r[field])),
+  ...extra,
+})
+
+const numCol = (field: string, title: string, width = 90, digits = 2) => ({
+  field,
+  title,
+  width,
+  fieldFormat: (r: any) => fmtNum(r?.[field], digits),
+  style: { textAlign: 'right' as const },
+})
+
+const EMPTY_TIP_SVG =
+  '<svg viewBox="0 0 1194 1024" xmlns="http://www.w3.org/2000/svg" width="28" height="28"><path d="M1038.7 367.2c13.3 23.3-16.6-40-63.1-40H219c-26.6 0-46.5 13.3-63.1 40S0 607.3 0 650.6v290a82.4 82.4 0 0 0 83 83.4h1028.7a82.3 82.3 0 0 0 83-83.4v-290c0-43.3-156-283.4-156-283.4zM730.1 667.3a136.3 136.3 0 0 1-132.7 133.3 133.4 133.4 0 0 1-132.8-133.3v-6.7a40.7 40.7 0 0 0-36.5-26.7H73l119.5-220s23.2-40 53.1-40h713.5c26.5 0 29.9 10 46.4 40l115.8 220H769.9c-26.2 0-39.8 7.6-39.8 33.3z" fill="#c0c4cc"/></svg>'
+
+const emptyTip = (text: string) => ({
+  text,
+  spaceBetweenTextAndIcon: 6,
+  textStyle: { fontSize: 12, color: '#909399' },
+  icon: { width: 28, height: 28, image: EMPTY_TIP_SVG },
+})
+
+const checkboxCol = {
+  field: '__checkbox__',
+  cellType: 'checkbox' as const,
+  headerType: 'checkbox' as const,
+  width: 42,
+  style: { textAlign: 'center' as const },
+}
+
+const masterColumnDefs: Array<{ field: string; title: string; width: number; center?: boolean }> = [
+  { field: 'wtNo', title: '派工单号', width: 168 },
+  { field: 'oriType', title: '单据来源', width: 100 },
+  { field: 'wtDate', title: '派工日期', width: 110 },
+  { field: 'wsCode', title: '车间代号', width: 90 },
+  { field: 'wsName', title: '车间名称', width: 130 },
+  { field: 'deptCode', title: '部门代号', width: 90 },
+  { field: 'deptName', title: '部门名称', width: 130 },
+  { field: 'prcGrpCode', title: '工序组代号', width: 110 },
+  { field: 'prcGrpName', title: '工序组名称', width: 120 },
+  { field: 'tpcPrcCode', title: '代表工序代号', width: 120 },
+  { field: 'tpcPrcName', title: '代表工序名称', width: 120 },
+  { field: 'finishFlag', title: '完成状态', width: 100, center: true },
+  { field: 'cFlag', title: '审核状态', width: 90, center: true },
+  { field: 'creator', title: '建立人', width: 80 },
+  { field: 'approver', title: '审核人', width: 80 },
+  { field: 'ifClose', title: '结案状态', width: 90, center: true },
+  { field: 'closer', title: '结案人', width: 80 },
+  { field: 'closeDate', title: '结案日期', width: 120 },
+  { field: 'ifCancel', title: '是否已作废', width: 100, center: true },
+  { field: 'dataOri', title: '数据来源', width: 100 },
+  { field: 'oriNo', title: '来源单号', width: 130 },
+  { field: 'moNo', title: '制令号', width: 150 },
+  { field: 'ordNo', title: '订单号', width: 130 },
+  { field: 'custOrdNo', title: '客户订单号', width: 130 },
+  { field: 'quickQuery', title: '速查码', width: 110 },
+  { field: 'clrCode', title: '颜色编号', width: 90 },
+  { field: 'clrName', title: '颜色', width: 90 },
+  { field: 'remark', title: '备注', width: 140 },
+]
+
+const masterOptions = computed(() => {
+  const columns: any[] = [checkboxCol]
+  for (const def of masterColumnDefs) {
+    if (!visible(def.field)) continue
+    columns.push(
+      col(def.field, def.title, def.width, def.center ? { style: { textAlign: 'center' } } : {})
+    )
+  }
+  columns.push(
+    {
+      field: '__op_audit__',
+      title: '审核',
+      width: 72,
+      fieldFormat: (r: any) => (isAudited(r) ? '反审核' : '审核'),
+      style: {
+        color: '#409eff',
+        cursor: 'pointer',
+        textAlign: 'center',
+        fontSize: 12,
+        fontWeight: 500,
+      },
+    },
+    {
+      field: '__op_del__',
+      title: '删除',
+      width: 60,
+      fieldFormat: () => '删除',
+      style: {
+        color: '#f56c6c',
+        cursor: 'pointer',
+        textAlign: 'center',
+        fontSize: 12,
+        fontWeight: 500,
+      },
+    }
+  )
+  return {
+    ...baseTableOpts,
+    frozenColCount: 2,
+    rightFrozenColCount: 2,
+    columns,
+    emptyTip: emptyTip('暂无派工单'),
+  }
+})
+
+const itemOptions = computed(() => ({
+  ...baseTableOpts,
+  frozenColCount: 2,
+  columns: [
+    checkboxCol,
+    col('moNo', '制令号', 150),
+    col('goodsCode', '品号', 110),
+    col('goodsName', '品名', 160),
+    col('goodsType', '货品类型', 90),
+    col('sizeDesc', '规格尺寸', 120),
+    col('unitCode', '标准单位', 90),
+    col('mrName', '制程名称', 110),
+    col('machiningSNo', '加工顺序', 90, { style: { textAlign: 'center' } }),
+    col('prcCode', '工序代号', 90),
+    col('prcName', '工序名称', 100),
+    col('woBorSno', '工单BOR序号', 120),
+    numCol('machiningUp', '加工单价', 90),
+    numCol('wtQty', '派工数量', 90),
+    numCol('fnQty', '完工数量', 90),
+    col('woNo', '工单号', 120),
+  ],
+  emptyTip: emptyTip(selectedWt.value ? '暂无工序明细' : '请先选择派工单'),
+}))
+
+const workerOptions = computed(() => {
+  const columns: any[] = []
+  if (visibleWorker('empNo')) columns.push(col('empNo', '工号', 110))
+  if (visibleWorker('empName')) columns.push(col('empName', '姓名', 90))
+  if (visibleWorker('deptCode')) columns.push(col('deptCode', '实际生产部门代号', 140))
+  if (visibleWorker('deptName')) columns.push(col('deptName', '实际生产部门名称', 150))
+  if (visibleWorker('planQty')) columns.push(numCol('planQty', '计划加工数量', 120))
+  if (visibleWorker('progress')) {
+    columns.push({
+      field: 'progress',
+      title: '完工进度',
+      width: 100,
+      fieldFormat: (r: any) => `${progressOf(r)}%`,
+      style: { textAlign: 'center' },
+    })
+  }
+  if (visibleWorker('workGpName')) columns.push(col('workGpName', '加工小组', 110))
+  if (visibleWorker('assistEmpNo')) columns.push(col('assistEmpNo', '辅助人员工号', 120))
+  if (visibleWorker('assistEmpName')) columns.push(col('assistEmpName', '辅助人员姓名', 120))
+  if (visibleWorker('assistRate')) columns.push(numCol('assistRate', '辅助补贴比例 (%)', 140))
+  if (visibleWorker('fnQty')) columns.push(numCol('fnQty', '已完工数量', 110))
+  if (visibleWorker('fnStatus')) {
+    columns.push({
+      field: 'fnStatus',
+      title: '已完工状态',
+      width: 110,
+      fieldFormat: (r: any) => (progressOf(r) >= 100 ? '已完工' : '进行中'),
+      style: { textAlign: 'center' },
+    })
+  }
+  if (visibleWorker('fnStdTime')) columns.push(numCol('fnStdTime', '完工标准工时', 130, 4))
+  if (visibleWorker('remark')) columns.push(col('remark', '备注', 140))
+  return {
+    ...baseTableOpts,
+    columns,
+    emptyTip: emptyTip(selectedItem.value ? '暂无人员派工' : '请先选择工序明细'),
+  }
+})
+
+const onCopyContextMenu = (args: any, tableRef: any) => {
+  handleVTableContextMenuCell(args, () => tableRef.value?.vTableInstance)
+}
+
+const onCopyTrack = (args: any, tableRef: any) => {
+  trackVTableCellForCopy(args, () => tableRef.value?.vTableInstance)
+}
+
+const getColumnField = (tableRef: any, colIdx: number, options: any): string => {
+  const inst = tableRef.value?.vTableInstance
+  try {
+    const def = inst?.getBodyColumnDefine?.(colIdx) || inst?.getColumnDefine?.(colIdx)
+    if (def?.field != null) return String(def.field)
+  } catch {
+    /* fall through */
+  }
+  return String(options?.columns?.[colIdx]?.field ?? '')
+}
+
+const getRecordFromArgs = (args: any, tableRef: any, list: any[]) => {
+  if (args.col === undefined || args.row === undefined) return null
+  const vtable = tableRef.value?.vTableInstance
+  if (!vtable) return null
+  const headerCount = vtable.columnHeaderLevelCount ?? 1
+  return list[args.row - headerCount] || null
+}
+
+const syncCheckedFromTable = (tableRef: any, list: any[]) => {
+  const vtable = tableRef.value?.vTableInstance
+  if (!vtable) return []
+  const headerCount = vtable.columnHeaderLevelCount ?? 1
+  const selected: any[] = []
+  list.forEach((_item, index) => {
+    const row = headerCount + index
+    if (vtable.getCellCheckboxState(0, row) === true) selected.push(list[index])
+  })
+  return selected
+}
+
+const onMasterCheckboxChange = () => {
+  nextTick(() => {
+    checkedMasters.value = syncCheckedFromTable(masterTableRef, masterList.value)
+  })
+}
+
+const onItemCheckboxChange = () => {
+  nextTick(() => {
+    const rows = syncCheckedFromTable(itemTableRef, itemList.value)
+    onItemSelectionChange(rows)
+  })
+}
+
+const onMasterClickCell = (args: any) => {
+  onCopyTrack(args, masterTableRef)
+  const field = getColumnField(masterTableRef, args.col, masterOptions.value)
+  if (field === '__checkbox__') return
+  const record = getRecordFromArgs(args, masterTableRef, masterList.value)
+  if (!record) return
+  if (field === '__op_audit__') {
+    if (isAudited(record)) runUnapprove([record])
+    else runApprove([record])
+    return
+  }
+  if (field === '__op_del__') {
+    openDeleteConfirm([record])
+    return
+  }
+  handleMasterClick(record)
+}
+
+const onItemClickCell = (args: any) => {
+  onCopyTrack(args, itemTableRef)
+  const field = getColumnField(itemTableRef, args.col, itemOptions.value)
+  if (field === '__checkbox__') return
+  const record = getRecordFromArgs(args, itemTableRef, itemList.value)
+  if (!record) return
+  handleItemClick(record)
+}
+
+const syncAllLayouts = () => {
+  ;[masterLayout, itemLayout, workerLayout].forEach((layout) => {
+    layout.syncSize(0)
+    layout.syncSize(80)
+  })
+}
 
 const startPaneResize = (e: MouseEvent, gripIdx: number) => {
   paneResizing.value = gripIdx
@@ -741,6 +903,7 @@ const stopPaneResize = () => {
   paneResizing.value = -1
   document.removeEventListener('mousemove', onPaneResize)
   document.removeEventListener('mouseup', stopPaneResize)
+  syncAllLayouts()
 }
 
 const fetchMaster = async () => {
@@ -839,10 +1002,6 @@ const onItemSelectionChange = (rows: any[]) => {
     if (!keep.has(k)) delete workersByItem[k]
   })
   ensureCardWorkers(checkedItems.value)
-}
-
-const onMasterSelectionChange = (rows: any[]) => {
-  checkedMasters.value = rows || []
 }
 
 const handleMasterClick = (row: any) => {
@@ -1329,18 +1488,16 @@ onBeforeUnmount(() => {
   }
 }
 
-.table-wrap {
+.vtable-wrap {
   flex: 1;
   min-height: 88px;
+  width: 100%;
   overflow: hidden;
+  position: relative;
 
-  :deep(.el-table) {
-    --el-table-current-row-bg-color: #e8f4ec;
-    --el-table-header-bg-color: #f4f8f5;
-  }
-
-  :deep(.el-progress__text) {
-    font-size: 12px;
+  :deep(canvas),
+  :deep(.vtable) {
+    width: 100% !important;
   }
 }
 
