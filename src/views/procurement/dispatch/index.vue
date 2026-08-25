@@ -38,6 +38,14 @@
             <el-button :icon="Search" :loading="listLoading" type="primary" @click="queryData">查询</el-button>
             <el-button :icon="Refresh" @click="resetQuery">重置</el-button>
             <el-button plain type="success" @click="goQuickDispatch">快捷派工</el-button>
+            <el-button
+              plain
+              type="danger"
+              :disabled="!checkedMasters.length"
+              @click="openDeleteConfirm(checkedMasters)"
+            >
+              删除选中{{ checkedMasters.length ? ` (${checkedMasters.length})` : '' }}
+            </el-button>
           </el-form-item>
         </el-form>
       </vab-query-form-left-panel>
@@ -65,16 +73,39 @@
         <span>完工 {{ fmtNum(itemTotals.fnQty) }}</span>
         <span>完成率 {{ itemTotals.rate }}%</span>
       </div>
+      <div class="wt-summary__actions">
+        <el-tooltip
+          :content="selectedDeleteReason || '仅未开工派工单可删'"
+          :disabled="selectedCanDelete"
+          placement="top"
+        >
+          <span>
+            <el-button
+              :disabled="!selectedCanDelete"
+              :icon="Delete"
+              size="small"
+              type="danger"
+              @click="openDeleteConfirm([selectedWt])"
+            >
+              删除本单
+            </el-button>
+          </span>
+        </el-tooltip>
+      </div>
     </div>
 
     <div class="pane-stack">
       <div class="pane" :style="{ flex: `${paneRatios[0]} 1 0px` }">
         <div class="pane-head">
           <span>派工单</span>
-          <em>{{ total }} 张</em>
+          <em>
+            {{ total }} 张
+            <template v-if="checkedMasters.length"> · 已选 {{ checkedMasters.length }}</template>
+          </em>
         </div>
         <div class="table-wrap">
           <el-table
+            ref="masterTableRef"
             v-loading="listLoading"
             border
             highlight-current-row
@@ -82,7 +113,9 @@
             :data="masterList"
             row-key="wtNo"
             @row-click="handleMasterClick"
+            @selection-change="onMasterSelectionChange"
           >
+            <el-table-column type="selection" width="42" :selectable="masterSelectable" />
             <el-table-column v-if="visible('wtNo')" label="派工单号" min-width="168" prop="wtNo" show-overflow-tooltip />
             <el-table-column v-if="visible('oriType')" label="单据来源" min-width="100" prop="oriType" show-overflow-tooltip />
             <el-table-column v-if="visible('wtDate')" label="派工日期" min-width="110" prop="wtDate" show-overflow-tooltip />
@@ -119,6 +152,25 @@
             <el-table-column v-if="visible('clrCode')" label="颜色编号" min-width="90" prop="clrCode" />
             <el-table-column v-if="visible('clrName')" label="颜色" min-width="90" prop="clrName" />
             <el-table-column v-if="visible('remark')" label="备注" min-width="140" prop="remark" show-overflow-tooltip />
+            <el-table-column align="center" fixed="right" label="操作" width="88">
+              <template #default="{ row }">
+                <el-tooltip
+                  :content="deleteBlockReason(row) || '删除未开工派工单'"
+                  placement="left"
+                >
+                  <span>
+                    <el-button
+                      link
+                      type="danger"
+                      :disabled="!!deleteBlockReason(row)"
+                      @click.stop="openDeleteConfirm([row])"
+                    >
+                      删除
+                    </el-button>
+                  </span>
+                </el-tooltip>
+              </template>
+            </el-table-column>
             <template #empty>
               <el-empty description="暂无派工单" />
             </template>
@@ -291,12 +343,71 @@
         </div>
       </div>
     </div>
+
+    <!-- 滑动确认删除 -->
+    <el-dialog
+      v-model="deleteDialog"
+      class="wt-delete-dialog"
+      width="480px"
+      append-to-body
+      destroy-on-close
+      :close-on-click-modal="!deleting"
+      @closed="resetDeleteSlide"
+    >
+      <template #header>
+        <div class="wt-delete-dialog__title">
+          <el-icon class="is-warn"><WarningFilled /></el-icon>
+          <div>
+            <strong>确认删除派工单</strong>
+            <p>仅未开工单据可删；删除后不可恢复，请滑动确认</p>
+          </div>
+        </div>
+      </template>
+
+      <div class="wt-delete-preview">
+        <article v-for="row in pendingDeleteRows" :key="row.wtNo" class="wt-delete-preview__card">
+          <header>
+            <b>{{ row.wtNo }}</b>
+            <el-tag size="small" effect="plain" type="info">{{ row.finishFlag || '未完成' }}</el-tag>
+          </header>
+          <p>
+            <span>{{ row.wsName || row.wsCode || '-' }}</span>
+            <span>{{ row.deptName || row.deptCode || '-' }}</span>
+            <span v-if="row.wtDate">{{ row.wtDate }}</span>
+          </p>
+        </article>
+        <div class="wt-delete-preview__sum">
+          将删除 <em>{{ pendingDeleteRows.length }}</em> 张派工单
+        </div>
+      </div>
+
+      <div
+        ref="slideTrackRef"
+        class="wt-slide"
+        :class="{ 'is-ready': slideReady, 'is-dragging': slideDragging }"
+        :style="{ '--slide': slidePercent / 100 }"
+        @pointerdown="onSlidePointerDown"
+      >
+        <div class="wt-slide__fill" :style="{ width: `${slidePercent}%` }" />
+        <span class="wt-slide__hint">{{ slideReady ? '已解锁，可确认删除' : '按住滑块拖到尽头' }}</span>
+        <button class="wt-slide__thumb" type="button" @pointerdown.stop="onSlidePointerDown">
+          →
+        </button>
+      </div>
+
+      <template #footer>
+        <el-button :disabled="deleting" @click="deleteDialog = false">取消</el-button>
+        <el-button type="danger" :loading="deleting" :disabled="!slideReady" @click="confirmDelete">
+          确认删除
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { Refresh, Search } from '@element-plus/icons-vue'
-import { getWtItems, getWtList, getWtWorkers } from '/@/api/procurement/dispatch'
+import { Delete, Refresh, Search, WarningFilled } from '@element-plus/icons-vue'
+import { getWtItems, getWtList, getWtWorkers, removeWt } from '/@/api/procurement/dispatch'
 import { $baseMessage } from '/@/hooks'
 import { useListColumns } from '/@/hooks/useListColumns'
 
@@ -327,12 +438,23 @@ const total = ref(0)
 const selectedWt = ref<any>(null)
 const selectedItem = ref<any>(null)
 const checkedItems = ref<any[]>([])
+const checkedMasters = ref<any[]>([])
+const masterTableRef = ref<any>(null)
 const workersByItem = reactive<Record<string, any[]>>({})
 
 const paneRatios = reactive([4, 4, 3, 3])
 const paneResizing = ref(-1)
 const resizeStartY = ref(0)
 const resizeStartRatio = ref([0, 0])
+
+/** 删除确认弹窗 / 滑块 */
+const deleteDialog = ref(false)
+const deleting = ref(false)
+const pendingDeleteRows = ref<any[]>([])
+const slidePercent = ref(0)
+const slideReady = ref(false)
+const slideDragging = ref(false)
+const slideTrackRef = ref<HTMLElement | null>(null)
 
 const itemTotals = computed(() => {
   const wtQty = itemList.value.reduce((s, r) => s + num(r.wtQty), 0)
@@ -383,6 +505,49 @@ const tagType = (label: string) => {
   return 'info'
 }
 
+const flagText = (v: any) => String(v ?? '').trim()
+
+const isClosed = (row: any) => {
+  const s = flagText(row?.ifClose)
+  return s === '1' || s.includes('已结案') || s === '结案'
+}
+
+const isCancelled = (row: any) => {
+  const s = flagText(row?.ifCancel)
+  return s === '1' || s.includes('已作废') || s === '作废'
+}
+
+/** 完成状态已开工：已完成 / 部分完成 */
+const isStartedByFinish = (row: any) => {
+  const s = flagText(row?.finishFlag)
+  if (s === '1' || s === '2') return true
+  return s.includes('已完成') || s.includes('部分完成')
+}
+
+/**
+ * 未开工可删：未结案、未作废、完成状态未开工；
+ * 若已加载明细则额外要求完工数合计为 0。
+ */
+const deleteBlockReason = (row: any, opts?: { fnQty?: number }) => {
+  if (!row?.wtNo) return '无效派工单'
+  if (isCancelled(row)) return '已作废，不可删除'
+  if (isClosed(row)) return '已结案，不可删除'
+  if (isStartedByFinish(row)) return '已开工/有完工，不可删除'
+  if (opts?.fnQty != null && opts.fnQty > 0.000001) return '已有完工数量，不可删除'
+  return ''
+}
+
+const masterSelectable = (row: any) => !deleteBlockReason(row)
+
+const selectedDeleteReason = computed(() => {
+  if (!selectedWt.value) return '请先选择派工单'
+  return deleteBlockReason(selectedWt.value, {
+    fnQty: selectedWt.value.wtNo === itemList.value[0]?.wtNo ? itemTotals.value.fnQty : undefined,
+  })
+})
+
+const selectedCanDelete = computed(() => !selectedDeleteReason.value)
+
 const itemRowKey = (row: any) =>
   `${row.wtNo}-${row.sNo}-${row.woNo}-${row.moNo}-${row.goodsId}-${row.prcCode}`
 
@@ -427,6 +592,7 @@ const fetchMaster = async () => {
     itemList.value = []
     workerList.value = []
     checkedItems.value = []
+    checkedMasters.value = []
     Object.keys(workersByItem).forEach((k) => delete workersByItem[k])
   } catch (e: any) {
     masterList.value = []
@@ -513,6 +679,10 @@ const onItemSelectionChange = (rows: any[]) => {
   ensureCardWorkers(checkedItems.value)
 }
 
+const onMasterSelectionChange = (rows: any[]) => {
+  checkedMasters.value = (rows || []).filter((r) => !deleteBlockReason(r))
+}
+
 const handleMasterClick = (row: any) => {
   if (!row?.wtNo) return
   selectedWt.value = row
@@ -522,6 +692,104 @@ const handleMasterClick = (row: any) => {
 const handleItemClick = (row: any) => {
   selectedItem.value = row
   loadWorkers(row)
+}
+
+const resetDeleteSlide = () => {
+  slidePercent.value = 0
+  slideReady.value = false
+  slideDragging.value = false
+  pendingDeleteRows.value = []
+}
+
+const openDeleteConfirm = async (rows: any[]) => {
+  const unique = new Map<string, any>()
+  for (const row of rows || []) {
+    if (!row?.wtNo) continue
+    unique.set(row.wtNo, row)
+  }
+  const list = [...unique.values()]
+  if (!list.length) {
+    $baseMessage('请选择要删除的派工单', 'warning', 'hey')
+    return
+  }
+
+  const blocked: string[] = []
+  const allowed: any[] = []
+  for (const row of list) {
+    // 当前选中单且明细已加载时，用完工数再校验一次
+    const fnQty =
+      selectedWt.value?.wtNo === row.wtNo && itemList.value.length
+        ? itemTotals.value.fnQty
+        : undefined
+    const reason = deleteBlockReason(row, { fnQty })
+    if (reason) blocked.push(`${row.wtNo}：${reason}`)
+    else allowed.push(row)
+  }
+  if (!allowed.length) {
+    $baseMessage(blocked[0] || '所选派工单不可删除', 'warning', 'hey')
+    return
+  }
+  if (blocked.length) {
+    $baseMessage(`已跳过 ${blocked.length} 张不可删单据`, 'warning', 'hey')
+  }
+
+  pendingDeleteRows.value = allowed
+  slidePercent.value = 0
+  slideReady.value = false
+  deleteDialog.value = true
+}
+
+const updateSlideFromClientX = (clientX: number) => {
+  const track = slideTrackRef.value
+  if (!track) return
+  const rect = track.getBoundingClientRect()
+  const thumb = 44
+  const max = Math.max(1, rect.width - thumb)
+  const x = Math.min(max, Math.max(0, clientX - rect.left - thumb / 2))
+  const pct = Math.round((x / max) * 100)
+  slidePercent.value = pct
+  slideReady.value = pct >= 96
+  if (slideReady.value) slidePercent.value = 100
+}
+
+const onSlidePointerMove = (e: PointerEvent) => {
+  if (!slideDragging.value) return
+  updateSlideFromClientX(e.clientX)
+}
+
+const onSlidePointerUp = () => {
+  if (!slideDragging.value) return
+  slideDragging.value = false
+  document.removeEventListener('pointermove', onSlidePointerMove)
+  document.removeEventListener('pointerup', onSlidePointerUp)
+  if (!slideReady.value && slidePercent.value < 96) {
+    slidePercent.value = 0
+  }
+}
+
+const onSlidePointerDown = (e: PointerEvent) => {
+  if (deleting.value) return
+  slideDragging.value = true
+  updateSlideFromClientX(e.clientX)
+  document.addEventListener('pointermove', onSlidePointerMove)
+  document.addEventListener('pointerup', onSlidePointerUp)
+  e.preventDefault()
+}
+
+const confirmDelete = async () => {
+  if (!slideReady.value || !pendingDeleteRows.value.length) return
+  deleting.value = true
+  try {
+    const wtNos = pendingDeleteRows.value.map((r) => r.wtNo)
+    await removeWt(wtNos)
+    $baseMessage(`已删除 ${wtNos.length} 张派工单`, 'success', 'hey')
+    deleteDialog.value = false
+    await fetchMaster()
+  } catch (e: any) {
+    $baseMessage(e?.message || '删除失败', 'error', 'hey')
+  } finally {
+    deleting.value = false
+  }
 }
 
 const router = useRouter()
@@ -550,7 +818,11 @@ const resetQuery = () => {
 }
 
 onBeforeMount(() => fetchMaster())
-onBeforeUnmount(() => stopPaneResize())
+onBeforeUnmount(() => {
+  stopPaneResize()
+  document.removeEventListener('pointermove', onSlidePointerMove)
+  document.removeEventListener('pointerup', onSlidePointerUp)
+})
 </script>
 
 <style lang="scss" scoped>
@@ -608,6 +880,11 @@ onBeforeUnmount(() => stopPaneResize())
     font-size: 12px;
     color: #2e7d5a;
     font-variant-numeric: tabular-nums;
+  }
+
+  &__actions {
+    display: inline-flex;
+    align-items: center;
   }
 }
 
@@ -811,6 +1088,163 @@ onBeforeUnmount(() => stopPaneResize())
     &::after {
       background: #2e7d5a;
       width: 72px;
+    }
+  }
+}
+</style>
+
+<style lang="scss">
+.wt-delete-dialog {
+  .el-dialog__header {
+    margin-right: 0;
+    padding-bottom: 8px;
+  }
+
+  .el-dialog__body {
+    padding-top: 4px;
+  }
+}
+
+.wt-delete-dialog__title {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+
+  .is-warn {
+    margin-top: 2px;
+    font-size: 22px;
+    color: #e11d48;
+  }
+
+  strong {
+    display: block;
+    font-size: 16px;
+    color: #1f2937;
+  }
+
+  p {
+    margin: 4px 0 0;
+    font-size: 12px;
+    color: #6b7280;
+  }
+}
+
+.wt-delete-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+  max-height: 220px;
+  overflow: auto;
+
+  &__card {
+    padding: 10px 12px;
+    border: 1px solid #fecdd3;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #fff1f2 0%, #fff 70%);
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+
+      b {
+        color: #be123c;
+        font-size: 14px;
+        letter-spacing: 0.02em;
+      }
+    }
+
+    p {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 0;
+      font-size: 12px;
+      color: #7a8b7f;
+    }
+  }
+
+  &__sum {
+    font-size: 13px;
+    color: #4b5563;
+
+    em {
+      font-style: normal;
+      font-weight: 700;
+      color: #e11d48;
+      margin: 0 2px;
+    }
+  }
+}
+
+.wt-slide {
+  position: relative;
+  height: 48px;
+  border-radius: 999px;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+  user-select: none;
+  touch-action: none;
+  cursor: pointer;
+
+  &__fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    background: linear-gradient(90deg, #fda4af 0%, #fb7185 55%, #e11d48 100%);
+    transition: width 0.05s linear;
+  }
+
+  &__hint {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: #6b7280;
+    letter-spacing: 0.04em;
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  &__thumb {
+    position: absolute;
+    top: 4px;
+    left: calc((100% - 48px) * var(--slide, 0) + 4px);
+    z-index: 2;
+    width: 40px;
+    height: 40px;
+    border: 0;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.18);
+    color: #e11d48;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: grab;
+  }
+
+  &.is-dragging .wt-slide__thumb {
+    cursor: grabbing;
+  }
+
+  &.is-ready {
+    border-color: #e11d48;
+
+    .wt-slide__hint {
+      color: #fff;
+      text-shadow: 0 1px 2px rgba(136, 19, 55, 0.35);
+    }
+
+    .wt-slide__thumb {
+      background: #fff1f2;
+      color: #be123c;
     }
   }
 }

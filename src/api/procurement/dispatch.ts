@@ -54,3 +54,23 @@ export async function getWtWorkers(params: {
   const data = unwrap(res)
   return Array.isArray(data) ? data : []
 }
+
+/**
+ * 删除未开工派工单（后端需再次校验完工数等）。
+ * wtNos: 单个或逗号分隔多个派工单号
+ */
+export async function removeWt(wtNos: string | string[]) {
+  const list = (Array.isArray(wtNos) ? wtNos : String(wtNos || '').split(','))
+    .map((s) => String(s || '').trim())
+    .filter(Boolean)
+  if (!list.length) throw new Error('缺少派工单号')
+  const res: any = await request({
+    url: '/api/blade-system/dispatch/remove',
+    method: 'post',
+    params: { wtNos: list.join(',') },
+  })
+  if (res?.success === false) {
+    throw new Error(res?.msg || '删除派工单失败')
+  }
+  return unwrap(res)
+}
