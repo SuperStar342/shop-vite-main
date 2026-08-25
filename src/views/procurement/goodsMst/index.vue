@@ -119,6 +119,7 @@
         :height="tableHeight"
         @on-checkbox-state-change="handleCheckboxStateChange"
         @on-click-cell="handleClickCell"
+        @on-contextmenu-cell="onCopyContextMenu"
         @on-initialized="handleTableReady"
       />
     </div>
@@ -143,6 +144,7 @@ import { ListTable } from '@visactor/vue-vtable'
 import { doDelete, getCategoryTree, getList } from '/@/api/procurement/goodsMst'
 import { useVTableLayout } from '/@/hooks/useVTableLayout'
 import { toIdSet } from '/@/utils/listMutate'
+import { handleVTableContextMenuCell } from '/@/utils/tableCopy'
 
 defineOptions({
   name: 'GoodsMstManagement',
@@ -399,7 +401,8 @@ const tableOptions = computed(() => {
   return {
     columns,
     hover: { highlightMode: 'row' as const },
-    select: { highlightMode: 'row' as const },
+    select: { highlightMode: 'cell' as const },
+    keyboardOptions: { copySelected: true },
     columnResizeMode: 'all' as const,
     dragHeaderMode: 'column' as const,
     defaultColWidth: 120,
@@ -416,6 +419,10 @@ const tableOptions = computed(() => {
     emptyTip: { text: '暂无材料资料数据', position: { x: '50%', y: '50%' }, textStyle: { fontSize: 14, color: '#909399' } },
   }
 })
+
+const onCopyContextMenu = (args: any) => {
+  handleVTableContextMenuCell(args, () => tableRef.value?.vTableInstance)
+}
 
 // ===== 选中同步 =====
 const syncSelectedRows = () => {

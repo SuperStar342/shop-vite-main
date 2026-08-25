@@ -74,6 +74,7 @@
             :records="masterList"
             :height="masterHeight"
             @on-click-cell="handleMasterClick"
+            @on-contextmenu-cell="(args: any) => onCopyContextMenu(args, masterTableRef)"
             @on-initialized="() => masterLayout.handleTableReady()"
           />
         </div>
@@ -106,6 +107,7 @@
             :options="midOptions"
             :records="midList"
             :height="midHeight"
+            @on-contextmenu-cell="(args: any) => onCopyContextMenu(args, midTableRef)"
             @on-initialized="() => midLayout.handleTableReady()"
           />
         </div>
@@ -129,6 +131,7 @@ import {
 } from '/@/api/procurement/workOrder'
 import { useVTableLayout } from '/@/hooks/useVTableLayout'
 import { sortNewestFirst } from '/@/utils/bladeAdapter'
+import { handleVTableContextMenuCell } from '/@/utils/tableCopy'
 
 defineOptions({ name: 'WorkOrderManagement' })
 
@@ -207,7 +210,8 @@ onBeforeUnmount(() => {
 
 const baseTableOpts = {
   hover: { highlightMode: 'row' as const },
-  select: { highlightMode: 'row' as const },
+  select: { highlightMode: 'cell' as const },
+  keyboardOptions: { copySelected: true },
   columnResizeMode: 'all' as const,
   dragHeaderMode: 'column' as const,
   widthMode: 'standard' as const,
@@ -469,6 +473,10 @@ const getRecord = (tableRefObj: any, args: any, list: any[]) => {
   const vtable = tableRefObj.value?.vTableInstance
   if (!vtable || args.col === undefined || args.row === undefined) return null
   return vtable.getCellOriginRecord?.(args.col, args.row) || list[args.row - (vtable.columnHeaderLevelCount ?? 1)] || null
+}
+
+const onCopyContextMenu = (args: any, tableRefObj: any) => {
+  handleVTableContextMenuCell(args, () => tableRefObj?.value?.vTableInstance)
 }
 
 const fetchMaster = async () => {

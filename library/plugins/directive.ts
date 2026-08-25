@@ -2,6 +2,9 @@ import { throttle } from 'lodash-es'
 import type { App, DirectiveBinding } from 'vue'
 import { devDependencies } from '~/package.json'
 import { hasPermission } from '/@/utils/permission'
+import { openTableCopyFromElCell } from '/@/utils/tableCopy'
+
+type ElWithCopy = HTMLElement & { __tableCopyHandler?: (e: MouseEvent) => void }
 
 export default {
   install: (app: App<Element>) => {
@@ -48,6 +51,33 @@ export default {
     app.directive('focus', {
       mounted(el) {
         el.querySelector('input').focus()
+      },
+    })
+
+    /**
+     * @description 表格右键复制（单元格/整行）v-table-copy
+     * 挂在包含 el-table 的容器或 el-table 根节点上即可。
+     */
+    app.directive('table-copy', {
+      mounted(el: ElWithCopy) {
+        const handler = (e: MouseEvent) => {
+          const target = e.target as HTMLElement | null
+          if (!target) return
+          if (target.closest('input, textarea, .el-input, .el-textarea, .el-select, button, .el-button, a')) {
+            return
+          }
+          const td = target.closest('td.el-table__cell') as HTMLElement | null
+          if (!td || !el.contains(td)) return
+          openTableCopyFromElCell(e, td)
+        }
+        el.__tableCopyHandler = handler
+        el.addEventListener('contextmenu', handler)
+      },
+      beforeUnmount(el: ElWithCopy) {
+        if (el.__tableCopyHandler) {
+          el.removeEventListener('contextmenu', el.__tableCopyHandler)
+          delete el.__tableCopyHandler
+        }
       },
     })
 

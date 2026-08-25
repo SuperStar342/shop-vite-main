@@ -1,5 +1,5 @@
 <template>
-  <div class="dispatch-container auto-height-container">
+  <div v-table-copy class="dispatch-container auto-height-container">
     <vab-query-form>
       <vab-query-form-left-panel :span="24">
         <el-form inline :model="queryForm" @submit.prevent>

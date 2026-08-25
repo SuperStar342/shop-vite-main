@@ -1,5 +1,5 @@
 <template>
-  <div class="nd-page auto-height-container">
+  <div v-table-copy class="nd-page auto-height-container">
     <header v-show="wizardStep !== 2" class="nd-hero">
       <div>
         <h1>普通派工</h1>

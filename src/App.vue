@@ -1,11 +1,13 @@
 <template>
   <vab-app />
+  <table-copy-menu />
 </template>
 
 <script lang="ts" setup>
 import DisableDevtool from 'disable-devtool'
 import { disableDebugger } from '/@/config'
 import { useSettingsStore } from '/@/store/modules/settings'
+import TableCopyMenu from '/@/components/TableCopyMenu.vue'
 
 defineOptions({
   name: 'App',

@@ -37,6 +37,7 @@
         :height="tableHeight"
         @on-checkbox-state-change="handleCheckboxStateChange"
         @on-click-cell="handleClickCell"
+        @on-contextmenu-cell="onCopyContextMenu"
         @on-initialized="handleTableReady"
       />
     </div>
@@ -65,6 +66,7 @@ import { ElMessageBox } from 'element-plus'
 import { ListTable } from '@visactor/vue-vtable'
 import { doDelete, getList } from '/@/api/procurement/materialCategory'
 import { useVTableLayout } from '/@/hooks/useVTableLayout'
+import { handleVTableContextMenuCell } from '/@/utils/tableCopy'
 import MaterialCategoryDetailDrawer from './vabAutoComponents/MaterialCategoryDetailDrawer.vue'
 
 defineOptions({
@@ -227,6 +229,7 @@ const tableOptions = computed(() => {
     columns,
     hover: { highlightMode: 'row' as const },
     select: { highlightMode: 'row' as const, disableSelect: true },
+    keyboardOptions: { copySelected: true },
     columnResizeMode: 'all' as const,
     dragHeaderMode: 'column' as const,
     defaultColWidth: 100,
@@ -264,6 +267,10 @@ const tableOptions = computed(() => {
     },
   }
 })
+
+const onCopyContextMenu = (args: any) => {
+  handleVTableContextMenuCell(args, () => tableRef.value?.vTableInstance)
+}
 
 const syncSelectedRows = () => {
   const vtable = tableRef.value?.vTableInstance

@@ -9,7 +9,7 @@
     @update:model-value="emit('update:modelValue', $event)"
     @opened="onOpen"
   >
-    <div class="emp-picker-wrap" :class="{ 'is-alloc-mode': isAllocMode }">
+    <div v-table-copy class="emp-picker-wrap" :class="{ 'is-alloc-mode': isAllocMode }">
       <div class="emp-picker">
       <aside class="emp-picker__depts">
         <button class="emp-picker__dept-item" :class="{ 'is-active': empNavKey === 'all' }" type="button" @click="selectEmpNav('all')">
