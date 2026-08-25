@@ -868,6 +868,7 @@ import {
   summarizeBorWageFields,
   wageTypeLabel,
 } from '/@/utils/dispatchBor'
+import { sortNewestFirst } from '/@/utils/bladeAdapter'
 import DispatchQtyCell from './DispatchQtyCell.vue'
 import EmpPickerDialog, { type EmpAllocLine } from './EmpPickerDialog.vue'
 
@@ -2171,7 +2172,10 @@ const loadPreview = async () => {
       moNo: queryMoNo.value,
       woNo: queryWoNo.value,
     })
-    allWorkOrders.value = (data.workOrders || []).filter((w: any) => num(w.remainQty) > 0)
+    allWorkOrders.value = sortNewestFirst(
+      (data.workOrders || []).filter((w: any) => num(w.remainQty) > 0),
+      'woNo'
+    )
     if (!activeWoNo.value && allWorkOrders.value[0]) activeWoNo.value = allWorkOrders.value[0].woNo
   } catch (e: any) {
     allWorkOrders.value = []

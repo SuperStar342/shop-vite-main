@@ -128,6 +128,7 @@ import {
   getWoWcsItems,
 } from '/@/api/procurement/workOrder'
 import { useVTableLayout } from '/@/hooks/useVTableLayout'
+import { sortNewestFirst } from '/@/utils/bladeAdapter'
 
 defineOptions({ name: 'WorkOrderManagement' })
 
@@ -474,7 +475,7 @@ const fetchMaster = async () => {
   listLoading.value = true
   try {
     const { data } = await getWoList(queryForm)
-    masterList.value = data.list || []
+    masterList.value = sortNewestFirst(data.list || [], 'woNo')
     total.value = data.total || 0
     selectedWo.value = null
     midList.value = []

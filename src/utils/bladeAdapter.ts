@@ -56,6 +56,20 @@ export const adaptPage = (res: any, mapRow?: (row: any) => any): ShopPageResult 
   }
 }
 
+/** 按建立时间、单号降序（新数据在前）；用于列表兜底排序 */
+export const sortNewestFirst = <T extends Record<string, any>>(
+  list: T[] | null | undefined,
+  noKey: string
+): T[] => {
+  const rows = Array.isArray(list) ? [...list] : []
+  return rows.sort((a, b) => {
+    const da = String(a?.cDate || '')
+    const db = String(b?.cDate || '')
+    if (da !== db) return db.localeCompare(da)
+    return String(b?.[noKey] || '').localeCompare(String(a?.[noKey] || ''))
+  })
+}
+
 /** 树/列表数组 */
 export const adaptList = (res: any, mapRow?: (row: any) => any) => {
   const envelope = getEnvelope(res) || {}

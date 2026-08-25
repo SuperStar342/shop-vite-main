@@ -123,6 +123,7 @@ import {
   getMoSchDailyPlans,
 } from '/@/api/procurement/instruction'
 import { useVTableLayout } from '/@/hooks/useVTableLayout'
+import { sortNewestFirst } from '/@/utils/bladeAdapter'
 
 defineOptions({ name: 'InstructionManagement' })
 
@@ -491,7 +492,7 @@ const fetchMaster = async () => {
   listLoading.value = true
   try {
     const { data } = await getMoList(queryForm)
-    masterList.value = data.list || []
+    masterList.value = sortNewestFirst(data.list || [], 'moNo')
     total.value = data.total || 0
     selectedMo.value = null
     selectedItem.value = null

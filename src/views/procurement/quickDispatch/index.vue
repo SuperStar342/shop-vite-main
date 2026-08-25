@@ -446,6 +446,7 @@ import {
 import { filterDeptsByKeyword, filterEmpsByKeyword, isPinyinLikeKeyword } from '/@/utils/empMatch'
 import { fmtNum, num } from '/@/utils/dispatchAlloc'
 import { borLineKey, borWageBrief, estimateBorWage, summarizeBorWageFields } from '/@/utils/dispatchBor'
+import { sortNewestFirst } from '/@/utils/bladeAdapter'
 
 defineOptions({ name: 'QuickDispatch' })
 
@@ -1348,7 +1349,10 @@ const loadPreview = async () => {
       moNo: queryForm.moNo,
       woNo: queryForm.woNo,
     })
-    allWorkOrders.value = (data.workOrders || []).filter((w: any) => num(w.remainQty) > 0)
+    allWorkOrders.value = sortNewestFirst(
+      (data.workOrders || []).filter((w: any) => num(w.remainQty) > 0),
+      'woNo'
+    )
     linesByWo.value = {}
     checkedLeafIds.value = []
     treeReloadKey.value += 1

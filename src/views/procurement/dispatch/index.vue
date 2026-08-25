@@ -40,6 +40,33 @@
             <el-button plain type="success" @click="goQuickDispatch">快捷派工</el-button>
             <el-button
               plain
+              type="primary"
+              :disabled="!checkedMasters.length"
+              :loading="auditing"
+              @click="runApprove(checkedMasters)"
+            >
+              审核选中{{ checkedMasters.length ? ` (${checkedMasters.length})` : '' }}
+            </el-button>
+            <el-button
+              plain
+              type="warning"
+              :disabled="!checkedMasters.length"
+              :loading="unauditing"
+              @click="runUnapprove(checkedMasters)"
+            >
+              反审核选中
+            </el-button>
+            <el-button
+              plain
+              type="info"
+              :disabled="!checkedMasters.length"
+              :loading="closing"
+              @click="runClose(checkedMasters)"
+            >
+              结案选中
+            </el-button>
+            <el-button
+              plain
               type="danger"
               :disabled="!checkedMasters.length"
               @click="openDeleteConfirm(checkedMasters)"
@@ -74,6 +101,58 @@
         <span>完成率 {{ itemTotals.rate }}%</span>
       </div>
       <div class="wt-summary__actions">
+        <el-tooltip
+          :content="selectedApproveReason || '审核后才可报工/结案'"
+          :disabled="selectedCanApprove"
+          placement="top"
+        >
+          <span>
+            <el-button
+              :disabled="!selectedCanApprove"
+              :icon="CircleCheck"
+              :loading="auditing"
+              size="small"
+              type="primary"
+              @click="runApprove([selectedWt])"
+            >
+              审核
+            </el-button>
+          </span>
+        </el-tooltip>
+        <el-tooltip
+          :content="selectedUnapproveReason || '反审核后恢复未审核限制'"
+          :disabled="selectedCanUnapprove"
+          placement="top"
+        >
+          <span>
+            <el-button
+              :disabled="!selectedCanUnapprove"
+              :loading="unauditing"
+              size="small"
+              type="warning"
+              @click="runUnapprove([selectedWt])"
+            >
+              反审核
+            </el-button>
+          </span>
+        </el-tooltip>
+        <el-tooltip
+          :content="selectedCloseReason || '仅已审核可结案'"
+          :disabled="selectedCanClose"
+          placement="top"
+        >
+          <span>
+            <el-button
+              :disabled="!selectedCanClose"
+              :loading="closing"
+              size="small"
+              type="info"
+              @click="runClose([selectedWt])"
+            >
+              结案
+            </el-button>
+          </span>
+        </el-tooltip>
         <el-tooltip
           :content="selectedDeleteReason || '仅未开工派工单可删'"
           :disabled="selectedCanDelete"
@@ -152,8 +231,26 @@
             <el-table-column v-if="visible('clrCode')" label="颜色编号" min-width="90" prop="clrCode" />
             <el-table-column v-if="visible('clrName')" label="颜色" min-width="90" prop="clrName" />
             <el-table-column v-if="visible('remark')" label="备注" min-width="140" prop="remark" show-overflow-tooltip />
-            <el-table-column align="center" fixed="right" label="操作" width="88">
+            <el-table-column align="center" fixed="right" label="操作" width="168">
               <template #default="{ row }">
+                <el-button
+                  v-if="!isAudited(row)"
+                  link
+                  type="primary"
+                  :disabled="!!approveBlockReason(row)"
+                  @click.stop="runApprove([row])"
+                >
+                  审核
+                </el-button>
+                <el-button
+                  v-else
+                  link
+                  type="warning"
+                  :disabled="!!unapproveBlockReason(row)"
+                  @click.stop="runUnapprove([row])"
+                >
+                  反审核
+                </el-button>
                 <el-tooltip
                   :content="deleteBlockReason(row) || '删除未开工派工单'"
                   placement="left"
@@ -406,10 +503,19 @@
 </template>
 
 <script lang="ts" setup>
-import { Delete, Refresh, Search, WarningFilled } from '@element-plus/icons-vue'
-import { getWtItems, getWtList, getWtWorkers, removeWt } from '/@/api/procurement/dispatch'
+import { CircleCheck, Delete, Refresh, Search, WarningFilled } from '@element-plus/icons-vue'
+import {
+  approveWt,
+  closeWt,
+  getWtItems,
+  getWtList,
+  getWtWorkers,
+  removeWt,
+  unapproveWt,
+} from '/@/api/procurement/dispatch'
 import { $baseMessage } from '/@/hooks'
 import { useListColumns } from '/@/hooks/useListColumns'
+import { sortNewestFirst } from '/@/utils/bladeAdapter'
 
 defineOptions({ name: 'DispatchManagement' })
 
@@ -450,6 +556,9 @@ const resizeStartRatio = ref([0, 0])
 /** 删除确认弹窗 / 滑块 */
 const deleteDialog = ref(false)
 const deleting = ref(false)
+const auditing = ref(false)
+const unauditing = ref(false)
+const closing = ref(false)
 const pendingDeleteRows = ref<any[]>([])
 const slidePercent = ref(0)
 const slideReady = ref(false)
@@ -500,7 +609,7 @@ const progressOf = (row: any) => {
 const tagType = (label: string) => {
   const s = String(label || '')
   if (['已审核', '已完成', '已结案'].includes(s)) return 'success'
-  if (['部分完成'].includes(s)) return 'warning'
+  if (['部分完成', '未审核'].includes(s)) return 'warning'
   if (['已作废', '作废'].includes(s)) return 'danger'
   return 'info'
 }
@@ -515,6 +624,11 @@ const isClosed = (row: any) => {
 const isCancelled = (row: any) => {
   const s = flagText(row?.ifCancel)
   return s === '1' || s.includes('已作废') || s === '作废'
+}
+
+const isAudited = (row: any) => {
+  const s = flagText(row?.cFlag)
+  return s === '1' || s.includes('已审核')
 }
 
 /** 完成状态已开工：已完成 / 部分完成 */
@@ -537,16 +651,64 @@ const deleteBlockReason = (row: any, opts?: { fnQty?: number }) => {
   return ''
 }
 
-const masterSelectable = (row: any) => !deleteBlockReason(row)
+const approveBlockReason = (row: any) => {
+  if (!row?.wtNo) return '无效派工单'
+  if (isCancelled(row)) return '已作废，不可审核'
+  if (isClosed(row)) return '已结案，不可审核'
+  if (isAudited(row)) return '已审核'
+  return ''
+}
+
+const unapproveBlockReason = (row: any, opts?: { fnQty?: number }) => {
+  if (!row?.wtNo) return '无效派工单'
+  if (isCancelled(row)) return '已作废，不可反审核'
+  if (isClosed(row)) return '已结案，不可反审核'
+  if (!isAudited(row)) return '未审核，无需反审核'
+  if (isStartedByFinish(row)) return '已开工/有完工，不可反审核'
+  if (opts?.fnQty != null && opts.fnQty > 0.000001) return '已有完工数量，不可反审核'
+  return ''
+}
+
+const closeBlockReason = (row: any) => {
+  if (!row?.wtNo) return '无效派工单'
+  if (isCancelled(row)) return '已作废，不可结案'
+  if (isClosed(row)) return '已结案'
+  if (!isAudited(row)) return '未审核，不可结案'
+  return ''
+}
+
+const masterSelectable = () => true
+
+const selectedFnQty = computed(() =>
+  selectedWt.value?.wtNo && itemList.value[0]?.wtNo === selectedWt.value.wtNo
+    ? itemTotals.value.fnQty
+    : undefined
+)
 
 const selectedDeleteReason = computed(() => {
   if (!selectedWt.value) return '请先选择派工单'
-  return deleteBlockReason(selectedWt.value, {
-    fnQty: selectedWt.value.wtNo === itemList.value[0]?.wtNo ? itemTotals.value.fnQty : undefined,
-  })
+  return deleteBlockReason(selectedWt.value, { fnQty: selectedFnQty.value })
 })
 
 const selectedCanDelete = computed(() => !selectedDeleteReason.value)
+
+const selectedApproveReason = computed(() => {
+  if (!selectedWt.value) return '请先选择派工单'
+  return approveBlockReason(selectedWt.value)
+})
+const selectedCanApprove = computed(() => !selectedApproveReason.value)
+
+const selectedUnapproveReason = computed(() => {
+  if (!selectedWt.value) return '请先选择派工单'
+  return unapproveBlockReason(selectedWt.value, { fnQty: selectedFnQty.value })
+})
+const selectedCanUnapprove = computed(() => !selectedUnapproveReason.value)
+
+const selectedCloseReason = computed(() => {
+  if (!selectedWt.value) return '请先选择派工单'
+  return closeBlockReason(selectedWt.value)
+})
+const selectedCanClose = computed(() => !selectedCloseReason.value)
 
 const itemRowKey = (row: any) =>
   `${row.wtNo}-${row.sNo}-${row.woNo}-${row.moNo}-${row.goodsId}-${row.prcCode}`
@@ -585,7 +747,7 @@ const fetchMaster = async () => {
   listLoading.value = true
   try {
     const { data } = await getWtList(queryForm)
-    masterList.value = data.list || []
+    masterList.value = sortNewestFirst(data.list || [], 'wtNo')
     total.value = data.total || 0
     selectedWt.value = null
     selectedItem.value = null
@@ -680,7 +842,7 @@ const onItemSelectionChange = (rows: any[]) => {
 }
 
 const onMasterSelectionChange = (rows: any[]) => {
-  checkedMasters.value = (rows || []).filter((r) => !deleteBlockReason(r))
+  checkedMasters.value = rows || []
 }
 
 const handleMasterClick = (row: any) => {
@@ -784,11 +946,127 @@ const confirmDelete = async () => {
     await removeWt(wtNos)
     $baseMessage(`已删除 ${wtNos.length} 张派工单`, 'success', 'hey')
     deleteDialog.value = false
-    await fetchMaster()
+    resetDeleteSlide()
+    await afterWtMutation(wtNos)
   } catch (e: any) {
     $baseMessage(e?.message || '删除失败', 'error', 'hey')
   } finally {
     deleting.value = false
+  }
+}
+
+const pickAllowedRows = (
+  rows: any[],
+  reasonOf: (row: any, opts?: { fnQty?: number }) => string,
+  emptyMsg: string
+) => {
+  const unique = new Map<string, any>()
+  for (const row of rows || []) {
+    if (!row?.wtNo) continue
+    unique.set(row.wtNo, row)
+  }
+  const list = [...unique.values()]
+  if (!list.length) {
+    $baseMessage(emptyMsg, 'warning', 'hey')
+    return []
+  }
+  const blocked: string[] = []
+  const allowed: any[] = []
+  for (const row of list) {
+    const fnQty =
+      selectedWt.value?.wtNo === row.wtNo && itemList.value.length
+        ? itemTotals.value.fnQty
+        : undefined
+    const reason = reasonOf(row, { fnQty })
+    if (reason) blocked.push(`${row.wtNo}：${reason}`)
+    else allowed.push(row)
+  }
+  if (!allowed.length) {
+    $baseMessage(blocked[0] || emptyMsg, 'warning', 'hey')
+    return []
+  }
+  if (blocked.length) {
+    $baseMessage(`已跳过 ${blocked.length} 张不可操作单据`, 'warning', 'hey')
+  }
+  return allowed
+}
+
+const afterWtMutation = async (wtNos: string[]) => {
+  const keepWt = selectedWt.value?.wtNo
+  listLoading.value = true
+  try {
+    const { data } = await getWtList(queryForm)
+    masterList.value = sortNewestFirst(data.list || [], 'wtNo')
+    total.value = data.total || 0
+    checkedMasters.value = []
+    if (keepWt && wtNos.includes(keepWt) && !masterList.value.some((r) => r.wtNo === keepWt)) {
+      selectedWt.value = null
+      selectedItem.value = null
+      itemList.value = []
+      workerList.value = []
+      checkedItems.value = []
+      Object.keys(workersByItem).forEach((k) => delete workersByItem[k])
+      return
+    }
+    if (keepWt) {
+      const fresh = masterList.value.find((r) => r.wtNo === keepWt)
+      if (fresh) {
+        selectedWt.value = fresh
+        await loadItems(keepWt)
+      }
+    }
+  } catch (e: any) {
+    $baseMessage(e?.message || '刷新列表失败', 'error', 'hey')
+  } finally {
+    listLoading.value = false
+  }
+}
+
+const runApprove = async (rows: any[]) => {
+  const allowed = pickAllowedRows(rows, (r) => approveBlockReason(r), '请选择要审核的派工单')
+  if (!allowed.length) return
+  auditing.value = true
+  try {
+    const wtNos = allowed.map((r) => r.wtNo)
+    await approveWt(wtNos)
+    $baseMessage(`已审核 ${wtNos.length} 张派工单`, 'success', 'hey')
+    await afterWtMutation(wtNos)
+  } catch (e: any) {
+    $baseMessage(e?.message || '审核失败', 'error', 'hey')
+  } finally {
+    auditing.value = false
+  }
+}
+
+const runUnapprove = async (rows: any[]) => {
+  const allowed = pickAllowedRows(rows, unapproveBlockReason, '请选择要反审核的派工单')
+  if (!allowed.length) return
+  unauditing.value = true
+  try {
+    const wtNos = allowed.map((r) => r.wtNo)
+    await unapproveWt(wtNos)
+    $baseMessage(`已反审核 ${wtNos.length} 张派工单`, 'success', 'hey')
+    await afterWtMutation(wtNos)
+  } catch (e: any) {
+    $baseMessage(e?.message || '反审核失败', 'error', 'hey')
+  } finally {
+    unauditing.value = false
+  }
+}
+
+const runClose = async (rows: any[]) => {
+  const allowed = pickAllowedRows(rows, (r) => closeBlockReason(r), '请选择要结案的派工单')
+  if (!allowed.length) return
+  closing.value = true
+  try {
+    const wtNos = allowed.map((r) => r.wtNo)
+    await closeWt(wtNos)
+    $baseMessage(`已结案 ${wtNos.length} 张派工单`, 'success', 'hey')
+    await afterWtMutation(wtNos)
+  } catch (e: any) {
+    $baseMessage(e?.message || '结案失败', 'error', 'hey')
+  } finally {
+    closing.value = false
   }
 }
 
@@ -885,6 +1163,8 @@ onBeforeUnmount(() => {
   &__actions {
     display: inline-flex;
     align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
   }
 }
 
