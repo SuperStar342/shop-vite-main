@@ -73,7 +73,7 @@
             :options="masterOptions"
             :records="masterList"
             :height="masterHeight"
-            @on-click-cell="handleMasterClick"
+            @on-click-cell="(args: any) => { onCopyTrack(args, masterTableRef); handleMasterClick(args) }"
             @on-contextmenu-cell="(args: any) => onCopyContextMenu(args, masterTableRef)"
             @on-initialized="() => masterLayout.handleTableReady()"
           />
@@ -108,6 +108,7 @@
             :records="midList"
             :height="midHeight"
             @on-contextmenu-cell="(args: any) => onCopyContextMenu(args, midTableRef)"
+            @on-click-cell="(args: any) => onCopyTrack(args, midTableRef)"
             @on-initialized="() => midLayout.handleTableReady()"
           />
         </div>
@@ -131,7 +132,7 @@ import {
 } from '/@/api/procurement/workOrder'
 import { useVTableLayout } from '/@/hooks/useVTableLayout'
 import { sortNewestFirst } from '/@/utils/bladeAdapter'
-import { handleVTableContextMenuCell } from '/@/utils/tableCopy'
+import { handleVTableContextMenuCell, trackVTableCellForCopy } from '/@/utils/tableCopy'
 
 defineOptions({ name: 'WorkOrderManagement' })
 
@@ -235,7 +236,7 @@ const baseTableOpts = {
       padding: [2, 8, 2, 8],
     },
     frameStyle: { borderColor: '#d9e4ef' },
-    selectionStyle: { cellBgColor: 'rgba(46, 125, 90, 0.12)' },
+    selectionStyle: { cellBgColor: 'rgba(46, 125, 90, 0.18)', cellBorderColor: '#2e7d5a', cellBorderLineWidth: 2 },
   },
 }
 
@@ -477,6 +478,10 @@ const getRecord = (tableRefObj: any, args: any, list: any[]) => {
 
 const onCopyContextMenu = (args: any, tableRefObj: any) => {
   handleVTableContextMenuCell(args, () => tableRefObj?.value?.vTableInstance)
+}
+
+const onCopyTrack = (args: any, tableRefObj: any) => {
+  trackVTableCellForCopy(args, () => tableRefObj?.value?.vTableInstance)
 }
 
 const fetchMaster = async () => {

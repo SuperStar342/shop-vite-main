@@ -46,7 +46,7 @@
             :options="masterOptions"
             :records="masterList"
             :height="masterHeight"
-            @on-click-cell="handleMasterClick"
+            @on-click-cell="(args: any) => { onCopyTrack(args, masterTableRef); handleMasterClick(args) }"
             @on-contextmenu-cell="(args: any) => onCopyContextMenu(args, masterTableRef)"
             @on-initialized="() => masterLayout.handleTableReady()"
           />
@@ -84,7 +84,7 @@
             :options="midOptions"
             :records="midList"
             :height="midHeight"
-            @on-click-cell="handleMidClick"
+            @on-click-cell="(args: any) => { onCopyTrack(args, midTableRef); handleMidClick(args) }"
             @on-contextmenu-cell="(args: any) => onCopyContextMenu(args, midTableRef)"
             @on-initialized="() => midLayout.handleTableReady()"
           />
@@ -104,6 +104,7 @@
             :records="detailList"
             :height="detailHeight"
             @on-contextmenu-cell="(args: any) => onCopyContextMenu(args, detailTableRef)"
+            @on-click-cell="(args: any) => onCopyTrack(args, detailTableRef)"
             @on-initialized="() => detailLayout.handleTableReady()"
           />
         </div>
@@ -127,7 +128,7 @@ import {
 } from '/@/api/procurement/instruction'
 import { useVTableLayout } from '/@/hooks/useVTableLayout'
 import { sortNewestFirst } from '/@/utils/bladeAdapter'
-import { handleVTableContextMenuCell } from '/@/utils/tableCopy'
+import { handleVTableContextMenuCell, trackVTableCellForCopy } from '/@/utils/tableCopy'
 
 defineOptions({ name: 'InstructionManagement' })
 
@@ -241,7 +242,7 @@ const baseTableOpts = {
       padding: [2, 8, 2, 8],
     },
     frameStyle: { borderColor: '#ebeef5' },
-    selectionStyle: { cellBgColor: 'rgba(64, 158, 255, 0.12)' },
+    selectionStyle: { cellBgColor: 'rgba(64, 158, 255, 0.18)', cellBorderColor: '#409eff', cellBorderLineWidth: 2 },
   },
 }
 
@@ -488,6 +489,10 @@ const getRecord = (tableRefObj: any, args: any, list: any[]) => {
 
 const onCopyContextMenu = (args: any, tableRefObj: any) => {
   handleVTableContextMenuCell(args, () => tableRefObj?.value?.vTableInstance)
+}
+
+const onCopyTrack = (args: any, tableRefObj: any) => {
+  trackVTableCellForCopy(args, () => tableRefObj?.value?.vTableInstance)
 }
 
 const srcTypeByTab = (tab: string) => {

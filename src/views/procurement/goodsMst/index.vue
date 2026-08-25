@@ -144,7 +144,7 @@ import { ListTable } from '@visactor/vue-vtable'
 import { doDelete, getCategoryTree, getList } from '/@/api/procurement/goodsMst'
 import { useVTableLayout } from '/@/hooks/useVTableLayout'
 import { toIdSet } from '/@/utils/listMutate'
-import { handleVTableContextMenuCell } from '/@/utils/tableCopy'
+import { handleVTableContextMenuCell, trackVTableCellForCopy } from '/@/utils/tableCopy'
 
 defineOptions({
   name: 'GoodsMstManagement',
@@ -414,7 +414,7 @@ const tableOptions = computed(() => {
       headerStyle: { bgColor: '#f5f7fa', fontSize: 13, fontWeight: 'bold', color: '#606266', borderColor: '#ebeef5' },
       bodyStyle: { fontSize: 13, color: '#303133', borderColor: '#ebeef5' },
       frameStyle: { borderColor: '#ebeef5' },
-      selectionStyle: { cellBgColor: 'rgba(64, 158, 255, 0.06)' },
+      selectionStyle: { cellBgColor: 'rgba(64, 158, 255, 0.18)', cellBorderColor: '#409eff', cellBorderLineWidth: 2 },
     },
     emptyTip: { text: '暂无材料资料数据', position: { x: '50%', y: '50%' }, textStyle: { fontSize: 14, color: '#909399' } },
   }
@@ -457,6 +457,7 @@ const getColumnField = (col: number): string => {
 }
 
 const handleClickCell = (args: any) => {
+  trackVTableCellForCopy(args, () => tableRef.value?.vTableInstance)
   if (args.col === undefined || args.row === undefined) return
   const field = getColumnField(args.col)
 

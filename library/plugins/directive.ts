@@ -2,9 +2,20 @@ import { throttle } from 'lodash-es'
 import type { App, DirectiveBinding } from 'vue'
 import { devDependencies } from '~/package.json'
 import { hasPermission } from '/@/utils/permission'
-import { openTableCopyFromElCell } from '/@/utils/tableCopy'
+import { openTableCopyFromElCell, selectElTableCell } from '/@/utils/tableCopy'
 
-type ElWithCopy = HTMLElement & { __tableCopyHandler?: (e: MouseEvent) => void }
+type ElWithCopy = HTMLElement & {
+  __tableCopyHandler?: (e: MouseEvent) => void
+  __tableCopyClickHandler?: (e: MouseEvent) => void
+}
+
+const ensureCopyHost = (el: HTMLElement) => {
+  el.setAttribute('data-table-copy-host', '1')
+  if (!el.hasAttribute('tabindex')) {
+    el.setAttribute('tabindex', '-1')
+  }
+  el.style.outline = el.style.outline || 'none'
+}
 
 export default {
   install: (app: App<Element>) => {
@@ -55,12 +66,14 @@ export default {
     })
 
     /**
-     * @description 表格右键复制（单元格/整行）v-table-copy
+     * @description 表格右键/单击选中复制（单元格/整行）v-table-copy
      * 挂在包含 el-table 的容器或 el-table 根节点上即可。
+     * 单击高亮单元格，Ctrl+C 复制单元格，Ctrl+Shift+C 复制整行。
      */
     app.directive('table-copy', {
       mounted(el: ElWithCopy) {
-        const handler = (e: MouseEvent) => {
+        ensureCopyHost(el)
+        const onContextMenu = (e: MouseEvent) => {
           const target = e.target as HTMLElement | null
           if (!target) return
           if (target.closest('input, textarea, .el-input, .el-textarea, .el-select, button, .el-button, a')) {
@@ -70,13 +83,30 @@ export default {
           if (!td || !el.contains(td)) return
           openTableCopyFromElCell(e, td)
         }
-        el.__tableCopyHandler = handler
-        el.addEventListener('contextmenu', handler)
+        const onClick = (e: MouseEvent) => {
+          const target = e.target as HTMLElement | null
+          if (!target) return
+          if (target.closest('input, textarea, .el-input, .el-textarea, .el-select, button, .el-button, a, .el-checkbox')) {
+            return
+          }
+          const td = target.closest('td.el-table__cell') as HTMLElement | null
+          if (!td || !el.contains(td)) return
+          if (td.classList.contains('el-table-column--selection')) return
+          selectElTableCell(td)
+        }
+        el.__tableCopyHandler = onContextMenu
+        el.__tableCopyClickHandler = onClick
+        el.addEventListener('contextmenu', onContextMenu)
+        el.addEventListener('click', onClick)
       },
       beforeUnmount(el: ElWithCopy) {
         if (el.__tableCopyHandler) {
           el.removeEventListener('contextmenu', el.__tableCopyHandler)
           delete el.__tableCopyHandler
+        }
+        if (el.__tableCopyClickHandler) {
+          el.removeEventListener('click', el.__tableCopyClickHandler)
+          delete el.__tableCopyClickHandler
         }
       },
     })

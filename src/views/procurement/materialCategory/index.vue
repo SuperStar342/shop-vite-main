@@ -66,7 +66,7 @@ import { ElMessageBox } from 'element-plus'
 import { ListTable } from '@visactor/vue-vtable'
 import { doDelete, getList } from '/@/api/procurement/materialCategory'
 import { useVTableLayout } from '/@/hooks/useVTableLayout'
-import { handleVTableContextMenuCell } from '/@/utils/tableCopy'
+import { handleVTableContextMenuCell, trackVTableCellForCopy } from '/@/utils/tableCopy'
 import MaterialCategoryDetailDrawer from './vabAutoComponents/MaterialCategoryDetailDrawer.vue'
 
 defineOptions({
@@ -328,6 +328,7 @@ let clickTimer: ReturnType<typeof setTimeout> | null = null
 let lastClickRowKey = ''
 
 const handleClickCell = (args: any) => {
+  trackVTableCellForCopy(args, () => tableRef.value?.vTableInstance)
   const field = getColumnField(args.col)
   if (field === '__checkbox__') return
   const record = getCellRecord(args)
