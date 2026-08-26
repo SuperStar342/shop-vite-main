@@ -74,12 +74,12 @@
             height="100%"
             row-key="id"
             :row-class-name="rowClassName"
-            @current-change="onTaskSelect"
-            @row-click="onTaskSelect"
+            @current-change="(row: any) => onTaskSelect(row)"
+            @row-click="(row: any) => onTaskSelect(row)"
           >
             <el-table-column align="center" width="42">
               <template #default="{ row }">
-                <el-radio :model-value="selectedTask?.id" :value="row.id" @change="onTaskSelect(row)" />
+                <el-radio :model-value="selectedTask?.id" :value="row.id" @change="onTaskSelect(row as WorkReportTask)" />
               </template>
             </el-table-column>
             <el-table-column label="工单号" min-width="130" prop="woNo" show-overflow-tooltip />
@@ -104,7 +104,7 @@
             </el-table-column>
             <el-table-column align="center" fixed="right" label="操作" width="72">
               <template #default="{ row }">
-                <el-button link type="primary" @click.stop="onTaskSelect(row)">报工</el-button>
+                <el-button link type="primary" @click.stop="onTaskSelect(row as WorkReportTask)">报工</el-button>
               </template>
             </el-table-column>
             <template #empty>

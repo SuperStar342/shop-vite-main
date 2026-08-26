@@ -42,6 +42,7 @@ export type WorkReportRecord = {
   reporter: string
   defectReason?: string
   remark?: string
+  reportMethod?: string
 }
 
 export type WorkReportStats = {
@@ -83,6 +84,27 @@ export type SubmitWorkReportPayload = {
   reworkQty: number
   defectReason?: string
   remark?: string
+}
+
+/** 派工页上下文报工（不依赖待报任务列表） */
+export type DispatchReportPayload = {
+  wtNo: string
+  woNo?: string
+  moNo?: string
+  goodsName?: string
+  prcCode?: string
+  prcName?: string
+  empNo?: string
+  empName?: string
+  pendingQty: number
+  reportQty: number
+  passQty: number
+  defectQty: number
+  reworkQty: number
+  reportTime: string
+  defectReason?: string
+  remark?: string
+  reportMethod?: string
 }
 
 const delay = (ms = 280) => new Promise((r) => setTimeout(r, ms))
@@ -349,6 +371,78 @@ export async function submitWorkReport(payload: SubmitWorkReportPayload) {
   })
   if (res?.success === false) throw new Error(res?.msg || '报工失败')
   return unwrap(res)
+}
+
+export function validateDispatchReport(payload: DispatchReportPayload) {
+  if (!payload.wtNo) return '缺少派工单号'
+  if (payload.reportQty <= 0) return '报工数量须大于 0'
+  if (payload.reportQty > payload.pendingQty) {
+    return `报工数量不能超过待报数量（${payload.pendingQty}）`
+  }
+  const sum = payload.passQty + payload.defectQty + payload.reworkQty
+  if (sum !== payload.reportQty) return '合格 + 不良 + 返工 须等于报工数量'
+  if (payload.defectQty > 0 && !payload.defectReason?.trim()) return '存在不良品时请填写不良原因'
+  return ''
+}
+
+/** 派工页提交报工；mock 时写入本地记录供弹窗查询 */
+export async function submitDispatchReport(payload: DispatchReportPayload) {
+  const err = validateDispatchReport(payload)
+  if (err) throw new Error(err)
+
+  if (USE_MOCK) {
+    await delay(320)
+    const reportNo = `RP${Date.now().toString().slice(-8)}`
+    mockRecords.push({
+      id: `r-${Date.now()}`,
+      reportNo,
+      wtNo: payload.wtNo,
+      woNo: payload.woNo || '',
+      moNo: payload.moNo || '',
+      goodsName: payload.goodsName || '',
+      prcName: payload.prcName || '',
+      reportQty: payload.reportQty,
+      passQty: payload.passQty,
+      defectQty: payload.defectQty,
+      reworkQty: payload.reworkQty,
+      reportTime: payload.reportTime,
+      reporter: payload.empName || payload.empNo || '当前用户',
+      defectReason: payload.defectReason,
+      remark: payload.remark,
+      reportMethod: payload.reportMethod || '手工报工',
+    } as WorkReportRecord & { reportMethod?: string })
+    return { reportNo }
+  }
+
+  const res: any = await request({
+    url: '/api/blade-system/work-report/submit-dispatch',
+    method: 'post',
+    data: payload,
+  })
+  if (res?.success === false) throw new Error(res?.msg || '报工失败')
+  return unwrap(res)
+}
+
+export async function getDispatchReportRecords(params: {
+  wtNo?: string
+  woNo?: string
+  prcCode?: string
+  prcName?: string
+}) {
+  if (USE_MOCK) {
+    await delay(160)
+    let list = [...mockRecords].reverse()
+    if (params.wtNo) list = list.filter((r) => r.wtNo === params.wtNo)
+    if (params.woNo) list = list.filter((r) => r.woNo === params.woNo)
+    if (params.prcName) list = list.filter((r) => r.prcName === params.prcName)
+    return { code: 200, data: { list, total: list.length } }
+  }
+  const res: any = await request({
+    url: '/api/blade-system/work-report/records',
+    method: 'get',
+    params,
+  })
+  return adaptPage(res)
 }
 
 export async function scanReportByCode(code: string) {
