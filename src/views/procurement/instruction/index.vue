@@ -47,7 +47,8 @@
             :records="masterList"
             :height="masterHeight"
             @on-click-cell="(args: any) => { onCopyTrack(args, masterTableRef); handleMasterClick(args) }"
-            @on-contextmenu-cell="(args: any) => onCopyContextMenu(args, masterTableRef)"
+            @on-selected-cell="(args: any) => onCopyTrack(args, masterTableRef)"
+            @on-context-menu-cell="(args: any) => onCopyContextMenu(args, masterTableRef)"
             @on-initialized="() => masterLayout.handleTableReady()"
           />
         </div>
@@ -85,7 +86,8 @@
             :records="midList"
             :height="midHeight"
             @on-click-cell="(args: any) => { onCopyTrack(args, midTableRef); handleMidClick(args) }"
-            @on-contextmenu-cell="(args: any) => onCopyContextMenu(args, midTableRef)"
+            @on-selected-cell="(args: any) => onCopyTrack(args, midTableRef)"
+            @on-context-menu-cell="(args: any) => onCopyContextMenu(args, midTableRef)"
             @on-initialized="() => midLayout.handleTableReady()"
           />
         </div>
@@ -103,8 +105,9 @@
             :options="detailOptions"
             :records="detailList"
             :height="detailHeight"
-            @on-contextmenu-cell="(args: any) => onCopyContextMenu(args, detailTableRef)"
+            @on-context-menu-cell="(args: any) => onCopyContextMenu(args, detailTableRef)"
             @on-click-cell="(args: any) => onCopyTrack(args, detailTableRef)"
+            @on-selected-cell="(args: any) => onCopyTrack(args, detailTableRef)"
             @on-initialized="() => detailLayout.handleTableReady()"
           />
         </div>
@@ -128,7 +131,7 @@ import {
 } from '/@/api/procurement/instruction'
 import { useVTableLayout } from '/@/hooks/useVTableLayout'
 import { sortNewestFirst } from '/@/utils/bladeAdapter'
-import { handleVTableContextMenuCell, trackVTableCellForCopy } from '/@/utils/tableCopy'
+import { getVTableInstance, handleVTableContextMenuCell, trackVTableCellForCopy } from '/@/utils/tableCopy'
 
 defineOptions({ name: 'InstructionManagement' })
 
@@ -488,11 +491,11 @@ const getRecord = (tableRefObj: any, args: any, list: any[]) => {
 }
 
 const onCopyContextMenu = (args: any, tableRefObj: any) => {
-  handleVTableContextMenuCell(args, () => tableRefObj?.value?.vTableInstance)
+  handleVTableContextMenuCell(args, () => getVTableInstance(tableRefObj))
 }
 
 const onCopyTrack = (args: any, tableRefObj: any) => {
-  trackVTableCellForCopy(args, () => tableRefObj?.value?.vTableInstance)
+  trackVTableCellForCopy(args, () => getVTableInstance(tableRefObj))
 }
 
 const srcTypeByTab = (tab: string) => {

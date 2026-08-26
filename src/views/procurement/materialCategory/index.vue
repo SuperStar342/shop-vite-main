@@ -37,7 +37,8 @@
         :height="tableHeight"
         @on-checkbox-state-change="handleCheckboxStateChange"
         @on-click-cell="handleClickCell"
-        @on-contextmenu-cell="onCopyContextMenu"
+        @on-selected-cell="onCopyTrack"
+        @on-context-menu-cell="onCopyContextMenu"
         @on-initialized="handleTableReady"
       />
     </div>
@@ -270,6 +271,10 @@ const tableOptions = computed(() => {
 
 const onCopyContextMenu = (args: any) => {
   handleVTableContextMenuCell(args, () => tableRef.value?.vTableInstance)
+}
+
+const onCopyTrack = (args: any) => {
+  trackVTableCellForCopy(args, () => tableRef.value?.vTableInstance)
 }
 
 const syncSelectedRows = () => {
