@@ -1,10 +1,25 @@
 <template>
+  <Teleport to="body">
+    <div
+      v-show="visible"
+      class="br-resize-handle"
+      :class="{ 'is-dragging': resizing }"
+      :style="resizeHandleStyle"
+      title="拖动调整宽度"
+      @mousedown.prevent="onResizeStart"
+    />
+  </Teleport>
+
   <el-drawer
     v-model="visible"
+    append-to-body
     class="br-drawer"
-    :close-on-click-modal="!submitting"
+    :close-on-click-modal="false"
+    :close-on-press-escape="!submitting"
     destroy-on-close
-    size="88%"
+    :modal="false"
+    modal-class="br-drawer-mask"
+    :size="`${drawerWidth}px`"
     title="批量报工"
     @closed="onClosed"
     @opened="onOpened"
@@ -13,7 +28,7 @@
       <div class="br-drawer__head">
         <div>
           <h2>批量报工</h2>
-          <p>选单 → 勾选工序 → 自动填满待报量 → 一键提交</p>
+          <p>点左侧派工单即可切换本侧数据 · 左缘拖拽调宽</p>
         </div>
         <div v-if="prep?.wtNo" class="br-drawer__wt">
           <span class="label">派工单</span>
@@ -184,6 +199,50 @@ const visible = computed({
 const loading = ref(false)
 const submitting = ref(false)
 const prep = ref<BatchReportPrep | null>(null)
+
+const DRAWER_MIN = 360
+const DRAWER_MAX = 900
+const DRAWER_DEFAULT = 480
+const drawerWidth = ref(DRAWER_DEFAULT)
+const resizing = ref(false)
+const resizeStartX = ref(0)
+const resizeStartW = ref(DRAWER_DEFAULT)
+
+const resizeHandleStyle = computed(() => ({
+  right: `${Math.max(0, drawerWidth.value - 3)}px`,
+}))
+
+const clampDrawerWidth = (w: number) => {
+  const max = Math.min(DRAWER_MAX, Math.floor(window.innerWidth * 0.72))
+  return Math.max(DRAWER_MIN, Math.min(max, Math.round(w)))
+}
+
+const onResizeMove = (e: MouseEvent) => {
+  if (!resizing.value) return
+  const dx = resizeStartX.value - e.clientX
+  drawerWidth.value = clampDrawerWidth(resizeStartW.value + dx)
+}
+
+const onResizeEnd = () => {
+  if (!resizing.value) return
+  resizing.value = false
+  document.body.style.cursor = ''
+  document.body.style.userSelect = ''
+  document.removeEventListener('mousemove', onResizeMove)
+  document.removeEventListener('mouseup', onResizeEnd)
+}
+
+const onResizeStart = (e: MouseEvent) => {
+  resizing.value = true
+  resizeStartX.value = e.clientX
+  resizeStartW.value = drawerWidth.value
+  document.body.style.cursor = 'col-resize'
+  document.body.style.userSelect = 'none'
+  document.addEventListener('mousemove', onResizeMove)
+  document.addEventListener('mouseup', onResizeEnd)
+}
+
+onBeforeUnmount(() => onResizeEnd())
 
 const num = (v: unknown) => {
   const n = Number(v)
@@ -376,14 +435,72 @@ const submitBatch = async () => {
 const onOpened = () => loadPrep()
 const onClosed = () => {
   prep.value = null
+  onResizeEnd()
 }
+
+watch(
+  () => props.wtNo,
+  (no, prev) => {
+    if (!visible.value) return
+    const next = String(no || '').trim()
+    const before = String(prev || '').trim()
+    if (!next || next === before) return
+    loadPrep()
+  }
+)
 </script>
 
+<style lang="scss">
+/* 非模态抽屉：容器全屏但需穿透，否则点不到左侧列表 */
+.el-drawer__container:has(.br-drawer),
+.br-drawer-mask {
+  pointer-events: none !important;
+  background: transparent !important;
+}
+
+.el-drawer.br-drawer {
+  pointer-events: auto !important;
+}
+</style>
+
 <style lang="scss" scoped>
+.br-resize-handle {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  z-index: 4001;
+  cursor: col-resize;
+  touch-action: none;
+  pointer-events: auto;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 1px;
+    width: 3px;
+    height: 48px;
+    margin-top: -24px;
+    border-radius: 2px;
+    background: rgb(26 111 181 / 28%);
+    transition: background 0.15s ease, height 0.15s ease;
+  }
+
+  &:hover::after,
+  &.is-dragging::after {
+    height: 72px;
+    margin-top: -36px;
+    background: rgb(26 111 181 / 55%);
+  }
+}
+
 .br-drawer {
+  box-shadow: -8px 0 28px rgb(26 58 82 / 12%);
+
   :deep(.el-drawer__header) {
     margin-bottom: 0;
-    padding: 16px 20px;
+    padding: 14px 16px;
     border-bottom: 1px solid #e8eef5;
   }
 
@@ -395,7 +512,7 @@ const onClosed = () => {
   }
 
   :deep(.el-drawer__footer) {
-    padding: 12px 20px;
+    padding: 10px 16px;
     border-top: 1px solid #e8eef5;
     background: #fafcff;
   }
@@ -403,14 +520,14 @@ const onClosed = () => {
 
 .br-drawer__head {
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
   width: 100%;
 
   h2 {
     margin: 0 0 4px;
-    font-size: 18px;
+    font-size: 17px;
     color: #1a3a52;
   }
 
@@ -425,10 +542,11 @@ const onClosed = () => {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 14px;
+  padding: 8px 12px;
   border-radius: 10px;
   background: linear-gradient(135deg, #eef6fc, #f8fbff);
   border: 1px solid #d4e6f5;
+  align-self: flex-start;
 
   .label {
     font-size: 12px;
@@ -436,7 +554,7 @@ const onClosed = () => {
   }
 
   strong {
-    font-size: 16px;
+    font-size: 15px;
     color: #1a6fb5;
     font-variant-numeric: tabular-nums;
   }
@@ -446,19 +564,19 @@ const onClosed = () => {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 16px 20px 20px;
+  padding: 12px 14px 16px;
   background: linear-gradient(180deg, #f4f8fc 0%, #f8fafc 120px, #fff 100%);
 }
 
 .br-kpi {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
 
   &__card {
-    padding: 12px 14px;
-    border-radius: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
     border: 1px solid #e3ecf5;
     background: #fff;
     box-shadow: 0 4px 14px rgb(26 58 82 / 4%);
@@ -466,13 +584,13 @@ const onClosed = () => {
     em {
       display: block;
       font-style: normal;
-      font-size: 12px;
+      font-size: 11px;
       color: #7a8b9a;
       margin-bottom: 4px;
     }
 
     strong {
-      font-size: 22px;
+      font-size: 18px;
       color: #1a3a52;
       font-variant-numeric: tabular-nums;
     }
@@ -487,9 +605,10 @@ const onClosed = () => {
 .br-toolbar {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 12px;
-  padding: 8px 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 8px 10px;
   border-radius: 10px;
   background: #fff;
   border: 1px solid #e8eef5;
@@ -515,10 +634,10 @@ const onClosed = () => {
 
   &__head {
     display: grid;
-    grid-template-columns: auto 1fr auto auto auto;
-    gap: 12px;
+    grid-template-columns: auto 1fr auto;
+    gap: 8px 10px;
     align-items: center;
-    padding: 12px 14px;
+    padding: 10px 12px;
     cursor: pointer;
     background: linear-gradient(90deg, #fafcff, #fff);
 
@@ -530,7 +649,8 @@ const onClosed = () => {
   &__title {
     display: flex;
     align-items: center;
-    gap: 8px;
+    flex-wrap: wrap;
+    gap: 6px;
     min-width: 0;
 
     .code {
@@ -543,28 +663,31 @@ const onClosed = () => {
     }
 
     strong {
-      font-size: 14px;
+      font-size: 13px;
       color: #1a3a52;
     }
   }
 
   &__chips {
+    grid-column: 2 / -1;
     display: flex;
     flex-direction: column;
     gap: 2px;
     font-size: 11px;
     color: #909399;
-    min-width: 140px;
+    min-width: 0;
   }
 
   &__nums {
+    grid-column: 1 / -1;
     display: flex;
-    gap: 14px;
+    flex-wrap: wrap;
+    gap: 10px 12px;
     font-variant-numeric: tabular-nums;
 
     div {
-      text-align: center;
-      min-width: 56px;
+      text-align: left;
+      min-width: 52px;
     }
 
     em {
@@ -575,7 +698,7 @@ const onClosed = () => {
     }
 
     b {
-      font-size: 13px;
+      font-size: 12px;
       color: #303133;
     }
 
@@ -598,8 +721,9 @@ const onClosed = () => {
   }
 
   &__workers {
-    padding: 0 12px 12px;
+    padding: 0 10px 10px;
     border-top: 1px dashed #e8eef5;
+    overflow-x: auto;
   }
 }
 
@@ -614,15 +738,16 @@ const onClosed = () => {
 
 .br-foot {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
   width: 100%;
 
   &__sum {
     display: flex;
-    gap: 18px;
-    font-size: 13px;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-size: 12px;
     color: #606266;
 
     b {
@@ -632,29 +757,15 @@ const onClosed = () => {
 
     .is-amt b {
       color: #1a6fb5;
-      font-size: 16px;
+      font-size: 15px;
     }
   }
 
   &__actions {
     display: flex;
-    gap: 8px;
-  }
-}
-
-@media (max-width: 1200px) {
-  .br-item__head {
-    grid-template-columns: auto 1fr;
-    grid-template-rows: auto auto;
-  }
-
-  .br-item__nums {
-    grid-column: 1 / -1;
     flex-wrap: wrap;
-  }
-
-  .br-kpi {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    justify-content: flex-end;
+    gap: 8px;
   }
 }
 </style>

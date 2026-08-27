@@ -3,7 +3,7 @@
     <header class="dr-hero">
       <div class="dr-hero__text">
         <h1>派工报工</h1>
-        <p>勾选派工单 · 按工序录入 · 支持批量报工</p>
+        <p>点选派工单 · 按工序录入 · 支持批量报工</p>
       </div>
       <div v-if="showDetail" class="dr-hero__actions">
         <el-button type="primary" @click="openBatchReport">
@@ -107,7 +107,7 @@
             <span>派工单列表</span>
             <em>
               {{ total }} 张
-              <template v-if="checkedMasters.length"> · 已选 {{ checkedMasters.length }}</template>
+              <template v-if="selectedWt?.wtNo"> · 当前 {{ selectedWt.wtNo }}</template>
             </em>
           </div>
           <div class="table-wrap">
@@ -120,9 +120,17 @@
               :data="masterList"
               row-key="wtNo"
               @row-click="handleMasterClick"
-              @selection-change="onMasterSelectionChange"
             >
-              <el-table-column type="selection" width="42" :selectable="masterSelectable" />
+              <el-table-column align="center" width="42">
+                <template #default="{ row }">
+                  <el-radio
+                    :model-value="selectedWt?.wtNo"
+                    :value="row.wtNo"
+                    @change="handleMasterClick(row)"
+                    @click.stop
+                  />
+                </template>
+              </el-table-column>
               <el-table-column v-if="visible('wtNo')" label="派工单号" min-width="168" prop="wtNo" show-overflow-tooltip />
               <el-table-column v-if="visible('oriType')" label="单据来源" min-width="100" prop="oriType" show-overflow-tooltip />
               <el-table-column v-if="visible('wtDate')" label="派工日期" min-width="110" prop="wtDate" show-overflow-tooltip />
@@ -409,7 +417,7 @@
         </template>
 
         <div v-else class="dp-hint">
-          <el-empty description="勾选或点选上方派工单后，展开工序明细与报工区" :image-size="80" />
+          <el-empty description="点选上方派工单后，展开工序明细与报工区" :image-size="80" />
         </div>
       </div>
     </div>
@@ -475,7 +483,6 @@ const total = ref(0)
 const selectedWt = ref<any>(null)
 const selectedItem = ref<any>(null)
 const checkedItems = ref<any[]>([])
-const checkedMasters = ref<any[]>([])
 const masterTableRef = ref<any>(null)
 const itemTableRef = ref<any>(null)
 const detailTab = ref<'items' | 'progress'>('items')
@@ -592,8 +599,6 @@ const isAudited = (row: any) => {
   return s === '1' || s.includes('已审核')
 }
 
-const masterSelectable = () => true
-
 const itemRowKey = (row: any) =>
   `${row.wtNo}-${row.sNo}-${row.woNo}-${row.moNo}-${row.goodsId}-${row.prcCode}`
 
@@ -636,7 +641,6 @@ const fetchMaster = async () => {
     masterList.value = sortNewestFirst(data.list || [], 'wtNo')
     total.value = data.total || 0
     clearDetail()
-    checkedMasters.value = []
   } catch (e: any) {
     masterList.value = []
     total.value = 0
@@ -730,29 +734,17 @@ const onItemSelectionChange = (rows: any[]) => {
   checkedItems.value = rows || []
 }
 
-const onMasterSelectionChange = (rows: any[]) => {
-  checkedMasters.value = rows || []
-  // 勾选驱动：无勾选则收起明细；有勾选则展示最后勾选的一张
-  if (!rows?.length) {
-    clearDetail()
-    return
-  }
-  const last = rows[rows.length - 1]
-  if (last?.wtNo && last.wtNo !== selectedWt.value?.wtNo) {
-    selectedWt.value = last
-    loadItems(last.wtNo)
-  }
-}
-
 const handleMasterClick = (row: any) => {
   if (!row?.wtNo) return
+  const same = selectedWt.value?.wtNo === row.wtNo
   selectedWt.value = row
-  // 同步勾选态：点选时勾上该行
   nextTick(() => {
-    masterTableRef.value?.clearSelection?.()
-    masterTableRef.value?.toggleRowSelection?.(row, true)
+    masterTableRef.value?.setCurrentRow?.(row)
   })
-  loadItems(row.wtNo)
+  if (!same) {
+    loadItems(row.wtNo)
+    // 抽屉打开时切换单号会由 BatchReportDrawer watch(wtNo) 自动 reload
+  }
 }
 
 const handleItemClick = (row: any) => {
@@ -1171,6 +1163,15 @@ onBeforeUnmount(() => {
   :deep(.el-table) {
     --el-table-current-row-bg-color: #e8f2fb;
     --el-table-header-bg-color: #f4f8fc;
+  }
+
+  :deep(.el-radio) {
+    height: auto;
+    margin-right: 0;
+
+    .el-radio__label {
+      display: none;
+    }
   }
 
   :deep(.el-progress__text) {
