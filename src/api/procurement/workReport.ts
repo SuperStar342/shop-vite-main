@@ -1,5 +1,6 @@
 import { adaptPage, unwrap } from '/@/utils/bladeAdapter'
 import request from '/@/utils/request'
+import { getWtItems, getWtWorkers } from './dispatch'
 
 /** 报工管理 → /api/blade-system/work-report */
 
@@ -129,7 +130,7 @@ const mkTask = (row: Partial<WorkReportTask> & Pick<WorkReportTask, 'id' | 'wtNo
 }
 
 /** 开发期 mock：后端就绪后由 USE_MOCK 关闭 */
-const USE_MOCK = true
+const USE_MOCK = false
 
 let mockTasks: WorkReportTask[] = [
   mkTask({ id: 't1', wtNo: 'WT240826001', woNo: 'WO-2024082601', moNo: 'MO-2408-001', goodsCode: 'SF-3S-001', goodsName: '三人位真皮沙发', prcCode: 'OP20', prcName: 'OP20 框架组装', wtQty: 20, fnQty: 8 }),
@@ -386,6 +387,67 @@ export function validateDispatchReport(payload: DispatchReportPayload) {
 }
 
 /** 派工页提交报工；mock 时写入本地记录供弹窗查询 */
+export type DispatchReportBatchPayload = {
+  payloads: DispatchReportPayload[]
+}
+
+export type DispatchReportBatchResult = {
+  successCount: number
+  failCount: number
+  reportNos: string[]
+  errors?: { empNo?: string; empName?: string; message: string }[]
+}
+
+/** 批量报工准备：工序 + 人员 + 单价金额 */
+export type BatchReportWorkerRow = {
+  empNo: string
+  empName: string
+  deptName?: string
+  planQty: number
+  fnQty: number
+  pendingQty: number
+  reportQty: number
+  passQty: number
+  defectQty: number
+  reworkQty: number
+  machiningUp: number
+  reportAmt: number
+  selected: boolean
+}
+
+export type BatchReportItemRow = {
+  itemKey: string
+  item: Record<string, any>
+  woNo: string
+  moNo: string
+  goodsCode: string
+  goodsName: string
+  prcCode: string
+  prcName: string
+  wtQty: number
+  fnQty: number
+  pendingQty: number
+  machiningUp: number
+  machiningAmt: number
+  reportAmt: number
+  pWageType: string
+  assignType: string
+  workGpName: string
+  workers: BatchReportWorkerRow[]
+  selected: boolean
+  expanded: boolean
+}
+
+export type BatchReportPrep = {
+  wtNo: string
+  wsName?: string
+  deptName?: string
+  pendingItemCount: number
+  totalPendingQty: number
+  totalReportAmt: number
+  items: BatchReportItemRow[]
+}
+
 export async function submitDispatchReport(payload: DispatchReportPayload) {
   const err = validateDispatchReport(payload)
   if (err) throw new Error(err)
@@ -423,6 +485,71 @@ export async function submitDispatchReport(payload: DispatchReportPayload) {
   return unwrap(res)
 }
 
+/** 批量/一键报工：单次请求提交多笔人员报工 */
+export async function submitDispatchReportBatch(batch: DispatchReportBatchPayload): Promise<DispatchReportBatchResult> {
+  const payloads = batch?.payloads || []
+  if (!payloads.length) throw new Error('没有可提交的报工数据')
+
+  for (const payload of payloads) {
+    const err = validateDispatchReport(payload)
+    if (err) throw new Error(err)
+  }
+
+  if (USE_MOCK) {
+    await delay(420)
+    const reportNos: string[] = []
+    const errors: DispatchReportBatchResult['errors'] = []
+    for (const payload of payloads) {
+      try {
+        const reportNo = `RP${Date.now().toString().slice(-8)}${Math.floor(Math.random() * 90 + 10)}`
+        mockRecords.push({
+          id: `r-${Date.now()}-${reportNos.length}`,
+          reportNo,
+          wtNo: payload.wtNo,
+          woNo: payload.woNo || '',
+          moNo: payload.moNo || '',
+          goodsName: payload.goodsName || '',
+          prcName: payload.prcName || '',
+          reportQty: payload.reportQty,
+          passQty: payload.passQty,
+          defectQty: payload.defectQty,
+          reworkQty: payload.reworkQty,
+          reportTime: payload.reportTime,
+          reporter: payload.empName || payload.empNo || '当前用户',
+          defectReason: payload.defectReason,
+          remark: payload.remark,
+          reportMethod: payload.reportMethod || '一键报工',
+        } as WorkReportRecord & { reportMethod?: string })
+        reportNos.push(reportNo)
+      } catch (e: any) {
+        errors.push({
+          empNo: payload.empNo,
+          empName: payload.empName,
+          message: e?.message || '报工失败',
+        })
+      }
+    }
+    return {
+      successCount: reportNos.length,
+      failCount: errors.length,
+      reportNos,
+      errors: errors.length ? errors : undefined,
+    }
+  }
+
+  const res: any = await request({
+    url: '/api/blade-system/work-report/submit-batch',
+    method: 'post',
+    data: batch,
+  })
+  if (res?.success === false) throw new Error(res?.msg || '批量报工失败')
+  const data = unwrap(res) as DispatchReportBatchResult
+  if (!data || (data.successCount == null && !Array.isArray((data as any).reportNos))) {
+    throw new Error('批量报工接口无返回有效结果，请确认已部署 work-report 并重启 blade-system')
+  }
+  return data
+}
+
 export async function getDispatchReportRecords(params: {
   wtNo?: string
   woNo?: string
@@ -458,4 +585,99 @@ export async function scanReportByCode(code: string) {
   }
   const res: any = await request({ url: '/api/blade-system/work-report/scan', method: 'get', params: { code: kw } })
   return unwrap(res) as WorkReportTask
+}
+
+const batchItemKey = (row: any) =>
+  `${row.wtNo}-${row.sNo}-${row.woNo}-${row.moNo}-${row.goodsId}-${row.prcCode}`
+
+const batchNum = (v: any) => {
+  const n = Number(v)
+  return Number.isFinite(n) ? n : 0
+}
+
+async function composeBatchPrepFromDispatch(wtNo: string, wtInfo?: Record<string, any>): Promise<BatchReportPrep> {
+  const rawItems = await getWtItems(wtNo)
+  const pending = rawItems.filter((item) => batchNum(item.wtQty) - batchNum(item.fnQty) > 0.000001)
+  const rows: BatchReportItemRow[] = []
+
+  for (const item of pending) {
+    const pendingQty = Math.max(0, batchNum(item.wtQty) - batchNum(item.fnQty))
+    const machiningUp = batchNum(item.machiningUp)
+    const workersRaw = await getWtWorkers({
+      wtNo,
+      woNo: item.woNo,
+      moNo: item.moNo,
+      goodsId: item.goodsId,
+      prcCode: item.prcCode,
+      woBorSno: item.woBorSno,
+    })
+    const workers: BatchReportWorkerRow[] = workersRaw
+      .map((w) => {
+        const wPending = Math.max(0, batchNum(w.planQty) - batchNum(w.fnQty))
+        const wUp = batchNum((w as any).machiningUp) || machiningUp
+        return {
+          empNo: w.empNo || '',
+          empName: w.empName || '',
+          deptName: w.deptName,
+          planQty: batchNum(w.planQty),
+          fnQty: batchNum(w.fnQty),
+          pendingQty: wPending,
+          reportQty: wPending,
+          passQty: wPending,
+          defectQty: 0,
+          reworkQty: 0,
+          machiningUp: wUp,
+          reportAmt: wPending * wUp,
+          selected: wPending > 0,
+        }
+      })
+      .filter((w) => w.pendingQty > 0)
+
+    rows.push({
+      itemKey: batchItemKey({ ...item, wtNo }),
+      item,
+      woNo: item.woNo || '',
+      moNo: item.moNo || '',
+      goodsCode: item.goodsCode || '',
+      goodsName: item.goodsName || '',
+      prcCode: item.prcCode || '',
+      prcName: item.prcName || '',
+      wtQty: batchNum(item.wtQty),
+      fnQty: batchNum(item.fnQty),
+      pendingQty,
+      machiningUp,
+      machiningAmt: batchNum(item.machiningAmt),
+      reportAmt: pendingQty * machiningUp,
+      pWageType: item.pWageType || '',
+      assignType: item.assignType || '',
+      workGpName: item.workGpName || '',
+      workers,
+      selected: workers.length > 0,
+      expanded: workers.length > 0,
+    })
+  }
+
+  const active = rows.filter((r) => r.workers.length > 0)
+  return {
+    wtNo,
+    wsName: wtInfo?.wsName,
+    deptName: wtInfo?.deptName,
+    pendingItemCount: active.length,
+    totalPendingQty: active.reduce(
+      (s, r) => s + r.workers.filter((w) => w.selected).reduce((ws, w) => ws + w.reportQty, 0),
+      0
+    ),
+    totalReportAmt: active.reduce(
+      (s, r) => s + r.workers.filter((w) => w.selected).reduce((ws, w) => ws + w.reportAmt, 0),
+      0
+    ),
+    items: active,
+  }
+}
+
+/** 批量报工准备：组合 dispatch/items + workers（batch-prep 未上线前不请求，避免报错） */
+export async function getBatchReportPrep(wtNo: string, wtInfo?: Record<string, any>): Promise<BatchReportPrep> {
+  const no = String(wtNo || '').trim()
+  if (!no) throw new Error('请选择派工单')
+  return composeBatchPrepFromDispatch(no, wtInfo)
 }

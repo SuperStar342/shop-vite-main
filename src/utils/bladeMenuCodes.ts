@@ -14,6 +14,7 @@ export const ROUTE_TO_BLADE_CODE: Record<string, string> = {
   ApiScope: 'api_scope',
   TenantManagement: 'tenant',
   DispatchManagement: 'dispatch',
+  DispatchReportManagement: 'dispatchReport',
   QuickDispatch: 'quickDispatch',
   NormalDispatch: 'normalDispatch',
   WorkReportManagement: 'workReport',

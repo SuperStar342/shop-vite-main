@@ -285,19 +285,27 @@
 
       <div class="resize-grip" @mousedown="(e: MouseEvent) => startPaneResize(e, 0)" />
 
-      <div class="pane" :style="{ flex: `${paneRatios[1]} 1 0px` }">
-        <div class="pane-head">
-          <span>工序明细</span>
+      <div class="pane pane-items" :style="{ flex: `${paneRatios[1]} 1 0px` }">
+        <div class="pane-head pane-head--tabs">
+          <el-radio-group v-model="detailTab" size="small">
+            <el-radio-button value="items">工序明细</el-radio-button>
+            <el-radio-button value="cards">派工明细</el-radio-button>
+          </el-radio-group>
           <em>
             {{
-              selectedWt
-                ? `${itemList.length} 行${checkedItems.length ? ` · 已选 ${checkedItems.length}` : ''}`
-                : '点选上方派工单'
+              !selectedWt
+                ? '点选上方派工单'
+                : detailTab === 'items'
+                  ? `${itemList.length} 行${checkedItems.length ? ` · 已选 ${checkedItems.length}` : ''}`
+                  : checkedItems.length
+                    ? `已勾选 ${checkedItems.length} 道工序`
+                    : '勾选工序明细后显示卡片'
             }}
           </em>
         </div>
-        <div class="table-wrap">
+        <div v-show="detailTab === 'items'" class="table-wrap">
           <el-table
+            ref="itemTableRef"
             v-loading="itemLoading"
             border
             highlight-current-row
@@ -307,32 +315,54 @@
             @row-click="handleItemClick"
             @selection-change="onItemSelectionChange"
           >
-            <el-table-column type="selection" width="42" />
-            <el-table-column label="制令号" min-width="150" prop="moNo" show-overflow-tooltip />
-            <el-table-column label="品号" min-width="110" prop="goodsCode" show-overflow-tooltip />
-            <el-table-column label="品名" min-width="160" prop="goodsName" show-overflow-tooltip />
-            <el-table-column label="货品类型" min-width="90" prop="goodsType" />
-            <el-table-column label="规格尺寸" min-width="120" prop="sizeDesc" show-overflow-tooltip />
-            <el-table-column label="标准单位" min-width="90" prop="unitCode" />
-            <el-table-column label="制程名称" min-width="110" prop="mrName" show-overflow-tooltip />
-            <el-table-column align="center" label="加工顺序" min-width="90" prop="machiningSNo" />
-            <el-table-column label="工序代号" min-width="90" prop="prcCode" />
-            <el-table-column label="工序名称" min-width="100" prop="prcName" show-overflow-tooltip />
-            <el-table-column label="工单BOR序号" min-width="120" prop="woBorSno" />
-            <el-table-column align="right" label="加工单价" min-width="90">
-              <template #default="{ row }">{{ fmtNum(row.machiningUp) }}</template>
-            </el-table-column>
-            <el-table-column align="right" label="派工数量" min-width="90">
-              <template #default="{ row }">{{ fmtNum(row.wtQty) }}</template>
-            </el-table-column>
-            <el-table-column align="right" label="完工数量" min-width="90">
-              <template #default="{ row }">{{ fmtNum(row.fnQty) }}</template>
-            </el-table-column>
-            <el-table-column label="工单号" min-width="120" prop="woNo" show-overflow-tooltip />
+            <dispatch-wt-item-columns :fmt="fmtNum" selection />
             <template #empty>
               <el-empty :description="selectedWt ? '暂无工序明细' : '请先选择派工单'" />
             </template>
           </el-table>
+        </div>
+        <div v-show="detailTab === 'cards'" v-loading="cardLoading" class="dispatch-cards">
+          <div v-if="checkedItems.length" class="dispatch-cards__list">
+            <article
+              v-for="card in dispatchCards"
+              :key="card.key"
+              class="dispatch-card"
+              :class="{ 'is-active': selectedItemKey === card.key }"
+              @click="handleCardClick(card)"
+            >
+              <header class="dispatch-card__head">
+                <div class="dispatch-card__title">
+                  <span class="code">{{ card.prcCode || '-' }}</span>
+                  <strong>{{ card.prcName || '工序' }}</strong>
+                </div>
+                <b class="qty">{{ fmtNum(card.wtQty) }}</b>
+              </header>
+              <div class="dispatch-card__meta">
+                <span>工单 {{ card.woNo || '-' }}</span>
+                <span>制令 {{ card.moNo || '-' }}</span>
+                <span>{{ card.goodsName || card.goodsCode || '-' }}</span>
+              </div>
+              <ul class="dispatch-card__workers">
+                <li v-for="w in card.workers" :key="`${card.key}-${w.empNo}`">
+                  <div class="name">
+                    <strong>{{ w.empName || w.empNo }}</strong>
+                    <span>{{ w.empNo }}</span>
+                  </div>
+                  <div class="plan">
+                    <em>计划 {{ fmtNum(w.planQty) }}</em>
+                    <em>完工 {{ fmtNum(w.fnQty) }}</em>
+                  </div>
+                  <el-progress
+                    :percentage="progressOf(w)"
+                    :stroke-width="8"
+                    :status="progressOf(w) >= 100 ? 'success' : undefined"
+                  />
+                </li>
+                <li v-if="!card.workers.length" class="is-empty">暂无人员派工</li>
+              </ul>
+            </article>
+          </div>
+          <el-empty v-else description="勾选工序明细后，在此显示派工明细卡片" />
         </div>
       </div>
 
@@ -341,7 +371,7 @@
       <div class="pane" :style="{ flex: `${paneRatios[2]} 1 0px` }">
         <div class="pane-head">
           <span>人员派工</span>
-          <em>{{ selectedItem ? `${workerList.length} 人` : '点选工序明细' }}</em>
+          <em>{{ selectedItem ? `${workerList.length} 人` : '点选工序明细或派工卡片' }}</em>
         </div>
         <div class="table-wrap">
           <el-table
@@ -394,51 +424,6 @@
         </div>
       </div>
 
-      <div class="resize-grip" @mousedown="(e: MouseEvent) => startPaneResize(e, 2)" />
-
-      <div class="pane pane-cards" :style="{ flex: `${paneRatios[3]} 1 0px` }">
-        <div class="pane-head">
-          <span>派工明细</span>
-          <em>{{ checkedItems.length ? `已勾选 ${checkedItems.length} 道工序` : '勾选工序明细后显示卡片' }}</em>
-        </div>
-        <div v-loading="cardLoading" class="dispatch-cards">
-          <div v-if="checkedItems.length" class="dispatch-cards__list">
-            <article v-for="card in dispatchCards" :key="card.key" class="dispatch-card">
-              <header class="dispatch-card__head">
-                <div class="dispatch-card__title">
-                  <span class="code">{{ card.prcCode || '-' }}</span>
-                  <strong>{{ card.prcName || '工序' }}</strong>
-                </div>
-                <b class="qty">{{ fmtNum(card.wtQty) }}</b>
-              </header>
-              <div class="dispatch-card__meta">
-                <span>工单 {{ card.woNo || '-' }}</span>
-                <span>制令 {{ card.moNo || '-' }}</span>
-                <span>{{ card.goodsName || card.goodsCode || '-' }}</span>
-              </div>
-              <ul class="dispatch-card__workers">
-                <li v-for="w in card.workers" :key="`${card.key}-${w.empNo}`">
-                  <div class="name">
-                    <strong>{{ w.empName || w.empNo }}</strong>
-                    <span>{{ w.empNo }}</span>
-                  </div>
-                  <div class="plan">
-                    <em>计划 {{ fmtNum(w.planQty) }}</em>
-                    <em>完工 {{ fmtNum(w.fnQty) }}</em>
-                  </div>
-                  <el-progress
-                    :percentage="progressOf(w)"
-                    :stroke-width="8"
-                    :status="progressOf(w) >= 100 ? 'success' : undefined"
-                  />
-                </li>
-                <li v-if="!card.workers.length" class="is-empty">暂无人员派工</li>
-              </ul>
-            </article>
-          </div>
-          <el-empty v-else description="勾选工序明细后，在此显示派工明细卡片" />
-        </div>
-      </div>
     </div>
 
     <!-- 滑动确认删除 -->
@@ -504,6 +489,7 @@
 
 <script lang="ts" setup>
 import { CircleCheck, Delete, Refresh, Search, WarningFilled } from '@element-plus/icons-vue'
+import DispatchWtItemColumns from '../shared/DispatchWtItemColumns.vue'
 import {
   approveWt,
   closeWt,
@@ -546,9 +532,11 @@ const selectedItem = ref<any>(null)
 const checkedItems = ref<any[]>([])
 const checkedMasters = ref<any[]>([])
 const masterTableRef = ref<any>(null)
+const itemTableRef = ref<any>(null)
 const workersByItem = reactive<Record<string, any[]>>({})
 
-const paneRatios = reactive([4, 4, 3, 3])
+const detailTab = ref<'items' | 'cards'>('items')
+const paneRatios = reactive([4, 5, 3])
 const paneResizing = ref(-1)
 const resizeStartY = ref(0)
 const resizeStartRatio = ref([0, 0])
@@ -577,6 +565,7 @@ const dispatchCards = computed(() =>
     const key = itemRowKey(item)
     return {
       key,
+      item,
       prcCode: item.prcCode,
       prcName: item.prcName,
       woNo: item.woNo,
@@ -588,6 +577,8 @@ const dispatchCards = computed(() =>
     }
   })
 )
+
+const selectedItemKey = computed(() => (selectedItem.value ? itemRowKey(selectedItem.value) : ''))
 
 const num = (v: any) => {
   const n = Number(v)
@@ -786,9 +777,15 @@ const loadWorkers = async (item: any) => {
     workerList.value = []
     return
   }
+  const key = itemRowKey(item)
+  const cached = workersByItem[key]
+  if (cached) {
+    workerList.value = cached
+    return
+  }
   workerLoading.value = true
   try {
-    workerList.value = await getWtWorkers({
+    const list = await getWtWorkers({
       wtNo: selectedWt.value.wtNo,
       woNo: item.woNo,
       moNo: item.moNo,
@@ -796,12 +793,28 @@ const loadWorkers = async (item: any) => {
       prcCode: item.prcCode,
       woBorSno: item.woBorSno,
     })
+    workerList.value = list
+    workersByItem[key] = list
   } catch (e: any) {
     workerList.value = []
     $baseMessage(e?.message || '加载人员派工失败', 'error', 'hey')
   } finally {
     workerLoading.value = false
   }
+}
+
+const selectItem = async (row: any) => {
+  if (!row) return
+  selectedItem.value = row
+  nextTick(() => {
+    itemTableRef.value?.setCurrentRow?.(row)
+  })
+  await loadWorkers(row)
+}
+
+const handleCardClick = (card: { key: string; item?: any }) => {
+  const item = card.item || checkedItems.value.find((r) => itemRowKey(r) === card.key)
+  if (item) selectItem(item)
 }
 
 const ensureCardWorkers = async (items: any[]) => {
@@ -841,6 +854,10 @@ const onItemSelectionChange = (rows: any[]) => {
   ensureCardWorkers(checkedItems.value)
 }
 
+watch(detailTab, (tab) => {
+  if (tab === 'cards' && checkedItems.value.length) ensureCardWorkers(checkedItems.value)
+})
+
 const onMasterSelectionChange = (rows: any[]) => {
   checkedMasters.value = rows || []
 }
@@ -852,8 +869,7 @@ const handleMasterClick = (row: any) => {
 }
 
 const handleItemClick = (row: any) => {
-  selectedItem.value = row
-  loadWorkers(row)
+  selectItem(row)
 }
 
 const resetDeleteSlide = () => {
@@ -1185,7 +1201,9 @@ onBeforeUnmount(() => {
   overflow: hidden;
 }
 
-.pane-cards {
+.pane-items {
+  min-height: 120px;
+
   .dispatch-cards {
     flex: 1;
     min-height: 0;
@@ -1220,6 +1238,19 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+  &:hover {
+    border-color: #9fd4b6;
+    box-shadow: 0 2px 8px rgb(46 125 90 / 10%);
+  }
+
+  &.is-active {
+    border-color: #2e7d5a;
+    box-shadow: 0 0 0 1px rgb(46 125 90 / 18%);
+    background: linear-gradient(180deg, #f4fbf7, #fff);
+  }
 
   &__head {
     display: flex;
@@ -1326,6 +1357,10 @@ onBeforeUnmount(() => {
     font-style: normal;
     font-size: 12px;
     color: #7a8b7f;
+  }
+
+  &--tabs {
+    gap: 12px;
   }
 }
 

@@ -1,0 +1,5 @@
+-- 派工工序明细扩展字段（DispatchMapper.selectWtItems）
+-- 已合并到 BladeX blade-system DispatchMapper.xml
+-- 新增字段对照 SF 截图：
+--   已分派数量 assignQty、加工小组 workGpName、计件类型 pWageType、分配方式 assignType
+--   是否再分配/完工工序、标准属性、订单/客户订单/SKU、金相编号、颜色等
