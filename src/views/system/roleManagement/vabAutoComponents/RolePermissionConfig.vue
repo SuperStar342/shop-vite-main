@@ -15,23 +15,23 @@
             <span class="toolbar-left">
               <el-switch v-model="menuLinked" active-text="节点联动" size="small" />
               <el-tooltip content="开启后勾选父节点会自动勾选子节点；关闭则可独立勾选" placement="top">
-                <el-icon class="tip-icon"><QuestionFilled /></el-icon>
+                <el-icon class="tip-icon"><question-filled /></el-icon>
               </el-tooltip>
             </span>
             <el-button-group>
-              <el-button size="small" plain :icon="treeExpand.menu ? Fold : Expand" @click="toggleTreeExpand('menu')">
+              <el-button :icon="treeExpand.menu ? Fold : Expand" plain size="small" @click="toggleTreeExpand('menu')">
                 {{ treeExpand.menu ? '全部折叠' : '全部展开' }}
               </el-button>
-              <el-button size="small" plain @click="selectAll('menu')">全选</el-button>
-              <el-button size="small" plain @click="invertSelect('menu')">反选</el-button>
+              <el-button plain size="small" @click="selectAll('menu')">全选</el-button>
+              <el-button plain size="small" @click="invertSelect('menu')">反选</el-button>
             </el-button-group>
           </div>
           <el-alert
+            class="tab-alert"
             :closable="false"
             show-icon
             title="菜单树来自数据库（数字 id）。保存时会自动补齐父级菜单，确保非管理员角色侧边栏完整。若为空请先导入菜单库表。"
             type="info"
-            class="tab-alert"
           />
           <div class="tree-box">
             <el-tree
@@ -53,23 +53,23 @@
             <span class="toolbar-left">
               <el-switch v-model="dataScopeLinked" active-text="节点联动" size="small" />
               <el-tooltip content="行级过滤：限制角色能看哪些数据行。请在「权限管理 → 数据权限」维护规则。" placement="top">
-                <el-icon class="tip-icon"><QuestionFilled /></el-icon>
+                <el-icon class="tip-icon"><question-filled /></el-icon>
               </el-tooltip>
             </span>
             <el-button-group>
-              <el-button size="small" plain :icon="treeExpand.dataScope ? Fold : Expand" @click="toggleTreeExpand('dataScope')">
+              <el-button :icon="treeExpand.dataScope ? Fold : Expand" plain size="small" @click="toggleTreeExpand('dataScope')">
                 {{ treeExpand.dataScope ? '全部折叠' : '全部展开' }}
               </el-button>
-              <el-button size="small" plain @click="selectAll('dataScope')">全选</el-button>
-              <el-button size="small" plain @click="invertSelect('dataScope')">反选</el-button>
+              <el-button plain size="small" @click="selectAll('dataScope')">全选</el-button>
+              <el-button plain size="small" @click="invertSelect('dataScope')">反选</el-button>
             </el-button-group>
           </div>
           <el-alert
+            class="tab-alert"
             :closable="false"
             show-icon
             title="数据权限用于行级过滤。列显隐请使用「列表权限」Tab。"
             type="info"
-            class="tab-alert"
           />
           <div class="tree-box">
             <el-tree
@@ -88,15 +88,15 @@
 
         <el-tab-pane label="列表权限" name="listColumn">
           <el-alert
+            class="tab-alert"
             :closable="false"
             show-icon
-            class="tab-alert"
-            type="info"
             title="仅展示「菜单权限」已勾选菜单对应的列表页。全选列=不限制（删除配置）；部分列=仅这些列可见。保存后当前会话会刷新；其他用户需重新登录生效。"
+            type="info"
           />
           <div class="list-column-layout">
             <div class="page-pane">
-              <el-input v-model.trim="pageFilter" clearable placeholder="筛选页面" size="small" class="page-filter" />
+              <el-input v-model.trim="pageFilter" class="page-filter" clearable placeholder="筛选页面" size="small" />
               <el-scrollbar max-height="380px">
                 <div v-if="!filteredPageGroups.length" class="page-empty-tip">
                   请先在「菜单权限」中勾选菜单，再配置对应列表列
@@ -111,7 +111,7 @@
                     @click="activeListPage = p.pageCode"
                   >
                     <span>{{ p.pageName }}</span>
-                    <el-tag v-if="configuredPages.has(p.pageCode)" size="small" effect="plain" type="success">已配</el-tag>
+                    <el-tag v-if="configuredPages.has(p.pageCode)" effect="plain" size="small" type="success">已配</el-tag>
                   </div>
                 </div>
               </el-scrollbar>
@@ -120,13 +120,13 @@
               <div class="column-toolbar">
                 <span class="column-title">{{ currentListPage?.pageName || '请选择页面' }}</span>
                 <el-button-group>
-                  <el-button size="small" plain :disabled="!activeListPage" @click="selectAllListColumns">全选</el-button>
-                  <el-button size="small" plain :disabled="!activeListPage" @click="invertListColumns">反选</el-button>
+                  <el-button :disabled="!activeListPage" plain size="small" @click="selectAllListColumns">全选</el-button>
+                  <el-button :disabled="!activeListPage" plain size="small" @click="invertListColumns">反选</el-button>
                   <el-button
-                    size="small"
-                    plain
-                    type="danger"
                     :disabled="!activeListPage || !configuredPages.has(activeListPage)"
+                    plain
+                    size="small"
+                    type="danger"
                     @click="clearListPageConfig"
                   >
                     清除本页
@@ -138,9 +138,9 @@
                   <el-checkbox
                     v-for="c in currentListPage.columns"
                     :key="c.prop"
-                    :label="c.prop"
                     border
                     class="col-check"
+                    :label="c.prop"
                   >
                     {{ c.label }}
                     <span class="prop-code">({{ c.prop }})</span>
@@ -157,23 +157,23 @@
             <span class="toolbar-left">
               <el-switch v-model="apiScopeLinked" active-text="节点联动" size="small" />
               <el-tooltip content="树节点为菜单，叶子为接口权限。建议勾选叶子节点；可在「接口权限」菜单维护规则。" placement="top">
-                <el-icon class="tip-icon"><QuestionFilled /></el-icon>
+                <el-icon class="tip-icon"><question-filled /></el-icon>
               </el-tooltip>
             </span>
             <el-button-group>
-              <el-button size="small" plain :icon="treeExpand.apiScope ? Fold : Expand" @click="toggleTreeExpand('apiScope')">
+              <el-button :icon="treeExpand.apiScope ? Fold : Expand" plain size="small" @click="toggleTreeExpand('apiScope')">
                 {{ treeExpand.apiScope ? '全部折叠' : '全部展开' }}
               </el-button>
-              <el-button size="small" plain @click="selectAll('apiScope')">全选</el-button>
-              <el-button size="small" plain @click="invertSelect('apiScope')">反选</el-button>
+              <el-button plain size="small" @click="selectAll('apiScope')">全选</el-button>
+              <el-button plain size="small" @click="invertSelect('apiScope')">反选</el-button>
             </el-button-group>
           </div>
           <el-alert
+            class="tab-alert"
             :closable="false"
             show-icon
             title="接口权限树来自 /menu/grant-tree 的 apiScope。若无叶子节点，请先在「权限管理 → 接口权限」中按菜单配置规则。"
             type="info"
-            class="tab-alert"
           />
           <div class="tree-box">
             <el-tree

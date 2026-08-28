@@ -1,5 +1,5 @@
 <template>
-  <Teleport to="body">
+  <teleport to="body">
     <div
       v-show="visible"
       class="br-resize-handle"
@@ -8,7 +8,7 @@
       title="拖动调整宽度"
       @mousedown.prevent="onResizeStart"
     />
-  </Teleport>
+  </teleport>
 
   <el-drawer
     v-model="visible"
@@ -61,7 +61,7 @@
           :class="{ 'is-selected': row.selected, 'is-expanded': row.expanded }"
         >
           <header class="br-item__head" @click="row.expanded = !row.expanded">
-            <el-checkbox v-model="row.selected" @click.stop @change="syncItemSelection(row)" />
+            <el-checkbox v-model="row.selected" @change="syncItemSelection(row)" @click.stop />
             <div class="br-item__title">
               <span class="code">{{ row.prcCode }}</span>
               <strong>{{ row.prcName }}</strong>
@@ -97,11 +97,11 @@
                 <b>¥{{ fmtMoney(itemReportAmt(row)) }}</b>
               </div>
             </div>
-            <el-icon class="br-item__chev"><ArrowDown /></el-icon>
+            <el-icon class="br-item__chev"><arrow-down /></el-icon>
           </header>
 
           <div v-show="row.expanded" class="br-item__workers">
-            <el-table border size="small" :data="row.workers">
+            <el-table border :data="row.workers" size="small">
               <el-table-column align="center" width="44">
                 <template #default="{ row: w }">
                   <el-checkbox v-model="w.selected" @change="onWorkerToggle(row)" />

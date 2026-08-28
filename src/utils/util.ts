@@ -1,14 +1,14 @@
 //表单序列化
-export const serialize = data => {
-  let list = [];
-  Object.keys(data).forEach(ele => {
-    list.push(`${ele}=${data[ele]}`);
-  });
-  return list.join('&');
-};
+export const serialize = (data) => {
+  let list = []
+  Object.keys(data).forEach((ele) => {
+    list.push(`${ele}=${data[ele]}`)
+  })
+  return list.join('&')
+}
 
-export const getObjType = obj => {
-  var toString = Object.prototype.toString;
+export const getObjType = (obj) => {
+  var toString = Object.prototype.toString
   var map = {
     '[object Boolean]': 'boolean',
     '[object Number]': 'number',
@@ -19,61 +19,61 @@ export const getObjType = obj => {
     '[object RegExp]': 'regExp',
     '[object Undefined]': 'undefined',
     '[object Null]': 'null',
-    '[object Object]': 'object'
-  };
-  if (obj instanceof Element) {
-    return 'element';
+    '[object Object]': 'object',
   }
-  return map[toString.call(obj)];
-};
+  if (obj instanceof Element) {
+    return 'element'
+  }
+  return map[toString.call(obj)]
+}
 /**
  * 对象深拷贝
  */
-export const deepClone = data => {
-  var type = getObjType(data);
-  var obj;
+export const deepClone = (data) => {
+  var type = getObjType(data)
+  var obj
   if (type === 'array') {
-    obj = [];
+    obj = []
   } else if (type === 'object') {
-    obj = {};
+    obj = {}
   } else {
     //不再具有下一层次
-    return data;
+    return data
   }
   if (type === 'array') {
     for (var i = 0, len = data.length; i < len; i++) {
-      obj.push(deepClone(data[i]));
+      obj.push(deepClone(data[i]))
     }
   } else if (type === 'object') {
     for (var key in data) {
-      obj[key] = deepClone(data[key]);
+      obj[key] = deepClone(data[key])
     }
   }
-  return obj;
-};
+  return obj
+}
 
 /**
  * 对象深拷贝
  */
-export const deepClone2 = data => {
-  var type = getObjType(data);
-  var obj;
+export const deepClone2 = (data) => {
+  var type = getObjType(data)
+  var obj
   if (type === 'array') {
-    obj = [];
+    obj = []
   } else if (type === 'object') {
-    obj = {};
+    obj = {}
   } else {
     //不再具有下一层次
-    return data;
+    return data
   }
   if (type === 'array') {
     for (var i = 0, len = data.length; i < len; i++) {
-      obj.push(deepClone(data[i]));
+      obj.push(deepClone(data[i]))
     }
   } else if (type === 'object') {
     for (var key in data) {
-      obj[key] = deepClone(data[key]);
+      obj[key] = deepClone(data[key])
     }
   }
-  return obj;
-};
+  return obj
+}

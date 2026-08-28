@@ -20,9 +20,7 @@ export const unwrap = (res: any) => res?.data ?? res
 /** 分页 records → list */
 export const adaptPage = (res: any, mapRow?: (row: any) => any): ShopPageResult => {
   const page = unwrap(res) || {}
-  const records = Array.isArray(page)
-    ? page
-    : page.records || page.list || page.data || []
+  const records = Array.isArray(page) ? page : page.records || page.list || page.data || []
   const list = mapRow ? records.map(mapRow) : records
   return {
     code: res?.code ?? 200,

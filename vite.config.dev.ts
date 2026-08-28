@@ -46,8 +46,8 @@ export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
         '/api': {
           target: 'http://localhost:123',
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api/, '')
-        }
+          rewrite: (path) => path.replace(/^\/api/, ''),
+        },
       },
       warmup: {
         clientFiles: ['./index.html', './library/{components,layouts}/*', './src/{views,plugins}/*'],

@@ -70,10 +70,10 @@
             v-loading="loading"
             border
             :data="taskList"
-            highlight-current-row
             height="100%"
-            row-key="id"
+            highlight-current-row
             :row-class-name="rowClassName"
+            row-key="id"
             @current-change="(row: any) => onTaskSelect(row)"
             @row-click="(row: any) => onTaskSelect(row)"
           >
@@ -156,7 +156,7 @@
     <report-progress-board v-if="viewTab !== 'records'" class="wr-board" :progress="moProgress" />
 
     <footer v-if="viewTab !== 'records'" class="wr-tips">
-      <el-icon><InfoFilled /></el-icon>
+      <el-icon><info-filled /></el-icon>
       <span>报工数量不可超过待报数量；合格 + 不良 + 返工 = 报工数量；提交后实时回写任务进度与制令看板。</span>
     </footer>
 

@@ -62,7 +62,21 @@ const filterRoutesByMenuAcl = (routes: VabRouteRecord[]): VabRouteRecord[] => {
       })
       .filter(Boolean) as VabRouteRecord[]
 
-  return walk(routes)
+  const filtered = walk(routes)
+  const countVisible = (list: VabRouteRecord[]): number =>
+    list.reduce((n, r) => {
+      if (r.meta?.hidden) return n
+      if (r.children?.length) return n + countVisible(r.children)
+      const path = String(r.path || '')
+      if (path && !path.includes('*') && path !== '/') return n + 1
+      return n
+    }, 0)
+  // menuCodes 与路由 name 偶发不一致时勿把侧栏清空成「未分配菜单」
+  if (countVisible(routes) > 0 && countVisible(filtered) === 0) {
+    console.warn('[filterRoutesByMenuAcl] 过滤后可见菜单为空，已回退为未过滤结果')
+    return routes
+  }
+  return filtered
 }
 
 const filterBreadcrumb = (data: any) => {
@@ -82,11 +96,7 @@ const tipEmptyMenuOnce = (roleId?: string) => {
   } catch {
     /* ignore */
   }
-  gp.$baseMessage(
-    '当前角色未分配菜单，请联系管理员在「角色管理 → 权限」中授权后重新登录',
-    'warning',
-    'hey'
-  )
+  gp.$baseMessage('当前角色未分配菜单，请联系管理员在「角色管理 → 权限」中授权后重新登录', 'warning', 'hey')
 }
 
 export const useRoutesStore = defineStore('routes', {
@@ -146,10 +156,7 @@ export const useRoutesStore = defineStore('routes', {
           return
         }
         if (!list.length) {
-          const roleId =
-            (userStore.userInfo as any)?.role_id ||
-            (userStore.userInfo as any)?.roleId ||
-            ''
+          const roleId = (userStore.userInfo as any)?.role_id || (userStore.userInfo as any)?.roleId || ''
           tipEmptyMenuOnce(String(roleId))
         }
         const hadMenus = list.length > 0

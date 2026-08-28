@@ -6,13 +6,13 @@
           v-model="form.menuId"
           check-strictly
           clearable
+          :data="menuOptions"
           default-expand-all
           filterable
-          :data="menuOptions"
           :loading="menusLoading"
           node-key="id"
-          :props="{ label: 'label', value: 'id', children: 'children' }"
           placeholder="请选择所属菜单"
+          :props="{ label: 'label', value: 'id', children: 'children' }"
           render-after-expand
           style="width: 100%"
         />
@@ -38,10 +38,10 @@
         <el-input v-model.trim="form.scopeClass" clearable placeholder="MyBatis Mapper 完整类名（可选）" />
       </el-form-item>
       <el-form-item v-if="Number(form.scopeType) === 5" label="规则值" prop="scopeValue">
-        <el-input v-model.trim="form.scopeValue" clearable type="textarea" :rows="2" placeholder="自定义规则值" />
+        <el-input v-model.trim="form.scopeValue" clearable placeholder="自定义规则值" :rows="2" type="textarea" />
       </el-form-item>
       <el-form-item label="备注" prop="remark">
-        <el-input v-model.trim="form.remark" clearable type="textarea" :rows="2" placeholder="选填" />
+        <el-input v-model.trim="form.remark" clearable placeholder="选填" :rows="2" type="textarea" />
       </el-form-item>
     </el-form>
     <template #footer>

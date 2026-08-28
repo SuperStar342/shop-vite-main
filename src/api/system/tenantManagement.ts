@@ -70,9 +70,7 @@ export async function getList(params?: any) {
   } catch (e: any) {
     const msg = String(e?.message || e?.msg || '加载租户列表失败')
     if (/请求未授权|权限不足|无访问权限|access is denied|forbidden/i.test(msg)) {
-      throw new Error(
-        '无租户管理权限：需菜单码 tenant，或 administrator 角色。请勾选「租户管理」后重新登录，并重启 blade-system'
-      )
+      throw new Error('无租户管理权限：需菜单码 tenant，或 administrator 角色。请勾选「租户管理」后重新登录，并重启 blade-system')
     }
     throw new Error(msg)
   }
@@ -165,12 +163,7 @@ export async function uploadTenantBackground(file: File) {
       timeout: 60000,
     })
   } catch (e: any) {
-    const tip =
-      e?.msg ||
-      e?.message ||
-      e?.error_description ||
-      (typeof e === 'string' ? e : '') ||
-      '背景图上传失败'
+    const tip = e?.msg || e?.message || e?.error_description || (typeof e === 'string' ? e : '') || '背景图上传失败'
     throw new Error(
       String(tip).includes('MinIO') || String(tip).includes('OSS') || String(tip).includes('上传')
         ? tip

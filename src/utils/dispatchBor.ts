@@ -29,10 +29,7 @@ export const normalizeBorLine = (raw: any) => {
   const woQty = num(pickBorField(raw, 'woQty', 'planQty', 'fWOQty'))
   const wtQty = num(pickBorField(raw, 'wtQty', 'fWTQty'))
   const remainRaw = pickBorField(raw, 'remainQty')
-  const remainQty =
-    remainRaw != null && remainRaw !== ''
-      ? num(remainRaw)
-      : Math.max(0, woQty - wtQty)
+  const remainQty = remainRaw != null && remainRaw !== '' ? num(remainRaw) : Math.max(0, woQty - wtQty)
 
   return {
     ...raw,
@@ -61,8 +58,7 @@ export const normalizeBorLine = (raw: any) => {
   }
 }
 
-export const normalizeBorLines = (rows: any[]) =>
-  (rows || []).map(normalizeBorLine).filter((l) => num(l?.remainQty) > 0)
+export const normalizeBorLines = (rows: any[]) => (rows || []).map(normalizeBorLine).filter((l) => num(l?.remainQty) > 0)
 
 /** SF：1 计时 / 2 计件 */
 export const wageTypeLabel = (v: any) => {
@@ -80,7 +76,9 @@ const TIME_UNIT_LABEL: Record<string, string> = {
 }
 
 export const timeUnitLabel = (unit?: any) => {
-  const u = String(unit ?? '').trim().toUpperCase()
+  const u = String(unit ?? '')
+    .trim()
+    .toUpperCase()
   return TIME_UNIT_LABEL[u] || u
 }
 
@@ -97,7 +95,9 @@ export const fmtMachiningTime = (time: any, unit?: any) => {
 export const toWorkSeconds = (time: any, unit?: any) => {
   const t = num(time)
   if (t <= 0) return 0
-  const u = String(unit ?? '').trim().toUpperCase()
+  const u = String(unit ?? '')
+    .trim()
+    .toUpperCase()
   if (u === 'H') return t * 3600
   if (u === 'M') return t * 60
   if (u === 'D') return t * 86400
@@ -132,10 +132,7 @@ export const summarizeBorWageFields = (lines: any[]) => {
     timeText: times.length <= 1 ? times[0] || '-' : '多项',
     estWageByQty: (qtyByLineKey: Map<string, number> | null, fallbackQty: number) => {
       if (qtyByLineKey) {
-        return lines.reduce(
-          (s, l) => s + estimateBorWage(l, num(qtyByLineKey.get(borLineKey(l)) || 0)),
-          0
-        )
+        return lines.reduce((s, l) => s + estimateBorWage(l, num(qtyByLineKey.get(borLineKey(l)) || 0)), 0)
       }
       if (lines.length === 1) return estimateBorWage(lines[0], fallbackQty)
       return lines.reduce((s, l) => s + estimateBorWage(l), 0)

@@ -3062,4 +3062,3 @@ export const REMIX_ICONS: string[] = [
 REMIX_ICONS.sort((a, b) => {
   return a.localeCompare(b)
 })
-

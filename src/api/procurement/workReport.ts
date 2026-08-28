@@ -110,7 +110,9 @@ export type DispatchReportPayload = {
 
 const delay = (ms = 280) => new Promise((r) => setTimeout(r, ms))
 
-const mkTask = (row: Partial<WorkReportTask> & Pick<WorkReportTask, 'id' | 'wtNo' | 'woNo' | 'moNo' | 'goodsName' | 'prcName' | 'wtQty' | 'fnQty'>): WorkReportTask => {
+const mkTask = (
+  row: Partial<WorkReportTask> & Pick<WorkReportTask, 'id' | 'wtNo' | 'woNo' | 'moNo' | 'goodsName' | 'prcName' | 'wtQty' | 'fnQty'>
+): WorkReportTask => {
   const pendingQty = Math.max(0, row.wtQty - row.fnQty)
   const progress = row.wtQty > 0 ? Math.round((row.fnQty / row.wtQty) * 100) : 0
   const status: ReportTaskStatus = pendingQty <= 0 ? '已完工' : row.fnQty > 0 ? '部分完工' : '待报工'
@@ -133,14 +135,105 @@ const mkTask = (row: Partial<WorkReportTask> & Pick<WorkReportTask, 'id' | 'wtNo
 const USE_MOCK = false
 
 let mockTasks: WorkReportTask[] = [
-  mkTask({ id: 't1', wtNo: 'WT240826001', woNo: 'WO-2024082601', moNo: 'MO-2408-001', goodsCode: 'SF-3S-001', goodsName: '三人位真皮沙发', prcCode: 'OP20', prcName: 'OP20 框架组装', wtQty: 20, fnQty: 8 }),
-  mkTask({ id: 't2', wtNo: 'WT240826002', woNo: 'WO-2024082602', moNo: 'MO-2408-001', goodsCode: 'SF-3S-001', goodsName: '三人位真皮沙发', prcCode: 'OP30', prcName: 'OP30 海绵裁切', wtQty: 20, fnQty: 0, wsName: '海绵车间' }),
-  mkTask({ id: 't3', wtNo: 'WT240826003', woNo: 'WO-2024082603', moNo: 'MO-2408-002', goodsCode: 'SF-2S-002', goodsName: '双人位布艺沙发', prcCode: 'OP40', prcName: 'OP40 缝纫', wtQty: 15, fnQty: 10, wsName: '缝纫车间' }),
-  mkTask({ id: 't4', wtNo: 'WT240826004', woNo: 'WO-2024082604', moNo: 'MO-2408-002', goodsCode: 'SF-2S-002', goodsName: '双人位布艺沙发', prcCode: 'OP50', prcName: 'OP50 组装', wtQty: 15, fnQty: 0 }),
-  mkTask({ id: 't5', wtNo: 'WT240826005', woNo: 'WO-2024082605', moNo: 'MO-2408-003', goodsCode: 'SF-1S-003', goodsName: '单人位功能沙发', prcCode: 'OP20', prcName: 'OP20 框架组装', wtQty: 30, fnQty: 22 }),
-  mkTask({ id: 't6', wtNo: 'WT240826006', woNo: 'WO-2024082606', moNo: 'MO-2408-003', goodsCode: 'SF-1S-003', goodsName: '单人位功能沙发', prcCode: 'OP60', prcName: 'OP60 包装', wtQty: 30, fnQty: 5, wsName: '包装车间' }),
-  mkTask({ id: 't7', wtNo: 'WT240826007', woNo: 'WO-2024082607', moNo: 'MO-2408-004', goodsCode: 'SF-L-004', goodsName: 'L型转角沙发', prcCode: 'OP30', prcName: 'OP30 海绵裁切', wtQty: 8, fnQty: 0 }),
-  mkTask({ id: 't8', wtNo: 'WT240826008', woNo: 'WO-2024082608', moNo: 'MO-2408-004', goodsCode: 'SF-L-004', goodsName: 'L型转角沙发', prcCode: 'OP50', prcName: 'OP50 组装', wtQty: 8, fnQty: 3 }),
+  mkTask({
+    id: 't1',
+    wtNo: 'WT240826001',
+    woNo: 'WO-2024082601',
+    moNo: 'MO-2408-001',
+    goodsCode: 'SF-3S-001',
+    goodsName: '三人位真皮沙发',
+    prcCode: 'OP20',
+    prcName: 'OP20 框架组装',
+    wtQty: 20,
+    fnQty: 8,
+  }),
+  mkTask({
+    id: 't2',
+    wtNo: 'WT240826002',
+    woNo: 'WO-2024082602',
+    moNo: 'MO-2408-001',
+    goodsCode: 'SF-3S-001',
+    goodsName: '三人位真皮沙发',
+    prcCode: 'OP30',
+    prcName: 'OP30 海绵裁切',
+    wtQty: 20,
+    fnQty: 0,
+    wsName: '海绵车间',
+  }),
+  mkTask({
+    id: 't3',
+    wtNo: 'WT240826003',
+    woNo: 'WO-2024082603',
+    moNo: 'MO-2408-002',
+    goodsCode: 'SF-2S-002',
+    goodsName: '双人位布艺沙发',
+    prcCode: 'OP40',
+    prcName: 'OP40 缝纫',
+    wtQty: 15,
+    fnQty: 10,
+    wsName: '缝纫车间',
+  }),
+  mkTask({
+    id: 't4',
+    wtNo: 'WT240826004',
+    woNo: 'WO-2024082604',
+    moNo: 'MO-2408-002',
+    goodsCode: 'SF-2S-002',
+    goodsName: '双人位布艺沙发',
+    prcCode: 'OP50',
+    prcName: 'OP50 组装',
+    wtQty: 15,
+    fnQty: 0,
+  }),
+  mkTask({
+    id: 't5',
+    wtNo: 'WT240826005',
+    woNo: 'WO-2024082605',
+    moNo: 'MO-2408-003',
+    goodsCode: 'SF-1S-003',
+    goodsName: '单人位功能沙发',
+    prcCode: 'OP20',
+    prcName: 'OP20 框架组装',
+    wtQty: 30,
+    fnQty: 22,
+  }),
+  mkTask({
+    id: 't6',
+    wtNo: 'WT240826006',
+    woNo: 'WO-2024082606',
+    moNo: 'MO-2408-003',
+    goodsCode: 'SF-1S-003',
+    goodsName: '单人位功能沙发',
+    prcCode: 'OP60',
+    prcName: 'OP60 包装',
+    wtQty: 30,
+    fnQty: 5,
+    wsName: '包装车间',
+  }),
+  mkTask({
+    id: 't7',
+    wtNo: 'WT240826007',
+    woNo: 'WO-2024082607',
+    moNo: 'MO-2408-004',
+    goodsCode: 'SF-L-004',
+    goodsName: 'L型转角沙发',
+    prcCode: 'OP30',
+    prcName: 'OP30 海绵裁切',
+    wtQty: 8,
+    fnQty: 0,
+  }),
+  mkTask({
+    id: 't8',
+    wtNo: 'WT240826008',
+    woNo: 'WO-2024082608',
+    moNo: 'MO-2408-004',
+    goodsCode: 'SF-L-004',
+    goodsName: 'L型转角沙发',
+    prcCode: 'OP50',
+    prcName: 'OP50 组装',
+    wtQty: 8,
+    fnQty: 3,
+  }),
 ]
 
 let mockRecords: WorkReportRecord[] = [
@@ -198,9 +291,7 @@ const mockProgressMap: Record<string, MoProgress> = {
 
 const calcStats = (tasks: WorkReportTask[]): WorkReportStats => {
   const pending = tasks.filter((t) => t.pendingQty > 0)
-  const todayReported = mockRecords
-    .filter((r) => r.reportTime.startsWith('2024-08-26'))
-    .reduce((s, r) => s + r.reportQty, 0)
+  const todayReported = mockRecords.filter((r) => r.reportTime.startsWith('2024-08-26')).reduce((s, r) => s + r.reportQty, 0)
   const defectCount = mockRecords.reduce((s, r) => s + r.defectQty, 0)
   const totalReported = mockRecords.reduce((s, r) => s + r.reportQty, 0)
   return {
@@ -217,7 +308,9 @@ const calcStats = (tasks: WorkReportTask[]): WorkReportStats => {
 
 const filterTasks = (tasks: WorkReportTask[], params?: any) => {
   let list = [...tasks]
-  const kw = String(params?.keyword || '').trim().toLowerCase()
+  const kw = String(params?.keyword || '')
+    .trim()
+    .toLowerCase()
   if (kw) {
     list = list.filter(
       (t) =>
@@ -271,13 +364,12 @@ export async function getReportRecords(params?: any) {
   if (USE_MOCK) {
     await delay()
     let list = [...mockRecords].reverse()
-    const kw = String(params?.keyword || '').trim().toLowerCase()
+    const kw = String(params?.keyword || '')
+      .trim()
+      .toLowerCase()
     if (kw) {
       list = list.filter(
-        (r) =>
-          r.reportNo.toLowerCase().includes(kw) ||
-          r.woNo.toLowerCase().includes(kw) ||
-          r.goodsName.toLowerCase().includes(kw)
+        (r) => r.reportNo.toLowerCase().includes(kw) || r.woNo.toLowerCase().includes(kw) || r.goodsName.toLowerCase().includes(kw)
       )
     }
     return { code: 200, data: { list, total: list.length } }
@@ -550,12 +642,7 @@ export async function submitDispatchReportBatch(batch: DispatchReportBatchPayloa
   return data
 }
 
-export async function getDispatchReportRecords(params: {
-  wtNo?: string
-  woNo?: string
-  prcCode?: string
-  prcName?: string
-}) {
+export async function getDispatchReportRecords(params: { wtNo?: string; woNo?: string; prcCode?: string; prcName?: string }) {
   if (USE_MOCK) {
     await delay(160)
     let list = [...mockRecords].reverse()
@@ -587,8 +674,7 @@ export async function scanReportByCode(code: string) {
   return unwrap(res) as WorkReportTask
 }
 
-const batchItemKey = (row: any) =>
-  `${row.wtNo}-${row.sNo}-${row.woNo}-${row.moNo}-${row.goodsId}-${row.prcCode}`
+const batchItemKey = (row: any) => `${row.wtNo}-${row.sNo}-${row.woNo}-${row.moNo}-${row.goodsId}-${row.prcCode}`
 
 const batchNum = (v: any) => {
   const n = Number(v)
@@ -663,14 +749,8 @@ async function composeBatchPrepFromDispatch(wtNo: string, wtInfo?: Record<string
     wsName: wtInfo?.wsName,
     deptName: wtInfo?.deptName,
     pendingItemCount: active.length,
-    totalPendingQty: active.reduce(
-      (s, r) => s + r.workers.filter((w) => w.selected).reduce((ws, w) => ws + w.reportQty, 0),
-      0
-    ),
-    totalReportAmt: active.reduce(
-      (s, r) => s + r.workers.filter((w) => w.selected).reduce((ws, w) => ws + w.reportAmt, 0),
-      0
-    ),
+    totalPendingQty: active.reduce((s, r) => s + r.workers.filter((w) => w.selected).reduce((ws, w) => ws + w.reportQty, 0), 0),
+    totalReportAmt: active.reduce((s, r) => s + r.workers.filter((w) => w.selected).reduce((ws, w) => ws + w.reportAmt, 0), 0),
     items: active,
   }
 }

@@ -4,9 +4,7 @@ import { pinyin } from 'pinyin-pro'
 export const isPinyinLikeKeyword = (keyword: string) => /^[a-zA-Z]+$/.test(String(keyword || '').trim())
 
 const nameSyllables = (text: string) =>
-  pinyin(String(text || ''), { toneType: 'none', type: 'array', v: true }).map((s) =>
-    String(s).toLowerCase().replace(/\s+/g, '')
-  )
+  pinyin(String(text || ''), { toneType: 'none', type: 'array', v: true }).map((s) => String(s).toLowerCase().replace(/\s+/g, ''))
 
 /**
  * 全拼音严格匹配（按音节边界，避免 zhang 误匹配「真」zhen）：
@@ -14,7 +12,9 @@ const nameSyllables = (text: string) =>
  * - 首字母：连续首字母前缀（zs → 张三）
  */
 export const matchByFullPinyin = (text: string, keyword: string) => {
-  const kw = String(keyword || '').trim().toLowerCase()
+  const kw = String(keyword || '')
+    .trim()
+    .toLowerCase()
   if (!kw || !text || !isPinyinLikeKeyword(kw)) return false
   const syllables = nameSyllables(text).filter(Boolean)
   if (!syllables.length) return false
@@ -33,10 +33,7 @@ export const matchByFullPinyin = (text: string, keyword: string) => {
 /**
  * 人员关键词：工号 / 姓名汉字 / 部门汉字，或姓名全拼/首字母
  */
-export const matchEmpByKeyword = (
-  row: { empNo?: string; empName?: string; deptName?: string; deptCode?: string },
-  keyword: string
-) => {
+export const matchEmpByKeyword = (row: { empNo?: string; empName?: string; deptName?: string; deptCode?: string }, keyword: string) => {
   const kw = String(keyword || '').trim()
   if (!kw) return true
   const lower = kw.toLowerCase()

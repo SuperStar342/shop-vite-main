@@ -1,21 +1,21 @@
-import CryptoJS from 'crypto-js';
+import CryptoJS from 'crypto-js'
 
 export default class crypto {
   /**
    * token加密key 使用@org.springblade.test.CryptoKeyGenerator获取,需和后端配置保持一致
    * @type {string}
    */
-  static cryptoKey = 'O0dQzirpHGwbOCSlzLeBGNRmyr7Ur9Ke';
+  static cryptoKey = 'O0dQzirpHGwbOCSlzLeBGNRmyr7Ur9Ke'
   /**
    * 报文加密key 使用@org.springblade.test.CryptoKeyGenerator获取,需和后端配置保持一致
    * @type {string}
    */
-  static aesKey = 'WWikEVWN9ar8N5FYjVfbSQ3O2ncxK4rC';
+  static aesKey = 'WWikEVWN9ar8N5FYjVfbSQ3O2ncxK4rC'
   /**
    * 报文加密key 使用@org.springblade.test.CryptoKeyGenerator获取,需和后端配置保持一致
    * @type {string}
    */
-  static desKey = '7yZ4Zfdv3lirGzsy';
+  static desKey = '7yZ4Zfdv3lirGzsy'
 
   /**
    * aes 加密方法
@@ -23,7 +23,7 @@ export default class crypto {
    * @returns {*}
    */
   static encrypt(data) {
-    return this.encryptAES(data, this.aesKey);
+    return this.encryptAES(data, this.aesKey)
   }
 
   /**
@@ -32,61 +32,57 @@ export default class crypto {
    * @returns {*}
    */
   static decrypt(data) {
-    return this.decryptAES(data, this.aesKey);
+    return this.decryptAES(data, this.aesKey)
   }
 
   /**
    * aes 加密方法，同java：AesUtil.encryptToBase64(text, aesKey);
    */
   static encryptAES(data, key) {
-    const dataBytes = CryptoJS.enc.Utf8.parse(data);
-    const keyBytes = CryptoJS.enc.Utf8.parse(key);
+    const dataBytes = CryptoJS.enc.Utf8.parse(data)
+    const keyBytes = CryptoJS.enc.Utf8.parse(key)
     const encrypted = CryptoJS.AES.encrypt(dataBytes, keyBytes, {
       iv: keyBytes,
       mode: CryptoJS.mode.CBC,
       padding: CryptoJS.pad.Pkcs7,
-    });
-    return CryptoJS.enc.Base64.stringify(encrypted.ciphertext);
+    })
+    return CryptoJS.enc.Base64.stringify(encrypted.ciphertext)
   }
 
   /**
    * aes 解密方法，同java：AesUtil.decryptFormBase64ToString(encrypt, aesKey);
    */
   static decryptAES(data, key) {
-    const keyBytes = CryptoJS.enc.Utf8.parse(key);
+    const keyBytes = CryptoJS.enc.Utf8.parse(key)
     const decrypted = CryptoJS.AES.decrypt(data, keyBytes, {
       iv: keyBytes,
       mode: CryptoJS.mode.CBC,
       padding: CryptoJS.pad.Pkcs7,
-    });
-    return CryptoJS.enc.Utf8.stringify(decrypted);
+    })
+    return CryptoJS.enc.Utf8.stringify(decrypted)
   }
 
   /**
    * des 加密方法，同java：DesUtil.encryptToBase64(text, desKey)
    */
   static encryptDES(data, key) {
-    const keyHex = CryptoJS.enc.Utf8.parse(key);
+    const keyHex = CryptoJS.enc.Utf8.parse(key)
     const encrypted = CryptoJS.DES.encrypt(data, keyHex, {
       mode: CryptoJS.mode.ECB,
       padding: CryptoJS.pad.Pkcs7,
-    });
-    return encrypted.toString();
+    })
+    return encrypted.toString()
   }
 
   /**
    * des 解密方法，同java：DesUtil.decryptFormBase64(encryptBase64, desKey);
    */
   static decryptDES(data, key) {
-    const keyHex = CryptoJS.enc.Utf8.parse(key);
-    const decrypted = CryptoJS.DES.decrypt(
-      data,
-      keyHex,
-      {
-        mode: CryptoJS.mode.ECB,
-        padding: CryptoJS.pad.Pkcs7,
-      }
-    );
-    return decrypted.toString(CryptoJS.enc.Utf8);
+    const keyHex = CryptoJS.enc.Utf8.parse(key)
+    const decrypted = CryptoJS.DES.decrypt(data, keyHex, {
+      mode: CryptoJS.mode.ECB,
+      padding: CryptoJS.pad.Pkcs7,
+    })
+    return decrypted.toString(CryptoJS.enc.Utf8)
   }
 }

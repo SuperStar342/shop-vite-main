@@ -6,11 +6,7 @@ import { $baseMessage } from '/@/hooks'
 /**
  * 保存成功：先关弹窗，再提示，避免 Message 被 dialog 遮罩挡住
  */
-export async function afterSaveSuccess(
-  visible: Ref<boolean>,
-  msg?: string,
-  onDone?: () => void
-) {
+export async function afterSaveSuccess(visible: Ref<boolean>, msg?: string, onDone?: () => void) {
   visible.value = false
   await nextTick()
   $baseMessage(msg || '保存成功', 'success', 'hey')
@@ -21,11 +17,7 @@ export async function afterSaveSuccess(
  * 保存失败提示（弹窗保持打开）
  */
 export function afterSaveFail(error?: any, fallback = '保存失败') {
-  const msg =
-    (typeof error === 'string' && error) ||
-    error?.message ||
-    error?.msg ||
-    fallback
+  const msg = (typeof error === 'string' && error) || error?.message || error?.msg || fallback
   $baseMessage(msg, 'error', 'hey')
 }
 
@@ -49,22 +41,13 @@ export function resolveEditDetail(detail: any, fallback?: any): any {
 }
 
 function isBladeEnvelope(obj: any): boolean {
-  return (
-    !!obj &&
-    typeof obj === 'object' &&
-    !Array.isArray(obj) &&
-    'data' in obj &&
-    ('code' in obj || 'success' in obj)
-  )
+  return !!obj && typeof obj === 'object' && !Array.isArray(obj) && 'data' in obj && ('code' in obj || 'success' in obj)
 }
 
 /**
  * 拉取详情并解析为回显数据；失败或无 id 时回退 row
  */
-export async function loadEditDetail(
-  fetcher: (id: string | number) => Promise<any>,
-  row: any
-): Promise<any> {
+export async function loadEditDetail(fetcher: (id: string | number) => Promise<any>, row: any): Promise<any> {
   if (!hasEntityId(row)) return row || {}
   try {
     const detail = await fetcher(row.id)

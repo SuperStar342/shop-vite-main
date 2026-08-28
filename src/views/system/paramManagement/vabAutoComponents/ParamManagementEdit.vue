@@ -8,28 +8,28 @@
         <template #label>
           <span>参数键</span>
           <el-tooltip content="参数键为系统内部唯一标识，请勿随意修改" placement="top">
-            <el-icon class="form-tip-icon"><QuestionFilled /></el-icon>
+            <el-icon class="form-tip-icon"><question-filled /></el-icon>
           </el-tooltip>
         </template>
         <el-input
           v-model.trim="form.paramKey"
           clearable
+          :disabled="isEditMode"
           maxlength="100"
           placeholder="请输入参数键"
-          :disabled="isEditMode"
         />
       </el-form-item>
       <el-form-item prop="paramValue">
         <template #label>
           <span>参数值</span>
           <el-tooltip content="包含敏感关键词（security/auth/password）的配置不展示具体数值" placement="top">
-            <el-icon class="form-tip-icon"><QuestionFilled /></el-icon>
+            <el-icon class="form-tip-icon"><question-filled /></el-icon>
           </el-tooltip>
         </template>
-        <el-input v-model="form.paramValue" clearable type="textarea" :rows="3" placeholder="请输入参数值" />
+        <el-input v-model="form.paramValue" clearable placeholder="请输入参数值" :rows="3" type="textarea" />
       </el-form-item>
       <el-form-item label="备注" prop="remark">
-        <el-input v-model.trim="form.remark" clearable maxlength="200" placeholder="请输入备注" type="textarea" :rows="2" />
+        <el-input v-model.trim="form.remark" clearable maxlength="200" placeholder="请输入备注" :rows="2" type="textarea" />
       </el-form-item>
     </el-form>
     <template #footer>

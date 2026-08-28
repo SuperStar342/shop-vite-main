@@ -64,10 +64,7 @@ export async function getList(params?: any) {
     startTime: params?.startTime,
     endTime: params?.endTime,
   }
-  const urls = [
-    '/api/blade-system/record-data/list',
-    '/api/blade-log/api/list',
-  ]
+  const urls = ['/api/blade-system/record-data/list', '/api/blade-log/api/list']
   for (const url of urls) {
     try {
       const res: any = await request({

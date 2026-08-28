@@ -1,5 +1,5 @@
 <template>
-  <div class="personal-center-container no-background-container auto-height-container" v-loading="pageLoading">
+  <div v-loading="pageLoading" class="personal-center-container no-background-container auto-height-container">
     <el-row :gutter="20">
       <el-col :lg="8" :md="12" :sm="24" :xl="8" :xs="24">
         <vab-card class="auto-height-card">
@@ -99,7 +99,7 @@
           <el-tabs v-model="activeName">
             <el-tab-pane label="基本信息" name="first">
               <el-col :lg="14" :md="18" :sm="24" :xl="12" :xs="24">
-                <el-form label-position="top" :model="form" :rules="rules" ref="formRef" @submit.prevent>
+                <el-form ref="formRef" label-position="top" :model="form" :rules="rules" @submit.prevent>
                   <el-form-item label="账号">
                     <el-input v-model="form.account" disabled />
                   </el-form-item>

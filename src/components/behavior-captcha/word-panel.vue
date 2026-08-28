@@ -1,7 +1,7 @@
 <template>
   <div class="word-panel">
     <div class="word-stage" :style="stageSize" @click="handleStageClick">
-      <img class="word-image" :src="data.image" alt="" draggable="false" />
+      <img alt="" class="word-image" draggable="false" :src="data.image" />
       <transition-group name="word-dot">
         <span
           v-for="(dot, index) in dots"
@@ -23,8 +23,8 @@
           >{{ chip }}</span
         >
       </div>
-      <button class="word-undo" title="撤销上一步" :disabled="!dots.length" @click="undo">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <button class="word-undo" :disabled="!dots.length" title="撤销上一步" @click="undo">
+        <svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
           <path d="M9 14 4 9l5-5" />
           <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
         </svg>

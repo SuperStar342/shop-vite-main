@@ -19,9 +19,7 @@ export const getIconList = async (params?: QueryFormType) => {
     .trim()
     .toLowerCase()
 
-  const filtered = title
-    ? REMIX_ICONS.filter((name) => name.toLowerCase().includes(title))
-    : REMIX_ICONS
+  const filtered = title ? REMIX_ICONS.filter((name) => name.toLowerCase().includes(title)) : REMIX_ICONS
 
   const start = (pageNo - 1) * pageSize
   const list = filtered.slice(start, start + pageSize)

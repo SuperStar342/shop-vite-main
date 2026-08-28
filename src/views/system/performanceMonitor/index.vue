@@ -1,12 +1,12 @@
 <template>
   <div class="performance-monitor-container auto-height-container">
     <!-- 顶部统计卡片 -->
-    <el-row :gutter="20" class="mb-4">
+    <el-row class="mb-4" :gutter="20">
       <el-col :lg="6" :md="12" :sm="24" :xl="6" :xs="24">
         <el-card shadow="hover">
           <div class="stat-card">
             <div class="stat-icon" style="background-color: #409eff">
-              <el-icon><Timer /></el-icon>
+              <el-icon><timer /></el-icon>
             </div>
             <div class="stat-content">
               <div class="stat-value">{{ avgLoadTime }}s</div>
@@ -19,7 +19,7 @@
         <el-card shadow="hover">
           <div class="stat-card">
             <div class="stat-icon" style="background-color: #67c23a">
-              <el-icon><Cpu /></el-icon>
+              <el-icon><cpu /></el-icon>
             </div>
             <div class="stat-content">
               <div class="stat-value">{{ avgFps }}</div>
@@ -32,7 +32,7 @@
         <el-card shadow="hover">
           <div class="stat-card">
             <div class="stat-icon" style="background-color: #e6a23c">
-              <el-icon><Download /></el-icon>
+              <el-icon><download /></el-icon>
             </div>
             <div class="stat-content">
               <div class="stat-value">{{ avgResourceSize }}KB</div>
@@ -45,7 +45,7 @@
         <el-card shadow="hover">
           <div class="stat-card">
             <div class="stat-icon" style="background-color: #f56c6c">
-              <el-icon><CircleClose /></el-icon>
+              <el-icon><circle-close /></el-icon>
             </div>
             <div class="stat-content">
               <div class="stat-value">{{ errorCount }}</div>

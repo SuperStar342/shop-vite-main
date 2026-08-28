@@ -77,7 +77,7 @@
               <li class="tags-item">
                 <vab-divider />
                 <h5 class="tags-title">
-                  <vab-icon icon="star-line" class="title-icon" />
+                  <vab-icon class="title-icon" icon="star-line" />
                   个性标签
                 </h5>
                 <el-space wrap>

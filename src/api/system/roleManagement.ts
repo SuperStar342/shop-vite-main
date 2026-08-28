@@ -53,9 +53,7 @@ async function loadTenantNameMap(force = false): Promise<Map<string, string>> {
 /** 递归映射角色树节点 */
 function mapRole(r: any, level = 0, tenantMap?: Map<string, string>): any {
   const childrenRaw = Array.isArray(r?.children) ? r.children : []
-  const children = childrenRaw.length
-    ? childrenRaw.map((c: any) => mapRole(c, level + 1, tenantMap))
-    : undefined
+  const children = childrenRaw.length ? childrenRaw.map((c: any) => mapRole(c, level + 1, tenantMap)) : undefined
   const roleAlias = String(r.roleAlias || r.role || r.alias || '').trim()
   // /role/tree 只返回 title；部分数据仅有别名
   const roleName = String(r.roleName || r.title || r.label || r.name || roleAlias || '').trim()
@@ -96,10 +94,7 @@ function fillRoleParentNames(nodes: any[], nameMap?: Map<string, string>): any[]
   if (!nameMap) walkCollect(nodes)
   return nodes.map((n) => {
     const parentId = String(n.parentId ?? '0')
-    const parentName =
-      !parentId || parentId === '0'
-        ? n.parentName || '顶级'
-        : n.parentName || map.get(parentId) || '-'
+    const parentName = !parentId || parentId === '0' ? n.parentName || '顶级' : n.parentName || map.get(parentId) || '-'
     return {
       ...n,
       parentName,
@@ -154,10 +149,7 @@ export async function getRoleTree(tenantId?: string) {
 }
 
 export async function doEdit(data: any) {
-  const parentId =
-    data.parentId === '' || data.parentId === undefined || data.parentId === null
-      ? 0
-      : data.parentId
+  const parentId = data.parentId === '' || data.parentId === undefined || data.parentId === null ? 0 : data.parentId
   const payload: Record<string, any> = {
     id: data.id || undefined,
     parentId,

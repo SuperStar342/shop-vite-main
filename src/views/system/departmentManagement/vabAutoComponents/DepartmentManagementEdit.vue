@@ -7,12 +7,12 @@
           check-strictly
           clearable
           :data="parentTree"
-          :disabled="!!lockParent"
           default-expand-all
+          :disabled="!!lockParent"
           filterable
           node-key="id"
-          :props="{ label: 'label', value: 'id', children: 'children', disabled: 'disabled' }"
           placeholder="不选则为顶级部门"
+          :props="{ label: 'label', value: 'id', children: 'children', disabled: 'disabled' }"
           render-after-expand
           style="width: 100%"
         />
@@ -37,7 +37,7 @@
         <el-input-number v-model="form.sort" :max="9999" :min="0" style="width: 100%" />
       </el-form-item>
       <el-form-item label="备注" prop="remark">
-        <el-input v-model.trim="form.remark" clearable type="textarea" :rows="2" />
+        <el-input v-model.trim="form.remark" clearable :rows="2" type="textarea" />
       </el-form-item>
     </el-form>
     <template #footer>

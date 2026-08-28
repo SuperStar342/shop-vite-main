@@ -77,7 +77,7 @@
         </el-col>
         <el-col :span="24">
           <el-form-item label="备注">
-            <el-input v-model.trim="form.remark" clearable maxlength="200" placeholder="请输入备注（可选）" type="textarea" :rows="2" />
+            <el-input v-model.trim="form.remark" clearable maxlength="200" placeholder="请输入备注（可选）" :rows="2" type="textarea" />
           </el-form-item>
         </el-col>
       </el-row>

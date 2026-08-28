@@ -7,12 +7,12 @@
           check-strictly
           clearable
           :data="parentTree"
-          :disabled="!!lockParent"
           default-expand-all
+          :disabled="!!lockParent"
           filterable
           node-key="id"
-          :props="{ label: 'roleName', value: 'id', children: 'children', disabled: 'disabled' }"
           placeholder="不选则为顶级角色"
+          :props="{ label: 'roleName', value: 'id', children: 'children', disabled: 'disabled' }"
           render-after-expand
           style="width: 100%"
         />

@@ -41,8 +41,8 @@
             <span class="domain-text">{{ row.domainUrl || '-' }}</span>
             <el-button
               v-if="row.domainUrl"
-              :icon="DocumentCopy"
               class="copy-btn"
+              :icon="DocumentCopy"
               link
               title="复制域名"
               type="primary"

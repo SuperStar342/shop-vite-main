@@ -59,19 +59,19 @@
       </el-table-column>
       <el-table-column align="center" label="字典名称" min-width="140" prop="dictValue" show-overflow-tooltip />
       <el-table-column align="center" label="字典键值" min-width="120" prop="dictKey" show-overflow-tooltip />
-      <el-table-column align="center" label="排序" width="80" prop="sort" />
+      <el-table-column align="center" label="排序" prop="sort" width="80" />
       <el-table-column align="center" label="状态" width="100">
         <template #default="{ row }">
           <el-switch
             v-model="row.status"
+            active-text="启用"
             :active-value="1"
+            :before-change="() => beforeToggleField(row, 'status')"
+            :disabled="!!row._statusLoading"
+            inactive-text="禁用"
             :inactive-value="0"
             inline-prompt
-            active-text="启用"
-            inactive-text="禁用"
-            :disabled="!!row._statusLoading"
             :loading="!!row._statusLoading"
-            :before-change="() => beforeToggleField(row, 'status')"
           />
         </template>
       </el-table-column>
@@ -79,14 +79,14 @@
         <template #default="{ row }">
           <el-switch
             v-model="row.isSealed"
+            active-text="是"
             :active-value="1"
+            :before-change="() => beforeToggleField(row, 'isSealed')"
+            :disabled="!!row._sealLoading"
+            inactive-text="否"
             :inactive-value="0"
             inline-prompt
-            active-text="是"
-            inactive-text="否"
-            :disabled="!!row._sealLoading"
             :loading="!!row._sealLoading"
-            :before-change="() => beforeToggleField(row, 'isSealed')"
           />
         </template>
       </el-table-column>
@@ -105,7 +105,7 @@
       </template>
     </el-table>
 
-    <DictionaryManagementEdit ref="editRef" @fetch-data="fetchData" />
+    <dictionary-management-edit ref="editRef" @fetch-data="fetchData" />
   </vab-dialog>
 </template>
 

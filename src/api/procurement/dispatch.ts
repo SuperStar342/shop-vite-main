@@ -60,9 +60,7 @@ export async function getWtWorkers(params: {
  * wtNos: 单个或逗号分隔多个派工单号
  */
 export async function removeWt(wtNos: string | string[]) {
-  const list = (Array.isArray(wtNos) ? wtNos : String(wtNos || '').split(','))
-    .map((s) => String(s || '').trim())
-    .filter(Boolean)
+  const list = (Array.isArray(wtNos) ? wtNos : String(wtNos || '').split(',')).map((s) => String(s || '').trim()).filter(Boolean)
   if (!list.length) throw new Error('缺少派工单号')
   const res: any = await request({
     url: '/api/blade-system/dispatch/remove',
@@ -76,9 +74,7 @@ export async function removeWt(wtNos: string | string[]) {
 }
 
 const postWtAction = async (path: string, wtNos: string | string[], failMsg: string) => {
-  const list = (Array.isArray(wtNos) ? wtNos : String(wtNos || '').split(','))
-    .map((s) => String(s || '').trim())
-    .filter(Boolean)
+  const list = (Array.isArray(wtNos) ? wtNos : String(wtNos || '').split(',')).map((s) => String(s || '').trim()).filter(Boolean)
   if (!list.length) throw new Error('缺少派工单号')
   const res: any = await request({
     url: `/api/blade-system/dispatch/${path}`,

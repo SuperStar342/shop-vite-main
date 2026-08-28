@@ -1,5 +1,5 @@
 <template>
-  <vab-dialog v-model="dialogFormVisible" append-to-body class="material-category-edit" :title="title" width="800px" destroy-on-close :loading="dialogLoading" @closed="handleClosed">
+  <vab-dialog v-model="dialogFormVisible" append-to-body class="material-category-edit" destroy-on-close :loading="dialogLoading" :title="title" width="800px" @closed="handleClosed">
     <el-form ref="formRef" label-position="top" :model="form" :rules="rules" @submit.prevent>
       <el-row :gutter="16">
         <el-col :md="12" :span="24">
@@ -10,20 +10,20 @@
               clearable
               :data="parentTree"
               default-expand-all
+              :disabled="isEditMode"
               filterable
               node-key="id"
-              :props="{ label: 'categoryName', children: 'children' }"
               placeholder="不选则为顶级"
+              :props="{ label: 'categoryName', children: 'children' }"
               render-after-expand
               style="width: 100%"
-              :disabled="isEditMode"
             />
           </el-form-item>
         </el-col>
         <el-col :md="12" :span="24">
           <el-form-item label="材料类别代码" prop="categoryCode">
             <div class="code-row">
-              <el-input v-model.trim="form.categoryCode" clearable maxlength="50" placeholder="类别代码" :disabled="isEditMode" />
+              <el-input v-model.trim="form.categoryCode" clearable :disabled="isEditMode" maxlength="50" placeholder="类别代码" />
               <el-button v-if="!isEditMode" @click="handleGenCode">产生编码</el-button>
             </div>
           </el-form-item>
@@ -35,12 +35,12 @@
         </el-col>
         <el-col :md="12" :span="24">
           <el-form-item label="采购额定天数" prop="daysBefPur">
-            <el-input-number v-model="form.daysBefPur" :min="0" :max="9999" controls-position="right" style="width: 100%" />
+            <el-input-number v-model="form.daysBefPur" controls-position="right" :max="9999" :min="0" style="width: 100%" />
           </el-form-item>
         </el-col>
         <el-col :md="12" :span="24">
           <el-form-item label="标准检验天数" prop="daysOfChk">
-            <el-input-number v-model="form.daysOfChk" :min="0" :max="9999" controls-position="right" style="width: 100%" />
+            <el-input-number v-model="form.daysOfChk" controls-position="right" :max="9999" :min="0" style="width: 100%" />
           </el-form-item>
         </el-col>
         <el-col :md="12" :span="24">
@@ -54,12 +54,12 @@
         </el-col>
         <el-col :md="12" :span="24">
           <el-form-item label="排序" prop="sort">
-            <el-input-number v-model="form.sort" :min="0" :max="9999" controls-position="right" style="width: 100%" />
+            <el-input-number v-model="form.sort" controls-position="right" :max="9999" :min="0" style="width: 100%" />
           </el-form-item>
         </el-col>
         <el-col :md="12" :span="24">
           <el-form-item label="是否启用" prop="status">
-            <el-switch v-model="form.status" :active-value="1" :inactive-value="0" active-text="启用" inactive-text="停用" />
+            <el-switch v-model="form.status" active-text="启用" :active-value="1" inactive-text="停用" :inactive-value="0" />
           </el-form-item>
         </el-col>
         <el-col :md="12" :span="24">
@@ -96,7 +96,7 @@
         </el-col>
         <el-col :span="24">
           <el-form-item label="备注" prop="remark">
-            <el-input v-model.trim="form.remark" clearable maxlength="200" type="textarea" :rows="2" placeholder="备注（可选）" />
+            <el-input v-model.trim="form.remark" clearable maxlength="200" placeholder="备注（可选）" :rows="2" type="textarea" />
           </el-form-item>
         </el-col>
       </el-row>

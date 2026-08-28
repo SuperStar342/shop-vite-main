@@ -39,36 +39,36 @@
             <el-button :icon="Refresh" @click="resetQuery">重置</el-button>
             <el-button plain type="success" @click="goQuickDispatch">快捷派工</el-button>
             <el-button
-              plain
-              type="primary"
               :disabled="!checkedMasters.length"
               :loading="auditing"
+              plain
+              type="primary"
               @click="runApprove(checkedMasters)"
             >
               审核选中{{ checkedMasters.length ? ` (${checkedMasters.length})` : '' }}
             </el-button>
             <el-button
-              plain
-              type="warning"
               :disabled="!checkedMasters.length"
               :loading="unauditing"
+              plain
+              type="warning"
               @click="runUnapprove(checkedMasters)"
             >
               反审核选中
             </el-button>
             <el-button
-              plain
-              type="info"
               :disabled="!checkedMasters.length"
               :loading="closing"
+              plain
+              type="info"
               @click="runClose(checkedMasters)"
             >
               结案选中
             </el-button>
             <el-button
+              :disabled="!checkedMasters.length"
               plain
               type="danger"
-              :disabled="!checkedMasters.length"
               @click="openDeleteConfirm(checkedMasters)"
             >
               删除选中{{ checkedMasters.length ? ` (${checkedMasters.length})` : '' }}
@@ -84,10 +84,10 @@
         <strong>{{ selectedWt.wtNo }}</strong>
       </div>
       <div class="wt-summary__tags">
-        <el-tag size="small" effect="plain" :type="tagType(selectedWt.finishFlag)">{{ selectedWt.finishFlag || '-' }}</el-tag>
-        <el-tag size="small" effect="plain" :type="tagType(selectedWt.cFlag)">{{ selectedWt.cFlag || '-' }}</el-tag>
-        <el-tag size="small" effect="plain" :type="tagType(selectedWt.ifClose)">{{ selectedWt.ifClose || '-' }}</el-tag>
-        <el-tag size="small" effect="plain" :type="tagType(selectedWt.ifCancel)">{{ selectedWt.ifCancel || '-' }}</el-tag>
+        <el-tag effect="plain" size="small" :type="tagType(selectedWt.finishFlag)">{{ selectedWt.finishFlag || '-' }}</el-tag>
+        <el-tag effect="plain" size="small" :type="tagType(selectedWt.cFlag)">{{ selectedWt.cFlag || '-' }}</el-tag>
+        <el-tag effect="plain" size="small" :type="tagType(selectedWt.ifClose)">{{ selectedWt.ifClose || '-' }}</el-tag>
+        <el-tag effect="plain" size="small" :type="tagType(selectedWt.ifCancel)">{{ selectedWt.ifCancel || '-' }}</el-tag>
       </div>
       <div class="wt-summary__meta">
         <span>{{ selectedWt.wsName || selectedWt.wsCode }}</span>
@@ -187,14 +187,14 @@
             ref="masterTableRef"
             v-loading="listLoading"
             border
-            highlight-current-row
-            height="100%"
             :data="masterList"
+            height="100%"
+            highlight-current-row
             row-key="wtNo"
             @row-click="handleMasterClick"
             @selection-change="onMasterSelectionChange"
           >
-            <el-table-column type="selection" width="42" :selectable="masterSelectable" />
+            <el-table-column :selectable="masterSelectable" type="selection" width="42" />
             <el-table-column v-if="visible('wtNo')" label="派工单号" min-width="168" prop="wtNo" show-overflow-tooltip />
             <el-table-column v-if="visible('oriType')" label="单据来源" min-width="100" prop="oriType" show-overflow-tooltip />
             <el-table-column v-if="visible('wtDate')" label="派工日期" min-width="110" prop="wtDate" show-overflow-tooltip />
@@ -208,12 +208,12 @@
             <el-table-column v-if="visible('tpcPrcName')" label="代表工序名称" min-width="120" prop="tpcPrcName" show-overflow-tooltip />
             <el-table-column v-if="visible('finishFlag')" align="center" label="完成状态" min-width="100" prop="finishFlag">
               <template #default="{ row }">
-                <el-tag size="small" effect="plain" :type="tagType(row.finishFlag)">{{ row.finishFlag || '-' }}</el-tag>
+                <el-tag effect="plain" size="small" :type="tagType(row.finishFlag)">{{ row.finishFlag || '-' }}</el-tag>
               </template>
             </el-table-column>
             <el-table-column v-if="visible('cFlag')" align="center" label="审核状态" min-width="90" prop="cFlag">
               <template #default="{ row }">
-                <el-tag size="small" effect="plain" :type="tagType(row.cFlag)">{{ row.cFlag || '-' }}</el-tag>
+                <el-tag effect="plain" size="small" :type="tagType(row.cFlag)">{{ row.cFlag || '-' }}</el-tag>
               </template>
             </el-table-column>
             <el-table-column v-if="visible('creator')" label="建立人" min-width="80" prop="creator" />
@@ -235,18 +235,18 @@
               <template #default="{ row }">
                 <el-button
                   v-if="!isAudited(row)"
+                  :disabled="!!approveBlockReason(row)"
                   link
                   type="primary"
-                  :disabled="!!approveBlockReason(row)"
                   @click.stop="runApprove([row])"
                 >
                   审核
                 </el-button>
                 <el-button
                   v-else
+                  :disabled="!!unapproveBlockReason(row)"
                   link
                   type="warning"
-                  :disabled="!!unapproveBlockReason(row)"
                   @click.stop="runUnapprove([row])"
                 >
                   反审核
@@ -257,9 +257,9 @@
                 >
                   <span>
                     <el-button
+                      :disabled="!!deleteBlockReason(row)"
                       link
                       type="danger"
-                      :disabled="!!deleteBlockReason(row)"
                       @click.stop="openDeleteConfirm([row])"
                     >
                       删除
@@ -308,9 +308,9 @@
             ref="itemTableRef"
             v-loading="itemLoading"
             border
-            highlight-current-row
-            height="100%"
             :data="itemList"
+            height="100%"
+            highlight-current-row
             :row-key="itemRowKey"
             @row-click="handleItemClick"
             @selection-change="onItemSelectionChange"
@@ -354,8 +354,8 @@
                   </div>
                   <el-progress
                     :percentage="progressOf(w)"
-                    :stroke-width="8"
                     :status="progressOf(w) >= 100 ? 'success' : undefined"
+                    :stroke-width="8"
                   />
                 </li>
                 <li v-if="!card.workers.length" class="is-empty">暂无人员派工</li>
@@ -377,8 +377,8 @@
           <el-table
             v-loading="workerLoading"
             border
-            height="100%"
             :data="workerList"
+            height="100%"
             :row-key="workerRowKey"
           >
             <el-table-column v-if="visibleWorker('empNo')" label="工号" min-width="110" prop="empNo" />
@@ -392,8 +392,8 @@
               <template #default="{ row }">
                 <el-progress
                   :percentage="progressOf(row)"
-                  :stroke-width="8"
                   :status="progressOf(row) >= 100 ? 'success' : undefined"
+                  :stroke-width="8"
                 />
               </template>
             </el-table-column>
@@ -408,7 +408,7 @@
             </el-table-column>
             <el-table-column v-if="visibleWorker('fnStatus')" align="center" label="已完工状态" min-width="110">
               <template #default="{ row }">
-                <el-tag size="small" effect="plain" :type="progressOf(row) >= 100 ? 'success' : 'info'">
+                <el-tag effect="plain" size="small" :type="progressOf(row) >= 100 ? 'success' : 'info'">
                   {{ progressOf(row) >= 100 ? '已完工' : '进行中' }}
                 </el-tag>
               </template>
@@ -429,16 +429,16 @@
     <!-- 滑动确认删除 -->
     <el-dialog
       v-model="deleteDialog"
-      class="wt-delete-dialog"
-      width="480px"
       append-to-body
-      destroy-on-close
+      class="wt-delete-dialog"
       :close-on-click-modal="!deleting"
+      destroy-on-close
+      width="480px"
       @closed="resetDeleteSlide"
     >
       <template #header>
         <div class="wt-delete-dialog__title">
-          <el-icon class="is-warn"><WarningFilled /></el-icon>
+          <el-icon class="is-warn"><warning-filled /></el-icon>
           <div>
             <strong>确认删除派工单</strong>
             <p>仅未开工单据可删；删除后不可恢复，请滑动确认</p>
@@ -450,7 +450,7 @@
         <article v-for="row in pendingDeleteRows" :key="row.wtNo" class="wt-delete-preview__card">
           <header>
             <b>{{ row.wtNo }}</b>
-            <el-tag size="small" effect="plain" type="info">{{ row.finishFlag || '未完成' }}</el-tag>
+            <el-tag effect="plain" size="small" type="info">{{ row.finishFlag || '未完成' }}</el-tag>
           </header>
           <p>
             <span>{{ row.wsName || row.wsCode || '-' }}</span>
@@ -479,7 +479,7 @@
 
       <template #footer>
         <el-button :disabled="deleting" @click="deleteDialog = false">取消</el-button>
-        <el-button type="danger" :loading="deleting" :disabled="!slideReady" @click="confirmDelete">
+        <el-button :disabled="!slideReady" :loading="deleting" type="danger" @click="confirmDelete">
           确认删除
         </el-button>
       </template>

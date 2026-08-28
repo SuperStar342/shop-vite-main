@@ -1,12 +1,12 @@
 <template>
   <div class="rotate-panel">
     <div class="rotate-stage" :style="stageSize">
-      <img class="rotate-image" :src="data.image" alt="" draggable="false" />
+      <img alt="" class="rotate-image" draggable="false" :src="data.image" />
       <img
-        class="rotate-ring"
-        :src="data.ring"
         alt=""
+        class="rotate-ring"
         draggable="false"
+        :src="data.ring"
         :style="{
           width: `${data.ringSize}px`,
           height: `${data.ringSize}px`,

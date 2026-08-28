@@ -60,9 +60,7 @@ const normalizeToSum = (parts: number[], target: number, preferInteger: boolean)
   if (preferInteger) {
     const floors = parts.map((p) => Math.max(0, Math.floor(p)))
     let left = Math.round(target) - floors.reduce((s, v) => s + v, 0)
-    const ordered = parts
-      .map((p, i) => ({ i, frac: p - Math.floor(p) }))
-      .sort((a, b) => b.frac - a.frac)
+    const ordered = parts.map((p, i) => ({ i, frac: p - Math.floor(p) })).sort((a, b) => b.frac - a.frac)
     let k = 0
     while (left > 0 && ordered.length) {
       floors[ordered[k % ordered.length].i] += 1
@@ -79,7 +77,11 @@ const normalizeToSum = (parts: number[], target: number, preferInteger: boolean)
     return floors
   }
   const sum = parts.reduce((s, v) => s + v, 0)
-  if (sum <= 0) return distributeByWeights(target, parts.map(() => 1))
+  if (sum <= 0)
+    return distributeByWeights(
+      target,
+      parts.map(() => 1)
+    )
   let assigned = 0
   return parts.map((p, i) => {
     if (i === n - 1) return Number((target - assigned).toFixed(2))
@@ -148,7 +150,10 @@ export const splitWorkersByWage = <T extends { remainQty?: any; machiningUp?: an
     const tSum = remTarget.reduce((s, n) => s + Math.max(0, n), 0)
     let raw: number[]
     if (tSum <= 0.000001) {
-      raw = distributeByWeights(qj, list.map(() => 1)).map((n) => Number(n))
+      raw = distributeByWeights(
+        qj,
+        list.map(() => 1)
+      ).map((n) => Number(n))
     } else {
       // 该行工费按剩余目标比例切，再换算数量
       raw = remTarget.map((t) => (qj * Math.max(0, t)) / tSum)
@@ -175,12 +180,7 @@ export const splitWorkersByWage = <T extends { remainQty?: any; machiningUp?: an
 }
 
 /** ERP 派工状态：未派工 / 部分派工 / 已派工 */
-export const resolveDispatchStatus = (
-  remainQty: any,
-  planQty: any,
-  wtQty?: any,
-  explicit?: string
-) => {
+export const resolveDispatchStatus = (remainQty: any, planQty: any, wtQty?: any, explicit?: string) => {
   const status = String(explicit || '').trim()
   if (status) return status
   const remain = num(remainQty)

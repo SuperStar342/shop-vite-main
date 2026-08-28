@@ -29,9 +29,9 @@
       </el-table-column>
       <el-table-column align="center" label="头像" width="80">
         <template #default="{ row }">
-          <el-avatar :size="40" :src="toOssPreviewUrl(row.avatar)" :icon="UserFilled">
+          <el-avatar :icon="UserFilled" :size="40" :src="toOssPreviewUrl(row.avatar)">
             <template #icon>
-              <UserFilled />
+              <user-filled />
             </template>
           </el-avatar>
         </template>
@@ -83,7 +83,7 @@
       @current-change="handleCurrentChange"
       @size-change="handleSizeChange"
     />
-    <UserManagementEdit ref="editRef" @fetch-data="fetchData" />
+    <user-management-edit ref="editRef" @fetch-data="fetchData" />
   </div>
 </template>
 

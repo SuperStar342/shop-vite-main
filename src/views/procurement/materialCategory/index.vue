@@ -6,7 +6,7 @@
         <el-button :icon="expandAll ? Fold : Expand" @click="toggleExpandAll">
           {{ expandAll ? '全部折叠' : '全部展开' }}
         </el-button>
-        <el-button :icon="Delete" :disabled="selectRows.length === 0" type="danger" @click="handleBatchDelete">
+        <el-button :disabled="selectRows.length === 0" :icon="Delete" type="danger" @click="handleBatchDelete">
           批量删除
         </el-button>
       </vab-query-form-left-panel>
@@ -29,17 +29,17 @@
     </vab-query-form>
 
     <div ref="wrapperRef" class="vtable-wrapper" :class="{ 'has-selection': !!selectedId }">
-      <ListTable
-        ref="tableRef"
+      <list-table
         :key="tableKey"
+        ref="tableRef"
+        :height="tableHeight"
         :options="tableOptions"
         :records="list"
-        :height="tableHeight"
         @on-checkbox-state-change="handleCheckboxStateChange"
         @on-click-cell="handleClickCell"
-        @on-selected-cell="onCopyTrack"
         @on-context-menu-cell="onCopyContextMenu"
         @on-initialized="handleTableReady"
+        @on-selected-cell="onCopyTrack"
       />
     </div>
 
@@ -54,9 +54,9 @@
     <material-category-edit ref="editRef" @fetch-data="handleSaved" />
     <material-category-detail-drawer
       ref="drawerRef"
-      @edit="handleEdit"
       @add-child="handleAdd"
       @closed="handleDrawerClosed"
+      @edit="handleEdit"
     />
   </div>
 </template>

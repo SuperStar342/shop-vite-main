@@ -5,7 +5,7 @@
         <h1>普通派工</h1>
         <p>多工单选工序；一键派工可批量设置人员配比，自动写入未派工序</p>
       </div>
-      <nav class="nd-steps" aria-label="派工步骤">
+      <nav aria-label="派工步骤" class="nd-steps">
         <button
           v-for="(s, idx) in stepItems"
           :key="s.key"
@@ -28,13 +28,23 @@
           <em>共 {{ filteredWorkOrders.length }} 张</em>
           <el-button :icon="Refresh" link :loading="loading" @click="loadPreview" />
         </header>
-        <el-input
-          v-model.trim="woKeyword"
-          clearable
-          placeholder="工单单号 / 品名"
-          size="small"
-          @keyup.enter="onWoSearchEnter"
-        />
+        <div class="nd-wo-search">
+          <el-input
+            v-model.trim="queryMoNo"
+            clearable
+            placeholder="制令号"
+            size="small"
+            @clear="onMoNoSearch"
+            @keyup.enter="onMoNoSearch"
+          />
+          <el-input
+            v-model.trim="woKeyword"
+            clearable
+            placeholder="工单单号 / 品名"
+            size="small"
+            @keyup.enter="onWoSearchEnter"
+          />
+        </div>
         <div v-loading="loading" class="nd-wo-list">
           <article
             v-for="(wo, idx) in filteredWorkOrders"
@@ -44,21 +54,22 @@
               'is-checked': selectedWoSet.has(wo.woNo),
               'is-active': activeWoNo === wo.woNo,
             }"
-            :style="{ '--wo-accent': woColors[idx % woColors.length] }"
             role="button"
+            :style="{ '--wo-accent': woColors[idx % woColors.length] }"
             tabindex="0"
             @click="onWoCardClick(wo)"
             @keydown.enter.prevent="onWoCardClick(wo)"
             @keydown.space.prevent="onWoCardClick(wo)"
           >
-            <div class="nd-wo-card__accent" aria-hidden="true" />
+            <div aria-hidden="true" class="nd-wo-card__accent" />
             <div class="nd-wo-card__body">
               <div class="nd-wo-card__top">
                 <b>{{ wo.woNo }}</b>
                 <el-tag v-if="selectedWoSet.has(wo.woNo)" effect="plain" size="small" type="success">已选</el-tag>
               </div>
+              <p v-if="wo.moNo" class="nd-wo-card__mo">制令 {{ wo.moNo }}</p>
               <p>{{ wo.goodsName || '-' }}</p>
-              <DispatchQtyCell
+              <dispatch-qty-cell
                 align="left"
                 :plan-qty="wo.planQty || wo.woQty"
                 :remain-qty="wo.remainQty"
@@ -66,7 +77,7 @@
                 :wt-qty="wo.wtQty"
               />
             </div>
-            <span v-if="selectedWoSet.has(wo.woNo)" class="nd-wo-card__check" aria-hidden="true">✓</span>
+            <span v-if="selectedWoSet.has(wo.woNo)" aria-hidden="true" class="nd-wo-card__check">✓</span>
           </article>
           <el-empty v-if="!filteredWorkOrders.length && !loading" description="暂无可派工单" />
         </div>
@@ -82,7 +93,7 @@
           <el-checkbox v-model="mergeSameProcess">
             同工序合并派工
             <el-tooltip content="勾选后按工序汇总分配，无法按每张工单单独指定数量；精细派工请取消勾选" placement="top">
-              <el-icon class="nd-merge-tip"><QuestionFilled /></el-icon>
+              <el-icon class="nd-merge-tip"><question-filled /></el-icon>
             </el-tooltip>
           </el-checkbox>
         </header>
@@ -96,34 +107,34 @@
         <div v-loading="prcLoading" class="nd-prc-pane__body">
           <template v-if="pickTab === 'current'">
             <el-table
-              ref="currentTableRef"
               :key="activeWoNo"
-              :data="activeWoLines"
+              ref="currentTableRef"
               border
+              :data="activeWoLines"
               height="100%"
               row-key="__key"
               @selection-change="onCurrentLineSelection"
             >
-              <el-table-column type="selection" width="46" :selectable="(row: any) => num(row.remainQty) > 0" />
+              <el-table-column :selectable="(row: any) => num(row.remainQty) > 0" type="selection" width="46" />
               <el-table-column label="工序编号/名称" min-width="160">
                 <template #default="{ row }">{{ row.prcCode }} {{ row.prcName }}</template>
               </el-table-column>
               <el-table-column label="工序类型" min-width="110" prop="mrName" show-overflow-tooltip />
-              <el-table-column label="计薪" width="72" align="center">
+              <el-table-column align="center" label="计薪" width="72">
                 <template #default="{ row }">{{ wageTypeLabel(row.pWageType) }}</template>
               </el-table-column>
-              <el-table-column label="加工单价" width="96" align="right">
+              <el-table-column align="right" label="加工单价" width="96">
                 <template #default="{ row }">{{ fmtNum(row.machiningUp) }}</template>
               </el-table-column>
-              <el-table-column label="加工工时" width="100" align="right">
+              <el-table-column align="right" label="加工工时" width="100">
                 <template #default="{ row }">{{ fmtMachiningTime(row.machiningTime, row.timeUnit) }}</template>
               </el-table-column>
-              <el-table-column label="加工次数" width="80" align="right">
+              <el-table-column align="right" label="加工次数" width="80">
                 <template #default="{ row }">{{ fmtNum(row.machiningTimes) }}</template>
               </el-table-column>
-              <el-table-column label="派工状态/数量" width="148" align="right">
+              <el-table-column align="right" label="派工状态/数量" width="148">
                 <template #default="{ row }">
-                  <DispatchQtyCell
+                  <dispatch-qty-cell
                     :plan-qty="row.woQty"
                     :remain-qty="row.remainQty"
                     :wt-qty="row.wtQty"
@@ -140,18 +151,18 @@
               </span>
               <div class="nd-batch-bar__actions">
                 <el-button
+                  :disabled="!batchSelectableCount"
+                  plain
                   size="small"
                   type="primary"
-                  plain
-                  :disabled="!batchSelectableCount"
                   @click="selectAllBatchProcesses"
                 >
                   全选
                 </el-button>
                 <el-button
-                  size="small"
-                  plain
                   :disabled="!batchCheckedCount"
+                  plain
+                  size="small"
                   @click="clearBatchProcesses"
                 >
                   取消全选
@@ -159,11 +170,11 @@
               </div>
             </div>
             <el-table
-              :data="batchProcessGroups"
               border
+              :data="batchProcessGroups"
               height="100%"
-              row-key="key"
               :row-class-name="batchProcessRowClass"
+              row-key="key"
               @expand-change="() => {}"
             >
               <el-table-column type="expand">
@@ -180,11 +191,11 @@
                       >
                         {{ line.woNo }}
                       </el-checkbox>
-                      <DispatchQtyCell
+                      <dispatch-qty-cell
                         align="left"
-                        size="sm"
                         :plan-qty="line.woQty"
                         :remain-qty="line.remainQty"
+                        size="sm"
                         :wt-qty="line.wtQty"
                       />
                       <span class="nd-expand__meta">
@@ -232,28 +243,28 @@
                 </template>
               </el-table-column>
               <el-table-column label="工序类型" min-width="110" prop="mrName" show-overflow-tooltip />
-              <el-table-column label="计薪" width="72" align="center">
+              <el-table-column align="center" label="计薪" width="72">
                 <template #default="{ row }">{{ row.wageTypeText }}</template>
               </el-table-column>
-              <el-table-column label="加工单价" width="110" align="right">
+              <el-table-column align="right" label="加工单价" width="110">
                 <template #default="{ row }">
                   <span>{{ row.upText }}</span>
                   <small v-if="row.upMixed" class="nd-mixed">各工单不同</small>
                 </template>
               </el-table-column>
-              <el-table-column label="加工工时" width="110" align="right">
+              <el-table-column align="right" label="加工工时" width="110">
                 <template #default="{ row }">{{ row.timeText }}</template>
               </el-table-column>
-              <el-table-column label="工单范围" width="110" align="center">
+              <el-table-column align="center" label="工单范围" width="110">
                 <template #default="{ row }">
                   <span class="nd-wo-scope" :class="row.lines.length > 1 ? 'is-multi' : 'is-single'">
                     {{ row.lines.length > 1 ? `${row.lines.length} 张工单` : '1 张工单' }}
                   </span>
                 </template>
               </el-table-column>
-              <el-table-column label="派工状态/数量" width="148" align="right">
+              <el-table-column align="right" label="派工状态/数量" width="148">
                 <template #default="{ row }">
-                  <DispatchQtyCell
+                  <dispatch-qty-cell
                     :plan-qty="row.planSum"
                     :remain-qty="row.remainSum"
                     :status="groupDispatchStatus(row.lines)"
@@ -274,30 +285,30 @@
           </template>
 
           <template v-else>
-            <el-table :data="selectedLines" border height="100%">
-              <el-table-column label="工单" width="130" prop="woNo" />
+            <el-table border :data="selectedLines" height="100%">
+              <el-table-column label="工单" prop="woNo" width="130" />
               <el-table-column label="工序" min-width="150">
                 <template #default="{ row }">{{ row.prcCode }} {{ row.prcName }}</template>
               </el-table-column>
-              <el-table-column label="计薪" width="72" align="center">
+              <el-table-column align="center" label="计薪" width="72">
                 <template #default="{ row }">{{ wageTypeLabel(row.pWageType) }}</template>
               </el-table-column>
-              <el-table-column label="加工单价" width="96" align="right">
+              <el-table-column align="right" label="加工单价" width="96">
                 <template #default="{ row }">{{ fmtNum(row.machiningUp) }}</template>
               </el-table-column>
-              <el-table-column label="加工工时" width="100" align="right">
+              <el-table-column align="right" label="加工工时" width="100">
                 <template #default="{ row }">{{ fmtMachiningTime(row.machiningTime, row.timeUnit) }}</template>
               </el-table-column>
-              <el-table-column label="派工状态/数量" width="148" align="right">
+              <el-table-column align="right" label="派工状态/数量" width="148">
                 <template #default="{ row }">
-                  <DispatchQtyCell
+                  <dispatch-qty-cell
                     :plan-qty="row.woQty"
                     :remain-qty="row.remainQty"
                     :wt-qty="row.wtQty"
                   />
                 </template>
               </el-table-column>
-              <el-table-column label="预估工费" width="100" align="right">
+              <el-table-column align="right" label="预估工费" width="100">
                 <template #default="{ row }">{{ fmtNum(estimateBorWage(row)) }}</template>
               </el-table-column>
               <el-table-column label="操作" width="80">
@@ -313,10 +324,10 @@
           <span>已选 {{ selectedWoNos.length }} 张工单 · {{ selectedLines.length }} 道工序</span>
           <div>
             <el-button @click="clearSelection">清空</el-button>
-            <el-button type="success" plain :loading="smartLoading" :disabled="!selectedWoNos.length" @click="openSmartDialog">
+            <el-button :disabled="!selectedWoNos.length" :loading="smartLoading" plain type="success" @click="openSmartDialog">
               智能派工
             </el-button>
-            <el-button type="primary" :disabled="!selectedLines.length" @click="wizardStep = 1">
+            <el-button :disabled="!selectedLines.length" type="primary" @click="wizardStep = 1">
               下一步：选择人员
             </el-button>
           </div>
@@ -352,16 +363,16 @@
           </div>
           <div v-if="mergeSameProcess" class="nd-mode-alert">
             <el-alert
-              show-icon
               :closable="false"
+              show-icon
               title="当前为合并模式：无法按每张工单单独指定数量。精细派工请返回上一步取消「同工序合并派工」。"
               type="warning"
             />
           </div>
           <div v-else-if="assignView !== 'process'" class="nd-mode-alert">
             <el-alert
-              show-icon
               :closable="false"
+              show-icon
               title="精细派工请使用「按工序汇总查看」：工序下会展示各工单，可分别选人、填数量。"
               type="info"
             />
@@ -374,22 +385,22 @@
                   : '按工序查看：工序下展示各工单，每张工单独立选人、填数量'
               }}
             </span>
-            <el-button size="small" type="success" plain :loading="smartLoading" @click="openSmartDialog">
+            <el-button :loading="smartLoading" plain size="small" type="success" @click="openSmartDialog">
               智能派工
             </el-button>
-            <el-button size="small" type="success" plain :disabled="!selectedLines.length" @click="openOneClickDispatch">
+            <el-button :disabled="!selectedLines.length" plain size="small" type="success" @click="openOneClickDispatch">
               一键派工
             </el-button>
-            <el-button size="small" type="primary" plain @click="applyEqualAll">全部平均</el-button>
+            <el-button plain size="small" type="primary" @click="applyEqualAll">全部平均</el-button>
           </div>
         </header>
 
         <el-table
-          :data="assignTableData"
           border
+          :data="assignTableData"
           height="100%"
-          row-key="rowKey"
           :row-class-name="assignRowClassName"
+          row-key="rowKey"
           :span-method="assignSpanMethod"
         >
           <el-table-column label="工单 / 工序" min-width="180">
@@ -397,12 +408,12 @@
               <template v-if="row.kind === 'wo-head'">
                 <div class="nd-wo-head-row">
                   <b class="nd-wo-head">{{ row.woNo }}</b>
-                  <DispatchQtyCell
+                  <dispatch-qty-cell
                     align="left"
-                    mode="alloc"
-                    size="sm"
                     :assigned-qty="row.assignedQty"
+                    mode="alloc"
                     :remain-qty="row.remainQty"
+                    size="sm"
                   />
                 </div>
               </template>
@@ -444,12 +455,12 @@
             </template>
           </el-table-column>
           <el-table-column label="工序类型" min-width="100" prop="mrName" show-overflow-tooltip />
-          <el-table-column label="计薪" width="72" align="center">
+          <el-table-column align="center" label="计薪" width="72">
             <template #default="{ row }">
               <template v-if="row.kind !== 'wo-head'">{{ row.wageTypeText }}</template>
             </template>
           </el-table-column>
-          <el-table-column label="加工单价" width="100" align="right">
+          <el-table-column align="right" label="加工单价" width="100">
             <template #default="{ row }">
               <template v-if="row.kind !== 'wo-head'">
                 <div class="nd-up-cell">
@@ -459,14 +470,14 @@
               </template>
             </template>
           </el-table-column>
-          <el-table-column label="加工工时" width="100" align="right">
+          <el-table-column align="right" label="加工工时" width="100">
             <template #default="{ row }">
               <template v-if="row.kind !== 'wo-head'">{{ row.timeText }}</template>
             </template>
           </el-table-column>
-          <el-table-column label="派工状态/数量" width="148" align="right">
+          <el-table-column align="right" label="派工状态/数量" width="148">
             <template #default="{ row }">
-              <DispatchQtyCell
+              <dispatch-qty-cell
                 v-if="row.kind !== 'wo-head'"
                 :plan-qty="row.planQty"
                 :remain-qty="row.remainQty"
@@ -477,7 +488,7 @@
           <el-table-column label="精细化指派（人员 / 比例 / 数量）" min-width="380">
             <template #default="{ row }">
               <div v-if="row.kind === 'process-head'" class="nd-fine nd-fine--head">
-                <el-button :icon="Plus" size="small" type="primary" plain @click="openEmpForProcess(row.processKey)">
+                <el-button :icon="Plus" plain size="small" type="primary" @click="openEmpForProcess(row.processKey)">
                   为各工单统一选人
                 </el-button>
                 <span class="nd-muted">快捷：一次选人并分别填各工单数量；也可在下方每张工单行单独配置</span>
@@ -493,8 +504,8 @@
                     <button
                       v-if="row.editable"
                       class="nd-fine__remove"
-                      type="button"
                       title="移除"
+                      type="button"
                       @click="removeWorker(row.taskKey, w.empNo)"
                     >
                       ×
@@ -538,7 +549,7 @@
                   <el-button :icon="Plus" size="small" type="primary" @click="openEmpFor(row.taskKey)">
                     {{ row.kind === 'line-sub' ? '选择人员' : '加人' }}
                   </el-button>
-                  <el-button size="small" :disabled="!row.workers.length" @click="applyEqualTask(row.taskKey)">
+                  <el-button :disabled="!row.workers.length" size="small" @click="applyEqualTask(row.taskKey)">
                     本行平均
                   </el-button>
                 </div>
@@ -547,18 +558,18 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="本次分配/未派" width="148" align="right">
+          <el-table-column align="right" label="本次分配/未派" width="148">
             <template #default="{ row }">
               <div v-if="row.kind !== 'wo-head'" :class="{ 'is-bad': row.overAssign }">
-                <DispatchQtyCell
-                  mode="alloc"
+                <dispatch-qty-cell
                   :assigned-qty="row.assignedQty"
+                  mode="alloc"
                   :remain-qty="row.remainQty"
                 />
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="预估工费" width="100" align="right">
+          <el-table-column align="right" label="预估工费" width="100">
             <template #default="{ row }">
               <template v-if="row.kind !== 'wo-head'">
                 <b class="is-ok">{{ fmtNum(row.estWage) }}</b>
@@ -576,7 +587,7 @@
           </span>
           <div>
             <el-button @click="wizardStep = 0">上一步</el-button>
-            <el-button type="primary" :disabled="!canGoConfirm" @click="wizardStep = 2">确认派工</el-button>
+            <el-button :disabled="!canGoConfirm" type="primary" @click="wizardStep = 2">确认派工</el-button>
           </div>
         </footer>
       </section>
@@ -588,7 +599,7 @@
         <header class="nd-preview__hero">
           <div class="nd-preview__hero-text">
             <h2>
-              <el-icon class="nd-preview__hero-icon"><Document /></el-icon>
+              <el-icon class="nd-preview__hero-icon"><document /></el-icon>
               派工预览
             </h2>
             <p>
@@ -623,8 +634,8 @@
               </el-select>
               <el-popover placement="bottom-end" trigger="click" :width="340">
                 <template #reference>
-                  <el-button size="small" :type="confirmFilterActive ? 'primary' : 'default'" plain>
-                    <el-icon><Filter /></el-icon>
+                  <el-button plain size="small" :type="confirmFilterActive ? 'primary' : 'default'">
+                    <el-icon><filter /></el-icon>
                     筛选
                     <em v-if="confirmFilterActive" class="nd-preview-filter-badge">{{ confirmFilterActive }}</em>
                   </el-button>
@@ -632,7 +643,7 @@
                 <div class="nd-preview-filter">
                   <header class="nd-preview-filter__head">
                     <strong>筛选条件</strong>
-                    <el-button link type="primary" :disabled="!confirmFilterActive" @click="resetConfirmFilter">
+                    <el-button :disabled="!confirmFilterActive" link type="primary" @click="resetConfirmFilter">
                       重置
                     </el-button>
                   </header>
@@ -678,7 +689,7 @@
                   </footer>
                 </div>
               </el-popover>
-              <el-button :icon="Download" size="small" :disabled="!filteredConfirmItems.length" @click="exportConfirmPreview">
+              <el-button :disabled="!filteredConfirmItems.length" :icon="Download" size="small" @click="exportConfirmPreview">
                 导出
               </el-button>
             </div>
@@ -703,7 +714,7 @@
               <tbody v-if="!displayConfirmGroups.length">
                 <tr>
                   <td class="nd-preview-table__empty" colspan="10">
-                    <el-empty :image-size="72" description="无匹配派工任务，请调整筛选条件" />
+                    <el-empty description="无匹配派工任务，请调整筛选条件" :image-size="72" />
                   </td>
                 </tr>
               </tbody>
@@ -738,12 +749,12 @@
                   <td class="is-num">{{ row.machiningTimeText }}</td>
                   <td class="is-qty">
                     <div class="nd-preview-qty">
-                      <DispatchQtyCell
-                        mode="alloc"
+                      <dispatch-qty-cell
                         align="left"
-                        size="sm"
                         :assigned-qty="row.assignedQty"
+                        mode="alloc"
                         :remain-qty="row.remainQty"
+                        size="sm"
                       />
                       <el-progress
                         :color="'#2e7d5a'"
@@ -760,7 +771,7 @@
                         <em>{{ w.empName || w.empNo }}</em>
                         <b>{{ fmtNum(w.planQty) }}</b>
                       </span>
-                      <button class="nd-preview-worker-add" type="button" title="调整人员" @click="wizardStep = 1">
+                      <button class="nd-preview-worker-add" title="调整人员" type="button" @click="wizardStep = 1">
                         +
                       </button>
                     </div>
@@ -778,14 +789,14 @@
 
         <footer class="nd-preview__foot">
           <el-button @click="wizardStep = 0">取消</el-button>
-          <el-button :icon="Promotion" :loading="saving" type="primary" :disabled="!canSubmit" @click="submit">
+          <el-button :disabled="!canSubmit" :icon="Promotion" :loading="saving" type="primary" @click="submit">
             确认派工
           </el-button>
         </footer>
       </section>
     </div>
 
-    <EmpPickerDialog
+    <emp-picker-dialog
       v-model="empDialog"
       :alloc-lines="editingAllocLines"
       :batch-template="isOneClickMode"
@@ -797,7 +808,7 @@
       @confirm-alloc="onEmpPickerConfirmAlloc"
     />
 
-    <el-dialog v-model="smartDialog" title="智能派工" width="520px" append-to-body destroy-on-close>
+    <el-dialog v-model="smartDialog" append-to-body destroy-on-close title="智能派工" width="520px">
       <p class="nd-smart-tip">
         按本车间近 {{ smartDays }} 天工序经验与在途负荷推荐人员；采用后按<strong>推荐得分占比</strong>分配比例（高分多派），再按工费份额拆到各工单。
       </p>
@@ -817,11 +828,11 @@
           <small>得分 {{ e.score }} · 预计比例 {{ smartPreviewRatio(e) }}%</small>
         </li>
       </ul>
-      <el-empty v-else-if="smartPreviewTried" :image-size="56" description="暂无推荐结果" />
+      <el-empty v-else-if="smartPreviewTried" description="暂无推荐结果" :image-size="56" />
       <template #footer>
         <el-button @click="smartDialog = false">取消</el-button>
         <el-button :loading="smartLoading" @click="previewSmartSuggest">预览推荐</el-button>
-        <el-button type="primary" :loading="smartLoading" @click="applySmartDispatch">采用并分配</el-button>
+        <el-button :loading="smartLoading" type="primary" @click="applySmartDispatch">采用并分配</el-button>
       </template>
     </el-dialog>
   </div>
@@ -2185,11 +2196,25 @@ const loadPreview = async () => {
   }
 }
 
+const onMoNoSearch = () => {
+  queryWoNo.value = ''
+  loadPreview()
+}
+
 const onWoSearchEnter = () => {
   const kw = woKeyword.value.trim()
-  if (/^W\d+/i.test(kw)) {
+  if (!kw) return
+  const looksLikeWo = /^W\d+/i.test(kw) || /W\d{6,}/i.test(kw)
+  if (looksLikeWo) {
     queryWoNo.value = kw
     queryMoNo.value = ''
+    loadPreview()
+    return
+  }
+  // 非工单号形态且较长时，按制令号走服务端查询（列表默认 TOP，历史单不在其中）
+  if (kw.length >= 6) {
+    queryMoNo.value = kw
+    queryWoNo.value = ''
     loadPreview()
   }
 }
@@ -2401,6 +2426,12 @@ onMounted(() => {
   }
 }
 
+.nd-wo-search {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .nd-wo-list {
   flex: 1;
   min-height: 0;
@@ -2487,6 +2518,16 @@ onMounted(() => {
     font-size: 12px;
     color: var(--nd-muted);
     line-height: 1.4;
+  }
+
+  .nd-wo-card__mo {
+    margin: 2px 0 0;
+    font-size: 11px;
+    color: #7a8b7f;
+  }
+
+  p + p {
+    margin-top: 4px;
   }
 
   &.is-checked {

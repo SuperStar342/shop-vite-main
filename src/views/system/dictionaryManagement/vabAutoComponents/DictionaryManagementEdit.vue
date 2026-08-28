@@ -2,7 +2,7 @@
   <vab-dialog v-model="dialogFormVisible" append-to-body :title="title" width="520px" @close="onDialogClose">
     <el-form ref="formRef" label-width="90px" :model="form" :rules="rules">
       <el-form-item v-if="isChildMode" label="所属字典">
-        <el-input :model-value="parentLabel" disabled />
+        <el-input disabled :model-value="parentLabel" />
       </el-form-item>
       <el-form-item label="字典编号" prop="code">
         <el-input
@@ -24,25 +24,25 @@
       <el-form-item label="状态" prop="status">
         <el-switch
           v-model="form.status"
+          active-text="启用"
           :active-value="1"
+          inactive-text="禁用"
           :inactive-value="0"
           inline-prompt
-          active-text="启用"
-          inactive-text="禁用"
         />
       </el-form-item>
       <el-form-item label="是否封存" prop="isSealed">
         <el-switch
           v-model="form.isSealed"
+          active-text="是"
           :active-value="1"
+          inactive-text="否"
           :inactive-value="0"
           inline-prompt
-          active-text="是"
-          inactive-text="否"
         />
       </el-form-item>
       <el-form-item label="备注" prop="remark">
-        <el-input v-model.trim="form.remark" clearable placeholder="选填" type="textarea" :rows="2" />
+        <el-input v-model.trim="form.remark" clearable placeholder="选填" :rows="2" type="textarea" />
       </el-form-item>
     </el-form>
     <template #footer>

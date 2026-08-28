@@ -34,7 +34,11 @@ const toUserType = (v: any) => {
 }
 
 const joinIds = (v: any) => {
-  if (Array.isArray(v)) return v.filter((x) => x !== '' && x != null).map(String).join(',')
+  if (Array.isArray(v))
+    return v
+      .filter((x) => x !== '' && x != null)
+      .map(String)
+      .join(',')
   if (v === '' || v === undefined || v === null) return undefined
   return String(v)
 }
@@ -44,9 +48,7 @@ export const toBladeUser = (data: any) => {
   const roleId =
     joinIds(data.roleId) ||
     joinIds(data.roleIds) ||
-    (Array.isArray(data.roles) && data.roles.every((r: any) => /^\d+$/.test(String(r)))
-      ? joinIds(data.roles)
-      : undefined)
+    (Array.isArray(data.roles) && data.roles.every((r: any) => /^\d+$/.test(String(r))) ? joinIds(data.roles) : undefined)
 
   const payload: Record<string, any> = {
     id: data.id || undefined,
@@ -192,12 +194,7 @@ export async function uploadAvatar(file: File) {
       timeout: 60000,
     })
   } catch (e: any) {
-    const tip =
-      e?.msg ||
-      e?.message ||
-      e?.error_description ||
-      (typeof e === 'string' ? e : '') ||
-      '头像上传失败'
+    const tip = e?.msg || e?.message || e?.error_description || (typeof e === 'string' ? e : '') || '头像上传失败'
     throw new Error(
       String(tip).includes('MinIO') || String(tip).includes('OSS') || String(tip).includes('上传')
         ? tip

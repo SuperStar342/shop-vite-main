@@ -17,11 +17,7 @@ export function findSiblings(nodes: any[], id: string, parentArr: any[] = nodes)
 
 export function getRowKey(el: Element | null | undefined): string {
   if (!el) return ''
-  return (
-    (el as HTMLElement).getAttribute('data-row-key') ||
-    (el as HTMLElement).getAttribute('row-key') ||
-    ''
-  )
+  return (el as HTMLElement).getAttribute('data-row-key') || (el as HTMLElement).getAttribute('row-key') || ''
 }
 
 export type TreeSortableOptions = {

@@ -30,7 +30,7 @@
         </el-col>
         <el-col :span="24">
           <el-form-item label="联系地址" prop="address">
-            <el-input v-model.trim="form.address" clearable maxlength="200" placeholder="请输入联系地址" type="textarea" :rows="2" />
+            <el-input v-model.trim="form.address" clearable maxlength="200" placeholder="请输入联系地址" :rows="2" type="textarea" />
           </el-form-item>
         </el-col>
         <el-col :span="24">
@@ -57,14 +57,14 @@
                       @error="handleBgPreviewError"
                     />
                     <div v-else class="bg-upload-placeholder">
-                      <el-icon v-if="bgUploading" class="is-loading bg-upload-icon"><Loading /></el-icon>
-                      <el-icon v-else class="bg-upload-icon"><Plus /></el-icon>
+                      <el-icon v-if="bgUploading" class="is-loading bg-upload-icon"><loading /></el-icon>
+                      <el-icon v-else class="bg-upload-icon"><plus /></el-icon>
                       <span>{{ bgUploading ? '上传中...' : '图片上传' }}</span>
                     </div>
                   </div>
                 </el-upload>
                 <button v-if="form.backgroundUrl || bgLocalPreview" class="remove-bg-btn" type="button" @click="removeBackground">
-                  <el-icon><Close /></el-icon>
+                  <el-icon><close /></el-icon>
                 </button>
               </div>
               <!-- <div class="bg-meta">
@@ -81,10 +81,10 @@
           <el-form-item label="过期时间" prop="expireTime">
             <el-date-picker
               v-model="form.expireTime"
-              type="datetime"
               placeholder="选择过期时间（可选）"
-              value-format="YYYY-MM-DD HH:mm:ss"
               style="width: 100%"
+              type="datetime"
+              value-format="YYYY-MM-DD HH:mm:ss"
             />
           </el-form-item>
         </el-col>

@@ -1,6 +1,6 @@
 import request from '/@/utils/request'
 import { captchaMode, captchaType } from '/@/config'
-import func from '/@/utils/func';
+import func from '/@/utils/func'
 
 export const loginByUsername = (tenantId, deptId, roleId, username, password, type, key, code) =>
   request({
@@ -17,17 +17,13 @@ export const loginByUsername = (tenantId, deptId, roleId, username, password, ty
       tenantId,
       username,
       password,
-      grant_type: captchaMode
-        ? captchaType === 'behavior'
-          ? 'behavior'
-          : 'captcha'
-        : 'password',
+      grant_type: captchaMode ? (captchaType === 'behavior' ? 'behavior' : 'captcha') : 'password',
       scope: 'all',
       type,
     },
     // 登录接口不带业务 Bearer，避免脏 token 干扰 OAuth
     meta: { isToken: false },
-  });
+  })
 
 // export const loginBySocial = (tenantId, source, code, state) =>
 //   request({
@@ -95,7 +91,7 @@ export const refreshToken = (refresh_token, tenantId, deptId, roleId) =>
       scope: 'all',
     },
     meta: { isToken: false },
-  });
+  })
 
 export const registerUser = (tenantId, name, account, password, phone, email) =>
   request({
@@ -114,7 +110,7 @@ export const registerUser = (tenantId, name, account, password, phone, email) =>
       grant_type: 'register',
       scope: 'all',
     },
-  });
+  })
 
 export const registerGuest = (form, oauthId) =>
   request({
@@ -127,7 +123,7 @@ export const registerGuest = (form, oauthId) =>
       password: form.password,
       oauthId,
     },
-  });
+  })
 
 export const getButtons = () =>
   request({
@@ -135,7 +131,7 @@ export const getButtons = () =>
     method: 'get',
     silentError: true,
     meta: { silentError: true },
-  });
+  })
 
 export const getCaptcha = () =>
   request({
@@ -145,7 +141,7 @@ export const getCaptcha = () =>
     meta: { isToken: false },
     // 题面为 base64 大图，避免默认 10s 超时导致「验证码无法加载」
     timeout: 30000,
-  });
+  })
 
 export const getBehavior = () =>
   request({
@@ -154,7 +150,7 @@ export const getBehavior = () =>
     authorization: false,
     meta: { isToken: false },
     timeout: 30000,
-  });
+  })
 
 export const checkBehavior = (key: string, answer: string) =>
   request({
@@ -167,14 +163,14 @@ export const checkBehavior = (key: string, answer: string) =>
       key,
       answer,
     },
-  });
+  })
 
 export const logout = () =>
   request({
     url: '/blade-auth/oauth/logout',
     method: 'get',
     authorization: false,
-  });
+  })
 
 export const getUserInfo = async () => {
   // 优先系统用户详情（与 shop-vite-main (5) 一致），失败再回退 OAuth user-info
@@ -204,19 +200,19 @@ export const updateUserInfo = (data: Record<string, any>) =>
     data,
   })
 
-export const sendLogs = list =>
+export const sendLogs = (list) =>
   request({
     url: '/blade-auth/oauth/logout',
     method: 'post',
     data: list,
-  });
+  })
 
 export const clearCache = () =>
   request({
     url: '/blade-auth/oauth/clear-cache',
     method: 'get',
     authorization: false,
-  });
+  })
 
 export const sendSms = (tenantId, phone) =>
   request({
@@ -226,8 +222,7 @@ export const sendSms = (tenantId, phone) =>
       tenantId,
       phone,
     },
-  });
-
+  })
 
 export const lock = () => {
   return request({

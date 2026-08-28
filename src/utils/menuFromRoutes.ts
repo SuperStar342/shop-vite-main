@@ -50,12 +50,7 @@ const joinPath = (parent: string, path: string) => {
 /**
  * 将 Vab 路由树转为菜单管理树（过滤 hidden / 404）
  */
-export function routesToMenuTree(
-  routes: any[] = asyncRoutes,
-  parentId = '0',
-  parentPath = '',
-  level = 0
-): RouteMenuNode[] {
+export function routesToMenuTree(routes: any[] = asyncRoutes, parentId = '0', parentPath = '', level = 0): RouteMenuNode[] {
   const result: RouteMenuNode[] = []
   let sort = 0
   for (const route of routes) {
@@ -67,9 +62,7 @@ export function routesToMenuTree(
     const fullPath = joinPath(parentPath, route.path || '')
     const title = route.meta?.title || route.name || fullPath || id
     const icon = route.meta?.icon || ''
-    const children = Array.isArray(route.children)
-      ? routesToMenuTree(route.children, id, fullPath, level + 1)
-      : []
+    const children = Array.isArray(route.children) ? routesToMenuTree(route.children, id, fullPath, level + 1) : []
 
     const routeName = String(route.name || id)
     // code 对齐 BladeX @PreAuth；alias 保留路由 name 供侧边栏过滤
@@ -102,17 +95,19 @@ export function routesToMenuTree(
 
 /** 按名称/编号过滤菜单树 */
 export function filterMenuTree(nodes: RouteMenuNode[], name?: string, code?: string): RouteMenuNode[] {
-  const n = String(name || '').trim().toLowerCase()
-  const c = String(code || '').trim().toLowerCase()
+  const n = String(name || '')
+    .trim()
+    .toLowerCase()
+  const c = String(code || '')
+    .trim()
+    .toLowerCase()
   if (!n && !c) return nodes
 
   const walk = (list: RouteMenuNode[]): RouteMenuNode[] => {
     const out: RouteMenuNode[] = []
     for (const node of list) {
       const children = node.children?.length ? walk(node.children) : []
-      const selfMatch =
-        (!n || String(node.name).toLowerCase().includes(n)) &&
-        (!c || String(node.code).toLowerCase().includes(c))
+      const selfMatch = (!n || String(node.name).toLowerCase().includes(n)) && (!c || String(node.code).toLowerCase().includes(c))
       if (selfMatch || children.length) {
         out.push({
           ...node,

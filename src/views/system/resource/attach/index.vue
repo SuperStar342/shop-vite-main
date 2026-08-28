@@ -43,7 +43,7 @@
             preview-teleported
             :src="getAttachUrl(row)"
           />
-          <el-icon v-else class="attach-thumb-icon" :title="getAttachExt(row) || '文件'"><Document /></el-icon>
+          <el-icon v-else class="attach-thumb-icon" :title="getAttachExt(row) || '文件'"><document /></el-icon>
         </template>
       </el-table-column>
       <el-table-column align="center" label="附件名称" min-width="150" prop="name" show-overflow-tooltip />
@@ -61,7 +61,7 @@
         <template #default="{ row }">
           <div class="table-op-links">
             <el-button link type="primary" @click="handlePreview(row)">预览</el-button>
-            <el-button link type="primary" :loading="downloadingId === getRowId(row)" @click="handleDownload(row)">
+            <el-button link :loading="downloadingId === getRowId(row)" type="primary" @click="handleDownload(row)">
               下载
             </el-button>
             <el-button link type="primary" @click="handleEdit(row)">编辑</el-button>
@@ -103,14 +103,14 @@
         <video v-else-if="previewKind === 'video' && previewUrl" class="attach-preview-media" controls :src="previewUrl" />
         <audio v-else-if="previewKind === 'audio' && previewUrl" class="attach-preview-audio" controls :src="previewUrl" />
         <div v-else class="attach-preview-fallback">
-          <el-icon class="attach-preview-fallback-icon"><Document /></el-icon>
+          <el-icon class="attach-preview-fallback-icon"><document /></el-icon>
           <p>该文件类型暂不支持在线预览</p>
           <el-button type="primary" @click="handleDownload(previewRow)">下载文件</el-button>
         </div>
       </div>
       <template #footer>
         <el-button @click="handlePreviewClose">关闭</el-button>
-        <el-button type="primary" :loading="!!previewRow && downloadingId === getRowId(previewRow)" @click="handleDownload(previewRow)">
+        <el-button :loading="!!previewRow && downloadingId === getRowId(previewRow)" type="primary" @click="handleDownload(previewRow)">
           下载
         </el-button>
       </template>
@@ -120,15 +120,15 @@
       <el-upload
         ref="uploadRef"
         :auto-upload="true"
+        class="attach-uploader"
         :drag="true"
         :http-request="handleHttpRequest"
         :limit="10"
         :multiple="true"
         :on-exceed="handleFileExceed"
         :show-file-list="true"
-        class="attach-uploader"
       >
-        <el-icon class="upload-icon"><UploadFilled /></el-icon>
+        <el-icon class="upload-icon"><upload-filled /></el-icon>
         <div class="upload-tip">拖拽文件到此处，或<em>点击上传</em></div>
         <div class="upload-hint">支持多文件上传，单次最多上传10个文件</div>
       </el-upload>

@@ -1,10 +1,9 @@
 // import website from '@/config/website';
-import { getToken } from '/@/utils/auth';
+import { getToken } from '/@/utils/auth'
 // import store from '/@/store';
-import { generateIframePath, processUrlForQuery, isURL } from './routerFun';
+import { generateIframePath, processUrlForQuery, isURL } from './routerFun'
 // const modules = import.meta.glob('../**/**/*.vue');
 import { useUserStore } from '/@/store/modules/user'
-
 
 // // 将多级路由扁平化为二级路由，支持 keep-alive 跨层级缓存
 // function flattenRouteChildren(children) {
@@ -181,7 +180,7 @@ export const menu = {
   query: 'query',
   href: 'path',
   meta: 'meta',
-} as const;
+} as const
 
 /** 后端 source 为空时，按菜单名/code 补默认图标 */
 const resolveMenuIcon = (ele: any, rawIcon: any) => {
@@ -202,33 +201,32 @@ const resolveMenuIcon = (ele: any, rawIcon: any) => {
  * 拆分地址中的参数部分
  */
 export function parsePathQuery(fullPath) {
-  const splitIndex = fullPath.indexOf('?');
-  if (splitIndex === -1) return { path: fullPath, query: {} };
-  const query = {};
+  const splitIndex = fullPath.indexOf('?')
+  if (splitIndex === -1) return { path: fullPath, query: {} }
+  const query = {}
   new URLSearchParams(fullPath.slice(splitIndex + 1)).forEach((value, key) => {
-    query[key] = value;
-  });
-  return { path: fullPath.slice(0, splitIndex), query };
+    query[key] = value
+  })
+  return { path: fullPath.slice(0, splitIndex), query }
 }
-
 
 /**
  * 菜单树归一化：把配置在地址中的参数拆入 query 字段
  * 组件解析与路由注册都依赖纯路径，须在 formatPath 之前执行
  */
 export function normalizeMenu(menuList = []) {
-  const props = menu;
-  menuList.forEach(item => {
-    const rawPath = item[props.path];
+  const props = menu
+  menuList.forEach((item) => {
+    const rawPath = item[props.path]
     if (rawPath && !isURL(rawPath) && rawPath.includes('?')) {
-      const { path, query } = parsePathQuery(rawPath);
-      item[props.path] = path;
-      item[props.query] = { ...query, ...(item[props.query] || {}) };
+      const { path, query } = parsePathQuery(rawPath)
+      item[props.path] = path
+      item[props.query] = { ...query, ...(item[props.query] || {}) }
     }
     if (item[props.children] && item[props.children].length) {
-      normalizeMenu(item[props.children]);
+      normalizeMenu(item[props.children])
     }
-  });
+  })
 }
 
 /**
@@ -236,34 +234,33 @@ export function normalizeMenu(menuList = []) {
  * formatPath 会重建菜单的 meta 对象，须在其之后执行
  */
 export function applyTabMeta(menuList = []) {
-  const props = menu;
-  const SINGLE_TAB_PARAM = '_single';
+  const props = menu
+  const SINGLE_TAB_PARAM = '_single'
 
-  menuList.forEach(item => {
-    const query = item[props.query];
+  menuList.forEach((item) => {
+    const query = item[props.query]
     if (query && query[SINGLE_TAB_PARAM] !== undefined) {
-      delete query[SINGLE_TAB_PARAM];
-      item.meta = item.meta || {};
-      item.meta.tabKey = 'path';
+      delete query[SINGLE_TAB_PARAM]
+      item.meta = item.meta || {}
+      item.meta.tabKey = 'path'
     }
     if (item[props.children] && item[props.children].length) {
-      applyTabMeta(item[props.children]);
+      applyTabMeta(item[props.children])
     }
-  });
+  })
 }
 
-
 export function formatMenu(menuList = []) {
-  normalizeMenu(menuList);
-  menuList.forEach(ele => formatPath(ele, true));
-  applyTabMeta(menuList);
+  normalizeMenu(menuList)
+  menuList.forEach((ele) => formatPath(ele, true))
+  applyTabMeta(menuList)
 }
 
 // export const formatPath = (ele, first) => {
 export const formatPath = (ele: any, first: boolean): void => {
   const { userInfo } = useUserStore()
 
-  const propsDefault = menu;
+  const propsDefault = menu
   const icon = resolveMenuIcon(ele, ele[propsDefault.icon])
   // 回写 source，侧边栏与菜单管理展示一致
   if (!ele[propsDefault.icon] || ele[propsDefault.icon] === 'icon-caidan') {
@@ -272,32 +269,25 @@ export const formatPath = (ele: any, first: boolean): void => {
   const code = String(ele.code || '')
   const pathStr = String(ele[propsDefault.path] || '')
   // 字典子菜单：系统 / 业务（对齐 shop-vite-main (5) meta.dictBiz）
-  const isDictBiz =
-    code === 'dictionaryBiz' ||
-    code === 'BizDictionaryManagement' ||
-    /dictionary\/biz/i.test(pathStr)
-  const isDictSystem =
-    code === 'dictionarySystem' ||
-    code === 'DictionaryManagement' ||
-    /dictionary\/system/i.test(pathStr)
+  const isDictBiz = code === 'dictionaryBiz' || code === 'BizDictionaryManagement' || /dictionary\/biz/i.test(pathStr)
+  const isDictSystem = code === 'dictionarySystem' || code === 'DictionaryManagement' || /dictionary\/system/i.test(pathStr)
 
   ele.meta = {
     title: ele.name,
     icon,
     noKeepAlive: ele.isOpen !== 2,
     ...(isDictBiz || isDictSystem ? { dictBiz: isDictBiz } : {}),
-  };
+  }
   ele.name = ele.code
 
-
-  const iframeComponent = 'components/iframe/main';
-  const iframeSrc = href => {
+  const iframeComponent = 'components/iframe/main'
+  const iframeSrc = (href) => {
     // 替换&为#
-    let processedHref = href.replace(/&/g, '#');
+    let processedHref = href.replace(/&/g, '#')
 
     // 获取用户信息
     // const userInfo = userInfo || {};
-    const userToken = getToken() || '';
+    const userToken = getToken() || ''
 
     // 定义替换参数映射
     const replacements = {
@@ -305,19 +295,19 @@ export const formatPath = (ele: any, first: boolean): void => {
       userId: userInfo.userId || '',
       userName: userInfo.userName || '',
       roleName: userInfo.roleName || '',
-    };
+    }
 
     // 统一替换所有参数
     Object.entries(replacements).forEach(([key, value]) => {
-      const pattern = new RegExp(`\\$\\{${key}\\}`, 'g');
-      processedHref = processedHref.replace(pattern, value);
-    });
+      const pattern = new RegExp(`\\$\\{${key}\\}`, 'g')
+      processedHref = processedHref.replace(pattern, value)
+    })
 
-    return processedHref;
-  };
+    return processedHref
+  }
 
-  const childList = ele[propsDefault.children];
-  const isChild = !!childList?.length;
+  const childList = ele[propsDefault.children]
+  const isChild = !!childList?.length
 
   /** 保留 blade_menu.component；仅在库表未填时用 path 回退 */
   const fallbackComponent = (item: any) => {
@@ -353,5 +343,5 @@ export const formatPath = (ele: any, first: boolean): void => {
       formatPath(child, false)
     })
   }
-};
+}
 // export default RouterPlugin;

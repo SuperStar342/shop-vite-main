@@ -19,12 +19,12 @@
     <div class="toolbar">
       <div class="toolbar-left">
         <el-button :icon="Plus" type="primary" @click="openEdit()">新增</el-button>
-        <el-button :icon="Delete" :disabled="selectedIds.length === 0" type="danger" plain @click="handleBatchDelete">
+        <el-button :disabled="selectedIds.length === 0" :icon="Delete" plain type="danger" @click="handleBatchDelete">
           删除
         </el-button>
       </div>
       <div class="toolbar-right">
-        <el-button :icon="Refresh" circle @click="fetchData" />
+        <el-button circle :icon="Refresh" @click="fetchData" />
       </div>
     </div>
 
@@ -48,10 +48,10 @@
               class="conn-check"
               :size="18"
             >
-              <CircleCheckFilled />
+              <circle-check-filled />
             </el-icon>
             <el-icon v-else-if="connStatus[item.id] === 'checking'" class="conn-loading" :size="16">
-              <Loading />
+              <loading />
             </el-icon>
             <span>{{ item.name }}</span>
           </div>
@@ -76,9 +76,9 @@
           </div>
         </div>
         <div class="ds-card__foot" @click.stop>
-          <el-button link type="primary" :icon="View" @click="openView(item)">查看</el-button>
-          <el-button link type="primary" :icon="EditPen" @click="openEdit(item)">编辑</el-button>
-          <el-button link type="danger" :icon="Delete" @click="handleDelete(item)">删除</el-button>
+          <el-button :icon="View" link type="primary" @click="openView(item)">查看</el-button>
+          <el-button :icon="EditPen" link type="primary" @click="openEdit(item)">编辑</el-button>
+          <el-button :icon="Delete" link type="danger" @click="handleDelete(item)">删除</el-button>
         </div>
       </div>
     </div>
@@ -93,12 +93,12 @@
 
     <el-dialog
       v-model="dialogVisible"
+      destroy-on-close
       :title="dialogTitle"
       width="640px"
-      destroy-on-close
       @closed="resetForm"
     >
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="96px" :disabled="viewMode">
+      <el-form ref="formRef" :disabled="viewMode" label-width="96px" :model="form" :rules="rules">
         <el-form-item label="名称" prop="name">
           <el-input v-model.trim="form.name" placeholder="请输入 名称（小写，如 sqlserver-sf）" />
         </el-form-item>
@@ -117,10 +117,10 @@
           <el-input v-model.trim="form.username" placeholder="请输入 用户名" />
         </el-form-item>
         <el-form-item label="密码" prop="password" style="display: inline-flex; width: 48%">
-          <el-input v-model="form.password" type="password" show-password placeholder="请输入 密码" />
+          <el-input v-model="form.password" placeholder="请输入 密码" show-password type="password" />
         </el-form-item>
         <el-form-item label="备注" prop="remark">
-          <el-input v-model="form.remark" type="textarea" :rows="3" placeholder="请输入 备注" />
+          <el-input v-model="form.remark" placeholder="请输入 备注" :rows="3" type="textarea" />
         </el-form-item>
       </el-form>
       <template #footer>

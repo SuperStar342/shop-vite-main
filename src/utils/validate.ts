@@ -212,20 +212,20 @@ export const isEnglish = (value: string) => {
  */
 export const validatenull = (val: string) => {
   if (typeof val == 'boolean') {
-    return false;
+    return false
   }
   if (typeof val == 'number') {
-    return false;
+    return false
   }
   if (val instanceof Array) {
-    if (val.length == 0) return true;
+    if (val.length == 0) return true
   } else if (val instanceof Object) {
-    if (JSON.stringify(val) === '{}') return true;
+    if (JSON.stringify(val) === '{}') return true
   } else {
-    if (val == 'null' || val == null || val == 'undefined' || val == undefined || val == '') return true;
-    return false;
+    if (val == 'null' || val == null || val == 'undefined' || val == undefined || val == '') return true
+    return false
   }
-  return false;
+  return false
 }
 
 /**
@@ -233,5 +233,5 @@ export const validatenull = (val: string) => {
  * @param {*} s
  */
 export function isURL(s) {
-  return /^http[s]?:\/\/.*/.test(s);
+  return /^http[s]?:\/\/.*/.test(s)
 }

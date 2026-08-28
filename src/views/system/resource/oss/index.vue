@@ -50,7 +50,7 @@
       <el-table-column align="center" label="地域" min-width="100" prop="region" show-overflow-tooltip />
       <el-table-column align="center" label="状态" min-width="100">
         <template #default="{ row }">
-          <el-tag :type="Number(row.status) === STATUS_ENABLED ? 'success' : 'info'" size="small">
+          <el-tag size="small" :type="Number(row.status) === STATUS_ENABLED ? 'success' : 'info'">
             {{ row.statusLabel || (Number(row.status) === STATUS_ENABLED ? '已启用' : '已停用') }}
           </el-tag>
         </template>

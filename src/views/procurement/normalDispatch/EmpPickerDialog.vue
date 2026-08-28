@@ -1,13 +1,13 @@
 <template>
   <el-dialog
-    :model-value="modelValue"
+    append-to-body
     class="emp-picker-dialog"
+    destroy-on-close
+    :model-value="modelValue"
     :title="dialogTitle"
     width="1100px"
-    append-to-body
-    destroy-on-close
-    @update:model-value="emit('update:modelValue', $event)"
     @opened="onOpen"
+    @update:model-value="emit('update:modelValue', $event)"
   >
     <div v-table-copy class="emp-picker-wrap" :class="{ 'is-alloc-mode': isAllocMode }">
       <div class="emp-picker">
@@ -37,7 +37,7 @@
             <span>{{ d.deptName || d.deptCode || d.deptId }}</span>
             <em v-if="d.deptCode">{{ d.deptCode }}</em>
           </button>
-          <el-empty v-if="!empDeptList.length" :image-size="48" description="暂无部门" />
+          <el-empty v-if="!empDeptList.length" description="暂无部门" :image-size="48" />
         </div>
         <footer class="emp-picker__dept-foot">共 {{ employees.length }} 人</footer>
       </aside>
@@ -47,9 +47,9 @@
           <el-autocomplete
             v-model.trim="empKeyword"
             class="emp-picker__search"
+            clearable
             :debounce="300"
             :fetch-suggestions="fetchEmpSuggestions"
-            clearable
             placeholder="搜索姓名 / 工号 / 部门 / 拼音"
             value-key="value"
             @clear="onEmpSearchClear"
@@ -57,7 +57,7 @@
             @select="onEmpSuggestSelect"
           >
             <template #prefix>
-              <el-icon><Search /></el-icon>
+              <el-icon><search /></el-icon>
             </template>
             <template #default="{ item }">
               <div class="emp-suggest-item">
@@ -78,10 +78,10 @@
             ref="empTableRef"
             v-loading="empLoading"
             border
-            height="100%"
             :data="pagedEmployees"
-            row-key="empNo"
+            height="100%"
             :row-class-name="empRowClassName"
+            row-key="empNo"
             @selection-change="onEmpDraftChange"
           >
             <el-table-column type="selection" width="46" />
@@ -116,7 +116,7 @@
       <aside class="emp-picker__tray">
         <header class="emp-picker__tray-head">
           <strong>已选 {{ empDraft.length }} 人</strong>
-          <el-button link type="primary" :disabled="!empDraft.length" @click="clearEmpDraft">清空</el-button>
+          <el-button :disabled="!empDraft.length" link type="primary" @click="clearEmpDraft">清空</el-button>
         </header>
         <el-scrollbar class="emp-picker__tray-scroll">
           <article v-for="row in empDraft" :key="row.empNo" class="emp-tray-card">
@@ -126,9 +126,9 @@
               <span>{{ row.empNo }}</span>
               <em>{{ row.deptName || '-' }}</em>
             </div>
-            <button class="emp-tray-card__remove" type="button" title="移除" @click="removeEmpDraft(row.empNo)">×</button>
+            <button class="emp-tray-card__remove" title="移除" type="button" @click="removeEmpDraft(row.empNo)">×</button>
           </article>
-          <el-empty v-if="!empDraft.length" :image-size="56" description="勾选左侧人员" />
+          <el-empty v-if="!empDraft.length" description="勾选左侧人员" :image-size="56" />
         </el-scrollbar>
       </aside>
       </div>
@@ -140,13 +140,13 @@
             <span>{{ allocHeadHint }}</span>
           </div>
           <div class="emp-picker__alloc-actions">
-            <el-button size="small" :disabled="!empDraft.length" @click="fillAllLinesEqual">
+            <el-button :disabled="!empDraft.length" size="small" @click="fillAllLinesEqual">
               {{ batchTemplate ? '平均填满模板' : isMultiAlloc ? '各工单平均填满' : '平均填满' }}
             </el-button>
             <el-button
               v-if="isMultiAlloc"
-              size="small"
               :disabled="!empDraft.length"
+              size="small"
               @click="syncRatiosAcrossLines"
             >
               同步比例到全部工单
@@ -196,8 +196,8 @@
                     :max="num(line.remainQty)"
                     :min="0"
                     :precision="2"
-                    :step="1"
                     size="small"
+                    :step="1"
                     @change="onLineQty(line.key)"
                   />
                 </label>

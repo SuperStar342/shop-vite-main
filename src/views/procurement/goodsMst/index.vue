@@ -4,7 +4,7 @@
     <div class="toolbar">
       <div class="toolbar-left">
         <el-button :icon="Plus" type="primary" @click="handleAdd">添加材料</el-button>
-        <el-button :icon="Delete" :disabled="selectRows.length === 0" type="danger" @click="handleBatchDelete">
+        <el-button :disabled="selectRows.length === 0" :icon="Delete" type="danger" @click="handleBatchDelete">
           批量删除
         </el-button>
       </div>
@@ -18,50 +18,50 @@
           <span class="filter-bar-label">搜索</span>
           <el-autocomplete
             v-model.trim="queryForm.goodsCode"
-            :fetch-suggestions="fetchCodeSuggestions"
             clearable
+            :debounce="300"
+            :fetch-suggestions="fetchCodeSuggestions"
             placeholder="材料编码"
             size="default"
             style="width: 160px"
-            :debounce="300"
             @select="queryData"
           />
           <el-autocomplete
             v-model.trim="queryForm.goodsName"
-            :fetch-suggestions="fetchNameSuggestions"
             clearable
+            :debounce="300"
+            :fetch-suggestions="fetchNameSuggestions"
             placeholder="材料名称"
             size="default"
             style="width: 170px"
-            :debounce="300"
             @select="queryData"
           />
         </div>
 
         <div class="filter-bar-group">
           <span class="filter-bar-label">类别</span>
-          <el-popover v-model:visible="categoryPopoverVisible" placement="bottom-start" :width="260" trigger="click">
+          <el-popover v-model:visible="categoryPopoverVisible" placement="bottom-start" trigger="click" :width="260">
             <template #reference>
-              <el-button size="default" class="category-picker-btn">
+              <el-button class="category-picker-btn" size="default">
                 {{ activeFilterLabel || '选择材料类别' }}
-                <el-icon><ArrowDown /></el-icon>
+                <el-icon><arrow-down /></el-icon>
               </el-button>
             </template>
             <el-input
               v-model.trim="treeFilterText"
-              size="small"
               clearable
               placeholder="搜索类别"
+              size="small"
               style="margin-bottom: 8px"
             />
             <el-tree
               ref="treeRef"
               :data="categoryTree"
-              node-key="id"
-              highlight-current
-              :expand-on-click-node="false"
               :default-expanded-keys="defaultExpandedKeys"
+              :expand-on-click-node="false"
               :filter-node-method="filterTreeNode"
+              highlight-current
+              node-key="id"
               :props="{ label: 'categoryName', children: 'children' }"
               style="max-height: 360px; overflow: auto"
               @node-click="handleCategoryClick"
@@ -72,19 +72,19 @@
             </el-tree>
             <div style="padding-top: 6px; border-top: 1px solid #ebeef5">
               <el-button size="small" text @click="clearCategoryFilter">清除</el-button>
-              <el-button size="small" text type="primary" style="float: right" @click="handleCategoryClick({ categoryCode: '3', categoryName: '全部' })">全部</el-button>
+              <el-button size="small" style="float: right" text type="primary" @click="handleCategoryClick({ categoryCode: '3', categoryName: '全部' })">全部</el-button>
             </div>
           </el-popover>
         </div>
 
         <div class="filter-bar-group">
           <span class="filter-bar-label">其他</span>
-          <el-input v-model.trim="queryForm.goodsType" clearable placeholder="材料类型" size="default" style="width: 120px" @keyup.enter="applySidebarFilter" @clear="applySidebarFilter" />
-          <el-input v-model.trim="queryForm.brandCode" clearable placeholder="品牌" size="default" style="width: 100px" @keyup.enter="applySidebarFilter" @clear="applySidebarFilter" />
-          <el-input v-model.trim="queryForm.stdUnit" clearable placeholder="单位" size="default" style="width: 90px" @keyup.enter="applySidebarFilter" @clear="applySidebarFilter" />
+          <el-input v-model.trim="queryForm.goodsType" clearable placeholder="材料类型" size="default" style="width: 120px" @clear="applySidebarFilter" @keyup.enter="applySidebarFilter" />
+          <el-input v-model.trim="queryForm.brandCode" clearable placeholder="品牌" size="default" style="width: 100px" @clear="applySidebarFilter" @keyup.enter="applySidebarFilter" />
+          <el-input v-model.trim="queryForm.stdUnit" clearable placeholder="单位" size="default" style="width: 90px" @clear="applySidebarFilter" @keyup.enter="applySidebarFilter" />
         </div>
 
-        <el-button text size="default" @click="clearAllFilters">重置</el-button>
+        <el-button size="default" text @click="clearAllFilters">重置</el-button>
       </div>
 
       <!-- 第二行：属性标签筛选 -->
@@ -111,17 +111,17 @@
 
     <!-- 表格 -->
     <div ref="wrapperRef" class="vtable-wrapper">
-      <ListTable
-        ref="tableRef"
+      <list-table
         :key="tableKey"
+        ref="tableRef"
+        :height="tableHeight"
         :options="tableOptions"
         :records="list"
-        :height="tableHeight"
         @on-checkbox-state-change="handleCheckboxStateChange"
         @on-click-cell="handleClickCell"
-        @on-selected-cell="onCopyTrack"
         @on-context-menu-cell="onCopyContextMenu"
         @on-initialized="handleTableReady"
+        @on-selected-cell="onCopyTrack"
       />
     </div>
 

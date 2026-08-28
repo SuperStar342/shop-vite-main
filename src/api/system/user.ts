@@ -1,11 +1,5 @@
 import request from '/@/utils/request'
-import {
-  captchaMode,
-  captchaType,
-  clientId,
-  clientSecret,
-  tenantId as defaultTenantId,
-} from '/@/config'
+import { captchaMode, captchaType, clientId, clientSecret, tenantId as defaultTenantId } from '/@/config'
 import { encryptedData } from '/@/utils/encrypt'
 import { getRefreshToken, getTenantId } from '/@/utils/token'
 

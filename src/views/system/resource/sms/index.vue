@@ -49,12 +49,12 @@
         <template #default="{ row }">
           <el-switch
             v-model="row.status"
-            :active-value="2"
-            :inactive-value="1"
-            :loading="row._statusLoading"
             active-text="启用"
+            :active-value="2"
             inactive-text="停用"
+            :inactive-value="1"
             inline-prompt
+            :loading="row._statusLoading"
             @change="(val: number) => handleStatusChange(row, val)"
           />
         </template>

@@ -10,13 +10,7 @@ import { getMyMenuCodes } from '/@/api/menuManagement'
 import { expandMenuCodesForRoutes } from '/@/utils/bladeMenuCodes'
 import { storage, tokenName } from '/@/config'
 import { toOssPreviewUrl } from '/@/utils/ossUrl'
-import {
-  getToken,
-  removeToken,
-  setRefreshToken,
-  setTenantId,
-  setToken,
-} from '/@/utils/token'
+import { getToken, removeToken, setRefreshToken, setTenantId, setToken } from '/@/utils/token'
 import { isArray, isString } from '/@/utils/validate'
 import { gp } from '/@vab/plugins/vab'
 
@@ -117,8 +111,7 @@ export const useUserStore = defineStore('user', {
       if (token) {
         this.setToken(token)
         const hour = new Date().getHours()
-        const thisTime =
-          hour < 8 ? '早上好' : hour <= 11 ? '上午好' : hour <= 13 ? '中午好' : hour < 18 ? '下午好' : '晚上好'
+        const thisTime = hour < 8 ? '早上好' : hour <= 11 ? '上午好' : hour <= 13 ? '中午好' : hour < 18 ? '下午好' : '晚上好'
         gp.$baseNotify(`欢迎登录${settingsStore.title}`, `${thisTime}！`)
       } else {
         const err = `登录接口异常，未正确返回${tokenNameKey}...`
@@ -153,8 +146,7 @@ export const useUserStore = defineStore('user', {
 
       // 优先用 token 载荷中的用户信息，再补拉详情与菜单权限
       const roleName = data?.role_name || data?.roleName
-      const username =
-        data?.user_name || data?.account || data?.nick_name || data?.real_name || userInfo.username
+      const username = data?.user_name || data?.account || data?.nick_name || data?.real_name || userInfo.username
       const avatar = data?.avatar
       if (username) this.setUsername(username)
       if (avatar) this.setAvatar(avatar)

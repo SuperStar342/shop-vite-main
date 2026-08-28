@@ -7,7 +7,7 @@
       :style="{ transform: `translateX(${handleX}px)` }"
       @pointerdown="handleDown"
     >
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
         <path d="M5 12h14" />
         <path d="m13 6 6 6-6 6" />
       </svg>

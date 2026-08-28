@@ -67,7 +67,7 @@
 <!--            <vab-icon icon="weibo-fill" style="color: #df1e33" />-->
 <!--            <vab-icon icon="github-fill" style="color: #151515" />-->
 <!--          </div>-->
-          <behavior-captcha ref="behaviorCaptcha" @success="handleBehaviorSuccess"></behavior-captcha>
+          <behavior-captcha ref="behaviorCaptcha" @success="handleBehaviorSuccess"/>
         </el-form>
       </div>
     </div>

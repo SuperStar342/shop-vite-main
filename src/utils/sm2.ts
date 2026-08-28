@@ -5,6 +5,6 @@ export function sm2Encrypt(plainText: string) {
   try {
     return sm2.doEncrypt(plainText, publicKey, 0)
   } catch {
-    return '';
+    return ''
   }
 }

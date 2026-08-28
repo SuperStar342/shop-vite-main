@@ -38,7 +38,7 @@
         <template #default="{ row }">
           <span class="dept-name-cell">
             <el-icon class="dept-icon" :class="{ 'is-root': isTop(row.parentId) }">
-              <OfficeBuilding />
+              <office-building />
             </el-icon>
             <span class="dept-name-text" :title="displayDeptName(row)">{{ displayDeptName(row) }}</span>
             <el-tag v-if="row.hasChildren" class="child-tag" size="small" type="info">
@@ -69,7 +69,7 @@
               :content="userTooltip(u)"
               placement="top"
             >
-              <el-avatar :size="28" :src="toOssPreviewUrl(u.avatar)" class="dept-user-avatar">
+              <el-avatar class="dept-user-avatar" :size="28" :src="toOssPreviewUrl(u.avatar)">
                 {{ (u.name || u.username || '?').slice(0, 1) }}
               </el-avatar>
             </el-tooltip>
@@ -102,11 +102,11 @@
       </template>
     </el-table>
 
-    <DepartmentManagementEdit ref="editRef" @saved="handleSaved" />
+    <department-management-edit ref="editRef" @saved="handleSaved" />
 
     <vab-dialog v-model="userDialogVisible" append-to-body :title="userDialogTitle" width="760px">
       <div v-loading="userDialogLoading">
-        <el-table :data="deptUsers" border max-height="440">
+        <el-table border :data="deptUsers" max-height="440">
           <el-table-column align="center" label="序号" type="index" width="56" />
           <el-table-column align="center" label="头像" width="70">
             <template #default="{ row }">
@@ -122,7 +122,7 @@
           <el-table-column align="center" label="角色" min-width="120" prop="roleName" show-overflow-tooltip />
           <el-table-column align="center" label="状态" width="80">
             <template #default="{ row }">
-              <el-tag :type="row.status === 0 || row.status === '0' ? 'info' : 'success'" size="small">
+              <el-tag size="small" :type="row.status === 0 || row.status === '0' ? 'info' : 'success'">
                 {{ row.statusLabel || (row.status === 0 || row.status === '0' ? '停用' : '启用') }}
               </el-tag>
             </template>

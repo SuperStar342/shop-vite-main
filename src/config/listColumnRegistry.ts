@@ -154,12 +154,7 @@ export const LIST_COLUMN_PAGES: ListPageDef[] = [
     pageCode: 'WorkOrder',
     pageName: '工单管理',
     group: '商品',
-    columns: [
-      col('uuid', '工单号'),
-      col('title', '标题'),
-      col('submit', '提交者'),
-      col('accept', '受理人员'),
-    ],
+    columns: [col('uuid', '工单号'), col('title', '标题'), col('submit', '提交者'), col('accept', '受理人员')],
   },
   {
     pageCode: 'dispatch',
@@ -339,13 +334,7 @@ export const LIST_COLUMN_PAGES: ListPageDef[] = [
     pageName: '菜单管理',
     group: '配置',
     menuCodes: ['menu', 'MenuManagement'],
-    columns: [
-      col('name', '菜单名称'),
-      col('code', '编号'),
-      col('path', '路由'),
-      col('component', '组件'),
-      col('sort', '排序'),
-    ],
+    columns: [col('name', '菜单名称'), col('code', '编号'), col('path', '路由'), col('component', '组件'), col('sort', '排序')],
   },
   {
     pageCode: 'DictionaryManagement',
@@ -366,12 +355,7 @@ export const LIST_COLUMN_PAGES: ListPageDef[] = [
     pageName: '参数管理',
     group: '配置',
     menuCodes: ['param', 'ParamManagement'],
-    columns: [
-      col('paramName', '参数名'),
-      col('paramKey', '参数键'),
-      col('paramValue', '参数值'),
-      col('remark', '备注'),
-    ],
+    columns: [col('paramName', '参数名'), col('paramKey', '参数键'), col('paramValue', '参数值'), col('remark', '备注')],
   },
   {
     pageCode: 'DataScope',
@@ -391,12 +375,7 @@ export const LIST_COLUMN_PAGES: ListPageDef[] = [
     pageName: '接口权限',
     group: '配置',
     menuCodes: ['api_scope', 'ApiScope', 'apiScope'],
-    columns: [
-      col('scopeName', '权限名称'),
-      col('resourceCode', '权限编号'),
-      col('scopePath', '权限路径'),
-      col('remark', '备注'),
-    ],
+    columns: [col('scopeName', '权限名称'), col('resourceCode', '权限编号'), col('scopePath', '权限路径'), col('remark', '备注')],
   },
   {
     pageCode: 'AuditLog',
@@ -424,19 +403,9 @@ const normToken = (s: string) =>
 export function pageMatchesMenuCodes(page: ListPageDef, menuCodes: Set<string> | string[]) {
   const set = menuCodes instanceof Set ? menuCodes : new Set(menuCodes)
   if (!set.size) return true
-  const aliases = [
-    page.pageCode,
-    page.pageName,
-    ...(page.menuCodes || []),
-  ]
-    .filter(Boolean)
-    .map((a) => normToken(String(a)))
+  const aliases = [page.pageCode, page.pageName, ...(page.menuCodes || [])].filter(Boolean).map((a) => normToken(String(a)))
   const tokens = [...set].map(normToken).filter(Boolean)
-  return tokens.some(
-    (t) =>
-      aliases.includes(t) ||
-      aliases.some((a) => a.includes(t) || t.includes(a))
-  )
+  return tokens.some((t) => aliases.includes(t) || aliases.some((a) => a.includes(t) || t.includes(a)))
 }
 
 export function getListPage(pageCode: string) {

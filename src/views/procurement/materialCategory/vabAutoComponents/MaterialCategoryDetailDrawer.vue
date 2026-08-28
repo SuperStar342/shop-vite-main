@@ -3,10 +3,10 @@
     v-model="visible"
     append-to-body
     class="material-category-drawer"
+    destroy-on-close
     direction="rtl"
     size="600px"
     :with-header="false"
-    destroy-on-close
     @closed="handleClosed"
   >
     <div v-if="detail" class="drawer-inner">
@@ -14,12 +14,12 @@
         <div class="drawer-topbar-title">
           分类详情 — {{ display(detail.categoryName) }}
         </div>
-        <el-button :icon="Close" circle size="small" text @click="visible = false" />
+        <el-button circle :icon="Close" size="small" text @click="visible = false" />
       </header>
 
       <section class="drawer-hero">
         <div class="hero-icon">
-          <el-icon :size="28"><Box /></el-icon>
+          <el-icon :size="28"><box /></el-icon>
         </div>
         <div class="hero-main">
           <div class="hero-name">{{ display(detail.categoryName) }}</div>
@@ -29,7 +29,7 @@
             <span>上级类别：{{ detail.parentName || '顶级' }}</span>
           </div>
         </div>
-        <el-tag :type="isEnabled ? 'success' : 'danger'" effect="light" round>
+        <el-tag effect="light" round :type="isEnabled ? 'success' : 'danger'">
           {{ isEnabled ? '启用' : '停用' }}
         </el-tag>
       </section>
@@ -38,16 +38,16 @@
         <el-tab-pane name="basic">
           <template #label>
             <span class="tab-label">
-              <el-icon><InfoFilled /></el-icon>
+              <el-icon><info-filled /></el-icon>
               基础信息
             </span>
           </template>
-          <el-descriptions :column="2" border class="detail-desc">
+          <el-descriptions border class="detail-desc" :column="2">
             <el-descriptions-item label="类别名称">{{ display(detail.categoryName) }}</el-descriptions-item>
             <el-descriptions-item label="类别编码">{{ display(detail.categoryCode) }}</el-descriptions-item>
             <el-descriptions-item label="上级类别">{{ detail.parentName || '顶级' }}</el-descriptions-item>
             <el-descriptions-item label="状态">
-              <el-tag :type="isEnabled ? 'success' : 'danger'" size="small" effect="light">
+              <el-tag effect="light" size="small" :type="isEnabled ? 'success' : 'danger'">
                 {{ isEnabled ? '启用' : '停用' }}
               </el-tag>
             </el-descriptions-item>
@@ -62,14 +62,14 @@
         <el-tab-pane name="quality">
           <template #label>
             <span class="tab-label">
-              <el-icon><CircleCheckFilled /></el-icon>
+              <el-icon><circle-check-filled /></el-icon>
               质量与天数
             </span>
           </template>
-          <el-descriptions :column="2" border class="detail-desc">
+          <el-descriptions border class="detail-desc" :column="2">
             <el-descriptions-item label="检验方式">{{ qcModeLabel(detail.qcMode) }}</el-descriptions-item>
             <el-descriptions-item label="是否必须品管">
-              <el-tag :type="isYes(detail.mustQc) ? 'warning' : 'info'" size="small" effect="plain">
+              <el-tag effect="plain" size="small" :type="isYes(detail.mustQc) ? 'warning' : 'info'">
                 {{ isYes(detail.mustQc) ? '是' : '否' }}
               </el-tag>
             </el-descriptions-item>
@@ -78,7 +78,7 @@
             <el-descriptions-item label="到货前置天数">{{ dayText(detail.leadDays) }}</el-descriptions-item>
             <el-descriptions-item label="物料流程前置">{{ dayText(detail.applyLeadDays) }}</el-descriptions-item>
             <el-descriptions-item label="是否线边仓">
-              <el-tag :type="isYes(detail.edgeWarehouse) ? 'success' : 'info'" size="small" effect="plain">
+              <el-tag effect="plain" size="small" :type="isYes(detail.edgeWarehouse) ? 'success' : 'info'">
                 {{ isYes(detail.edgeWarehouse) ? '是' : '否' }}
               </el-tag>
             </el-descriptions-item>
@@ -89,11 +89,11 @@
         <el-tab-pane name="rules">
           <template #label>
             <span class="tab-label">
-              <el-icon><Document /></el-icon>
+              <el-icon><document /></el-icon>
               编码与规格规则
             </span>
           </template>
-          <el-descriptions :column="2" border class="detail-desc">
+          <el-descriptions border class="detail-desc" :column="2">
             <el-descriptions-item label="材料成本属性">
               {{ detail.costType === '0' ? '间接材料' : '直接材料' }}
             </el-descriptions-item>

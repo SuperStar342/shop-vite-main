@@ -1,12 +1,12 @@
 <template>
   <div class="puzzle-panel">
     <div class="puzzle-stage" :style="stageSize">
-      <img class="puzzle-image" :src="data.image" alt="" draggable="false" />
+      <img alt="" class="puzzle-image" draggable="false" :src="data.image" />
       <img
-        class="puzzle-piece"
-        :src="data.piece"
         alt=""
+        class="puzzle-piece"
         draggable="false"
+        :src="data.piece"
         :style="{
           left: `${pieceX}px`,
           top: `${data.pieceY}px`,

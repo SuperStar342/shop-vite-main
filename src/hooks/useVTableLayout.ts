@@ -9,11 +9,7 @@ import type { Ref } from 'vue'
  *
  * 注意：切勿用 minHeight 去抬高已测量到的较小容器高度（分栏场景会撑破布局，导致首次无法完整渲染）。
  */
-export function useVTableLayout(
-  tableRef: Ref<any>,
-  wrapperRef: Ref<HTMLElement | null | undefined>,
-  options?: { minHeight?: number }
-) {
+export function useVTableLayout(tableRef: Ref<any>, wrapperRef: Ref<HTMLElement | null | undefined>, options?: { minHeight?: number }) {
   const minHeight = options?.minHeight ?? 320
   const tableHeight = ref(minHeight)
 
@@ -57,13 +53,31 @@ export function useVTableLayout(
   let resizeObserver: ResizeObserver | null = null
 
   onMounted(() => {
-    const el = wrapperRef.value
-    if (el) {
+    const bind = () => {
+      const el = wrapperRef.value
+      if (!el || resizeObserver) return
       resizeObserver = new ResizeObserver(() => syncSize())
       resizeObserver.observe(el)
     }
+    bind()
+    // ref 偶发晚于 onMounted 就绪
+    nextTick(bind)
     handleTableReady()
   })
+
+  watch(
+    () => wrapperRef.value,
+    (el, prev) => {
+      if (el === prev) return
+      resizeObserver?.disconnect()
+      resizeObserver = null
+      if (el) {
+        resizeObserver = new ResizeObserver(() => syncSize())
+        resizeObserver.observe(el)
+        handleTableReady()
+      }
+    }
+  )
 
   onActivated(() => {
     handleTableReady()

@@ -44,11 +44,11 @@
     </vab-query-form>
 
     <div ref="wrapperRef" class="vtable-wrapper">
-      <ListTable
+      <list-table
         ref="tableRef"
+        :height="tableHeight"
         :options="tableOptions"
         :records="list"
-        :height="tableHeight"
         @on-click-cell="handleClickCell"
         @on-initialized="handleTableReady"
       />
@@ -63,9 +63,9 @@
     />
 
     <!-- 操作详情弹窗（替代原展开行） -->
-    <el-dialog v-model="detailVisible" title="操作详情" width="700px" destroy-on-close>
+    <el-dialog v-model="detailVisible" destroy-on-close title="操作详情" width="700px">
       <template v-if="currentRow">
-        <el-descriptions :column="2" border>
+        <el-descriptions border :column="2">
           <el-descriptions-item label="操作模块">
             {{ currentRow.bizName || '-' }}
           </el-descriptions-item>
@@ -78,7 +78,7 @@
             <code>{{ currentRow.requestUri || '-' }}</code>
           </el-descriptions-item>
           <el-descriptions-item label="请求方法">
-            <el-tag :type="getMethodTagType(currentRow.method)" effect="plain">
+            <el-tag effect="plain" :type="getMethodTagType(currentRow.method)">
               {{ currentRow.method || '-' }}
             </el-tag>
           </el-descriptions-item>

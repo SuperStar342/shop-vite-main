@@ -35,7 +35,7 @@ for (let i = 0; i < count; i++) {
   // 80% 的概率生成优秀数据，15% 良好，5% 一般
   const rand = Math.random()
   let loadTime: number, fcp: number, lcp: number, fid: number, cls: number, fps: number, resourceSize: number
-  
+
   if (rand < 0.8) {
     // 优秀性能：加载时间 < 1.5s, FPS > 55
     loadTime = +(Math.random() * 0.8 + 0.3).toFixed(2) // 0.3-1.1s
@@ -64,7 +64,7 @@ for (let i = 0; i < count; i++) {
     fps = Math.floor(Math.random() * 10 + 35) // 35-45fps
     resourceSize = Math.floor(Math.random() * 2000 + 1500) // 1500-3500KB
   }
-  
+
   // 根据性能指标计算等级
   let performanceLevel = 'good'
   if (loadTime < 1.5 && fps > 55 && cls < 0.1) {
@@ -76,7 +76,7 @@ for (let i = 0; i < count; i++) {
   } else {
     performanceLevel = 'poor'
   }
-  
+
   PerformanceList.push({
     id: '@id',
     uuid: '@uuid',
@@ -100,21 +100,21 @@ const getTrendData = (startDate?: string, endDate?: string) => {
   const fcpTrend: number[] = []
   const lcpTrend: number[] = []
   const fpsTrend: number[] = []
-  
+
   const days = 7
   for (let i = 0; i < days; i++) {
     const date = new Date()
     date.setDate(date.getDate() - (days - 1 - i))
     const dateStr = `${date.getMonth() + 1}/${date.getDate()}`
     dates.push(dateStr)
-    
+
     // 优秀的性能趋势数据
     loadTimeTrend.push(+(Math.random() * 0.6 + 0.5).toFixed(2)) // 0.5-1.1s
     fcpTrend.push(+(Math.random() * 0.5 + 0.3).toFixed(2)) // 0.3-0.8s
     lcpTrend.push(+(Math.random() * 0.7 + 0.4).toFixed(2)) // 0.4-1.1s
     fpsTrend.push(Math.floor(Math.random() * 4 + 58)) // 58-62fps
   }
-  
+
   return {
     dates,
     loadTimeTrend,
@@ -130,7 +130,7 @@ export default [
     method: 'get',
     response: ({ query }: any) => {
       const { pagePath, performanceLevel, pageNo = 1, pageSize = 20 } = query
-      
+
       let mockList = PerformanceList.filter((item: any) => {
         if (pagePath && !item.pagePath.includes(pagePath)) {
           return false
@@ -140,17 +140,15 @@ export default [
         }
         return true
       })
-      
-      const list = mockList.filter((item: any, index: any) => 
-        index < pageSize * pageNo && index >= pageSize * (pageNo - 1)
-      )
-      
+
+      const list = mockList.filter((item: any, index: any) => index < pageSize * pageNo && index >= pageSize * (pageNo - 1))
+
       return {
         code: 200,
         msg: 'success',
-        data: { 
-          list, 
-          total: mockList.length 
+        data: {
+          list,
+          total: mockList.length,
         },
       }
     },
@@ -161,7 +159,7 @@ export default [
     response: ({ query }: any) => {
       const { startDate, endDate } = query
       const trendData = getTrendData(startDate, endDate)
-      
+
       return {
         code: 200,
         msg: 'success',
@@ -177,7 +175,7 @@ export default [
       const totalFps = PerformanceList.reduce((sum, item) => sum + item.fps, 0)
       const totalResourceSize = PerformanceList.reduce((sum, item) => sum + item.resourceSize, 0)
       const errors = PerformanceList.filter((item) => item.performanceLevel === 'poor').length
-      
+
       return {
         code: 200,
         msg: 'success',

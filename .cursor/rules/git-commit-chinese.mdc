@@ -1,0 +1,10 @@
+---
+description: Git 提交说明统一使用中文
+alwaysApply: true
+---
+
+# Git 提交备注
+
+- 所有 `git commit` 的提交说明（subject / body）统一使用**中文**。
+- 可用简短类型前缀（可选）：`feat` / `fix` / `refactor` / `docs` / `chore`，冒号后必须是中文，例如：`feat: 新增普通派工菜单与合并派工页`。
+- 说明写清「为什么 / 做了什么」，1～2 句，避免纯英文 commit message。

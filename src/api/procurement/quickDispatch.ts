@@ -71,9 +71,7 @@ export async function getQuickDispatchSmartSuggest(params?: {
   limit?: number
   days?: number
 }) {
-  const codes = Array.isArray(params?.prcCodes)
-    ? params!.prcCodes!.filter(Boolean).join(',')
-    : params?.prcCodes || undefined
+  const codes = Array.isArray(params?.prcCodes) ? params!.prcCodes!.filter(Boolean).join(',') : params?.prcCodes || undefined
   const res: any = await request({
     url: `${BASE}/smart-suggest`,
     method: 'get',

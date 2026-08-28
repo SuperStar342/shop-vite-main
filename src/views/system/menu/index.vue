@@ -44,7 +44,7 @@
             <span class="menu-icon-box" :class="{ 'is-empty': !menuIcon(row) }">
               <i v-if="isIconfont(menuIcon(row))" :class="menuIcon(row)" />
               <vab-icon v-else-if="menuIcon(row)" :icon="menuIcon(row)" />
-              <el-icon v-else :size="14"><Menu /></el-icon>
+              <el-icon v-else :size="14"><menu /></el-icon>
             </span>
             <span class="menu-title">{{ row.name || row.meta?.title || '-' }}</span>
             <el-tag
@@ -101,7 +101,7 @@
       </template>
     </el-table>
 
-    <MenuManagementEdit ref="editRef" @fetch-data="fetchData" />
+    <menu-management-edit ref="editRef" @fetch-data="fetchData" />
   </div>
 </template>
 

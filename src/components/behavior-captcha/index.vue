@@ -5,7 +5,7 @@
         <div class="behavior-panel" :class="{ 'is-shake': status === 'fail' }">
           <div class="behavior-header">
             <div class="behavior-badge">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
               </svg>
             </div>
@@ -15,13 +15,13 @@
             </div>
             <div class="behavior-actions">
               <button class="behavior-icon-btn" :class="{ 'is-spinning': status === 'loading' }" title="换一题" @click="load">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
                   <path d="M21 12a9 9 0 1 1-2.64-6.36" />
                   <path d="M21 3v6h-6" />
                 </svg>
               </button>
               <button class="behavior-icon-btn" title="关闭" @click="close">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
                   <path d="M18 6 6 18" />
                   <path d="m6 6 12 12" />
                 </svg>
@@ -30,12 +30,12 @@
           </div>
 
           <div class="behavior-body">
-            <transition name="behavior-swap" mode="out-in">
+            <transition mode="out-in" name="behavior-swap">
               <div v-if="status === 'loading'" key="skeleton" class="behavior-skeleton">
                 <div class="behavior-skeleton-stage">
                   <div class="behavior-skeleton-brand">
                     <span class="behavior-skeleton-halo"></span>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
                       <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                     </svg>
                   </div>
@@ -54,8 +54,8 @@
             <transition name="behavior-result">
               <div v-if="status === 'success'" class="behavior-success">
                 <svg class="behavior-success-icon" viewBox="0 0 52 52">
-                  <circle class="behavior-success-circle" cx="26" cy="26" r="24" fill="none" />
-                  <path class="behavior-success-check" fill="none" d="M14 27l8 8 16-17" />
+                  <circle class="behavior-success-circle" cx="26" cy="26" fill="none" r="24" />
+                  <path class="behavior-success-check" d="M14 27l8 8 16-17" fill="none" />
                 </svg>
                 <span class="behavior-success-text">验证通过</span>
               </div>
@@ -64,7 +64,7 @@
 
           <transition name="behavior-result">
             <div v-if="status === 'fail'" class="behavior-fail">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24">
                 <circle cx="12" cy="12" r="10" />
                 <path d="M12 8v4" />
                 <path d="M12 16h.01" />

@@ -6,13 +6,13 @@
           v-model="form.menuId"
           check-strictly
           clearable
+          :data="menuOptions"
           default-expand-all
           filterable
-          :data="menuOptions"
           :loading="menusLoading"
           node-key="id"
-          :props="{ label: 'label', value: 'id', children: 'children' }"
           placeholder="请选择所属菜单"
+          :props="{ label: 'label', value: 'id', children: 'children' }"
           render-after-expand
           style="width: 100%"
         />
@@ -32,7 +32,7 @@
         </el-select>
       </el-form-item>
       <el-form-item label="备注" prop="remark">
-        <el-input v-model.trim="form.remark" clearable type="textarea" :rows="2" placeholder="选填" />
+        <el-input v-model.trim="form.remark" clearable placeholder="选填" :rows="2" type="textarea" />
       </el-form-item>
     </el-form>
     <template #footer>

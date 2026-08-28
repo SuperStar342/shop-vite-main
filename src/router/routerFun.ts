@@ -3,7 +3,7 @@
  */
 
 // 统一的URL正则表达式
-export const URL_REGEX = /^https?:\/\//;
+export const URL_REGEX = /^https?:\/\//
 
 /**
  * 生成iframe路径
@@ -12,14 +12,14 @@ export const URL_REGEX = /^https?:\/\//;
  * @returns {String} 生成的路径
  */
 export function generateIframePath(item, pathKey = 'path') {
-  const path = item[pathKey];
-  if (!path) return path;
+  const path = item[pathKey]
+  if (!path) return path
 
   // 如果是URL且有ID，生成iframe路径
   if (URL_REGEX.test(path) && item.id) {
-    return `/iframe/${item.id}`;
+    return `/iframe/${item.id}`
   }
-  return path;
+  return path
 }
 
 /**
@@ -28,8 +28,8 @@ export function generateIframePath(item, pathKey = 'path') {
  * @returns {String} 处理后的URL
  */
 export function processUrlForQuery(url) {
-  if (!url) return url;
-  return url.replace(/&/g, '#');
+  if (!url) return url
+  return url.replace(/&/g, '#')
 }
 
 /**
@@ -40,8 +40,8 @@ export function processUrlForQuery(url) {
  * @returns {Object} query参数
  */
 export function generateIframeQuery(item, pathKey = 'path', queryKey = 'query') {
-  const originalPath = item[pathKey];
-  const existingQuery = item[queryKey] || {};
+  const originalPath = item[pathKey]
+  const existingQuery = item[queryKey] || {}
 
   // 如果是URL且没有url参数，添加处理后的URL
   if (URL_REGEX.test(originalPath)) {
@@ -49,12 +49,12 @@ export function generateIframeQuery(item, pathKey = 'path', queryKey = 'query') 
     if (!existingQuery.url) {
       return {
         ...existingQuery,
-        url: processUrlForQuery(originalPath)
-      };
+        url: processUrlForQuery(originalPath),
+      }
     }
   }
 
-  return existingQuery;
+  return existingQuery
 }
 
 /**
@@ -65,7 +65,7 @@ export function generateIframeQuery(item, pathKey = 'path', queryKey = 'query') 
  */
 export function isIframeRoute(path, originalPath) {
   // 路径以/iframe/开头且原始路径是URL
-  return path && path.startsWith('/iframe/') && URL_REGEX.test(originalPath);
+  return path && path.startsWith('/iframe/') && URL_REGEX.test(originalPath)
 }
 
 /**
@@ -74,5 +74,5 @@ export function isIframeRoute(path, originalPath) {
  * @returns {Boolean} 是否为URL
  */
 export function isURL(path) {
-  return URL_REGEX.test(path);
+  return URL_REGEX.test(path)
 }

@@ -38,7 +38,7 @@
         <template #default="{ row }">
           <span class="role-name-cell">
             <el-icon class="role-icon" :class="{ 'is-root': isTopRole(row.parentId) }">
-              <UserFilled />
+              <user-filled />
             </el-icon>
             <span class="role-name-text" :title="displayRoleName(row)">{{ displayRoleName(row) }}</span>
             <el-tag v-if="row.hasChildren" class="child-tag" size="small" type="info">
@@ -82,8 +82,8 @@
       </template>
     </el-table>
 
-    <RoleManagementEdit ref="editRef" @fetch-data="fetchData" />
-    <RolePermissionConfig ref="permissionConfigRef" @fetch-data="fetchData" />
+    <role-management-edit ref="editRef" @fetch-data="fetchData" />
+    <role-permission-config ref="permissionConfigRef" @fetch-data="fetchData" />
   </div>
 </template>
 

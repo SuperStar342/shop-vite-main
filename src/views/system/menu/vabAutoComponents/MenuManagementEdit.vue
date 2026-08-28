@@ -13,12 +13,12 @@
           check-strictly
           clearable
           :data="parentTree"
-          :disabled="!!lockParent"
           default-expand-all
+          :disabled="!!lockParent"
           filterable
           node-key="id"
-          :props="{ label: 'name', value: 'id', children: 'children', disabled: 'disabled' }"
           placeholder="不选则为顶级菜单"
+          :props="{ label: 'name', value: 'id', children: 'children', disabled: 'disabled' }"
           render-after-expand
           style="width: 100%"
         />
@@ -44,11 +44,11 @@
       </el-form-item>
       <el-form-item label="菜单图标" prop="source">
         <div class="icon-field">
-          <el-popover v-model:visible="iconPickerVisible" :width="320" placement="bottom-start">
+          <el-popover v-model:visible="iconPickerVisible" placement="bottom-start" :width="320">
             <template #reference>
               <el-input v-model.trim="form.source" clearable placeholder="iconfont 类名或选择图标">
                 <template #prefix>
-                  <i v-if="isIconfont(form.source)" :class="form.source" class="icon-preview" />
+                  <i v-if="isIconfont(form.source)" class="icon-preview" :class="form.source" />
                   <vab-icon v-else-if="form.source" :icon="form.source" />
                 </template>
               </el-input>
@@ -68,7 +68,7 @@
         </el-radio-group>
       </el-form-item>
       <el-form-item label="备注" prop="remark">
-        <el-input v-model.trim="form.remark" clearable type="textarea" :rows="2" />
+        <el-input v-model.trim="form.remark" clearable :rows="2" type="textarea" />
       </el-form-item>
     </el-form>
     <template #footer>

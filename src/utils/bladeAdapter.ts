@@ -26,12 +26,7 @@ export const getEnvelope = (res: any) => {
 export const unwrap = (res: any) => {
   const envelope = getEnvelope(res)
   if (envelope == null) return envelope
-  if (
-    typeof envelope === 'object' &&
-    !Array.isArray(envelope) &&
-    'data' in envelope &&
-    ('code' in envelope || 'success' in envelope)
-  ) {
+  if (typeof envelope === 'object' && !Array.isArray(envelope) && 'data' in envelope && ('code' in envelope || 'success' in envelope)) {
     return envelope.data
   }
   return envelope
@@ -41,9 +36,7 @@ export const unwrap = (res: any) => {
 export const adaptPage = (res: any, mapRow?: (row: any) => any): ShopPageResult => {
   const envelope = getEnvelope(res) || {}
   const page = unwrap(res) || {}
-  const records = Array.isArray(page)
-    ? page
-    : page.records || page.list || (Array.isArray(page.data) ? page.data : [])
+  const records = Array.isArray(page) ? page : page.records || page.list || (Array.isArray(page.data) ? page.data : [])
   const list = mapRow ? records.map(mapRow) : records
   return {
     code: envelope?.code ?? 200,
@@ -57,10 +50,7 @@ export const adaptPage = (res: any, mapRow?: (row: any) => any): ShopPageResult 
 }
 
 /** 按建立时间、单号降序（新数据在前）；用于列表兜底排序 */
-export const sortNewestFirst = <T extends Record<string, any>>(
-  list: T[] | null | undefined,
-  noKey: string
-): T[] => {
+export const sortNewestFirst = <T extends Record<string, any>>(list: T[] | null | undefined, noKey: string): T[] => {
   const rows = Array.isArray(list) ? [...list] : []
   return rows.sort((a, b) => {
     const da = String(a?.cDate || '')
@@ -115,12 +105,7 @@ export const unwrapBladeFile = (res: any) => {
   if (envelope?.success === false || (envelope?.code != null && Number(envelope.code) !== 200)) {
     throw new Error(envelope?.msg || '上传失败')
   }
-  const link =
-    file?.link ||
-    file?.url ||
-    file?.domainUrl ||
-    file?.domain ||
-    ''
+  const link = file?.link || file?.url || file?.domainUrl || file?.domain || ''
   return {
     link: link ? String(link) : '',
     name: file?.name || '',
@@ -130,4 +115,3 @@ export const unwrapBladeFile = (res: any) => {
     raw: file,
   }
 }
-

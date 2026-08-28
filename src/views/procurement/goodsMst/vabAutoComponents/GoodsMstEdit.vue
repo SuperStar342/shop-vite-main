@@ -1,9 +1,9 @@
 <template>
   <el-drawer
     v-model="dialogFormVisible"
-    :title="title"
-    size="640px"
     destroy-on-close
+    size="640px"
+    :title="title"
     @closed="handleClose"
   >
     <el-form ref="formRef" label-position="top" :model="form" :rules="rules" @submit.prevent>
@@ -16,15 +16,15 @@
               <el-input
                 v-model.trim="form.goodsCode"
                 clearable
+                :disabled="viewOnly || isEditMode"
                 maxlength="50"
                 placeholder="请输入材料编码"
-                :disabled="viewOnly || isEditMode"
               />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="材料名称" prop="goodsName">
-              <el-input v-model.trim="form.goodsName" clearable maxlength="200" placeholder="请输入材料名称" :disabled="viewOnly" />
+              <el-input v-model.trim="form.goodsName" clearable :disabled="viewOnly" maxlength="200" placeholder="请输入材料名称" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -32,7 +32,7 @@
         <el-row :gutter="16">
           <el-col :span="12">
             <el-form-item label="材料类别" prop="sortCode">
-              <el-select v-model="form.sortCode" clearable filterable placeholder="请选择材料类别" style="width: 100%" :disabled="viewOnly">
+              <el-select v-model="form.sortCode" clearable :disabled="viewOnly" filterable placeholder="请选择材料类别" style="width: 100%">
                 <el-option
                   v-for="cat in categoryOptions"
                   :key="cat.id"
@@ -44,7 +44,7 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="材料类型代码" prop="goodsType">
-              <el-input v-model.trim="form.goodsType" clearable maxlength="5" placeholder="如：C（材料类型编码）" :disabled="viewOnly" />
+              <el-input v-model.trim="form.goodsType" clearable :disabled="viewOnly" maxlength="5" placeholder="如：C（材料类型编码）" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -56,17 +56,17 @@
         <el-row :gutter="16">
           <el-col :span="8">
             <el-form-item label="标准单位" prop="stdUnit">
-              <el-input v-model.trim="form.stdUnit" clearable maxlength="6" placeholder="如：PCS" :disabled="viewOnly" />
+              <el-input v-model.trim="form.stdUnit" clearable :disabled="viewOnly" maxlength="6" placeholder="如：PCS" />
             </el-form-item>
           </el-col>
           <el-col :span="8">
             <el-form-item label="库存单位" prop="stkUnit">
-              <el-input v-model.trim="form.stkUnit" clearable maxlength="6" placeholder="如：PCS" :disabled="viewOnly" />
+              <el-input v-model.trim="form.stkUnit" clearable :disabled="viewOnly" maxlength="6" placeholder="如：PCS" />
             </el-form-item>
           </el-col>
           <el-col :span="8">
             <el-form-item label="交易单位" prop="businessUnit">
-              <el-input v-model.trim="form.businessUnit" clearable maxlength="6" placeholder="如：PCS" :disabled="viewOnly" />
+              <el-input v-model.trim="form.businessUnit" clearable :disabled="viewOnly" maxlength="6" placeholder="如：PCS" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -74,12 +74,12 @@
         <el-row :gutter="16">
           <el-col :span="12">
             <el-form-item label="品牌代码" prop="brandCode">
-              <el-input v-model.trim="form.brandCode" clearable maxlength="10" placeholder="请输入品牌代码" :disabled="viewOnly" />
+              <el-input v-model.trim="form.brandCode" clearable :disabled="viewOnly" maxlength="10" placeholder="请输入品牌代码" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="规格描述" prop="sizeDesc">
-              <el-input v-model.trim="form.sizeDesc" clearable maxlength="500" placeholder="请输入规格描述" :disabled="viewOnly" />
+              <el-input v-model.trim="form.sizeDesc" clearable :disabled="viewOnly" maxlength="500" placeholder="请输入规格描述" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -133,18 +133,18 @@
         <el-row :gutter="16">
           <el-col :span="12">
             <el-form-item label="别名" prop="alias">
-              <el-input v-model.trim="form.alias" clearable maxlength="100" placeholder="请输入别名" :disabled="viewOnly" />
+              <el-input v-model.trim="form.alias" clearable :disabled="viewOnly" maxlength="100" placeholder="请输入别名" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="快速查询" prop="quickQuery">
-              <el-input v-model.trim="form.quickQuery" clearable maxlength="50" placeholder="请输入快速查询码" :disabled="viewOnly" />
+              <el-input v-model.trim="form.quickQuery" clearable :disabled="viewOnly" maxlength="50" placeholder="请输入快速查询码" />
             </el-form-item>
           </el-col>
         </el-row>
 
         <el-form-item label="备注" prop="remark">
-          <el-input v-model.trim="form.remark" clearable maxlength="500" placeholder="请输入备注" type="textarea" :rows="2" :disabled="viewOnly" />
+          <el-input v-model.trim="form.remark" clearable :disabled="viewOnly" maxlength="500" placeholder="请输入备注" :rows="2" type="textarea" />
         </el-form-item>
       </div>
     </el-form>

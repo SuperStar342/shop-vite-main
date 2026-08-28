@@ -59,9 +59,6 @@ export const constantRoutes: VabRouteRecord[] = [
   },
 ]
 
-
-
-
 const router = createRouter({
   history: isHashRouterMode ? createWebHashHistory(base) : createWebHistory(base),
   routes: constantRoutes as RouteRecordRaw[],
@@ -85,10 +82,9 @@ const getPureRoute = (rawRoute: any): RouteRecordRaw => {
     component: rawRoute.component,
     meta: rawRoute.meta,
     // 有子路由就递归清洗子节点
-    children: rawRoute.children?.length ? rawRoute.children.map(item => getPureRoute(item)) : undefined
+    children: rawRoute.children?.length ? rawRoute.children.map((item) => getPureRoute(item)) : undefined,
   }
 }
-
 
 const addRouter = (routes: VabRouteRecord[]) => {
   routes.forEach((route: VabRouteRecord) => {

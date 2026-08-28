@@ -3,7 +3,7 @@
     <vab-query-form>
       <vab-query-form-left-panel :span="12">
         <el-button :icon="Plus" type="primary" @click="handleAdd">添加参数</el-button>
-        <el-button :icon="Delete" :disabled="selectRows.length === 0" type="danger" @click="handleBatchDelete">
+        <el-button :disabled="selectRows.length === 0" :icon="Delete" type="danger" @click="handleBatchDelete">
           批量删除
         </el-button>
       </vab-query-form-left-panel>

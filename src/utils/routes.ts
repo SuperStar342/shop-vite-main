@@ -41,9 +41,7 @@ export const convertRouter = (asyncRoutes: VabRouteRecord[]) => {
         route.component = () => import('/@vab/layouts/index.vue')
       } else if (typeof route.component === 'string') {
         const key = resolveComponentKey(route.component, route.path)
-        route.component =
-          (key && routeAllPathToCompMap[`../${key}.vue`]) ||
-          (() => import('/@/views/error/403.vue'))
+        route.component = (key && routeAllPathToCompMap[`../${key}.vue`]) || (() => import('/@/views/error/403.vue'))
       }
     }
     if (route.children && route.children.length > 0) route.children = convertRouter(route.children)

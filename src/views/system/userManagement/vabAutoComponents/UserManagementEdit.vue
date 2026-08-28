@@ -35,14 +35,14 @@
                   @error="handleAvatarPreviewError"
                 />
                 <div v-else class="avatar-upload-placeholder">
-                  <el-icon v-if="avatarUploading" class="is-loading avatar-upload-icon"><Loading /></el-icon>
-                  <el-icon v-else class="avatar-upload-icon"><Plus /></el-icon>
+                  <el-icon v-if="avatarUploading" class="is-loading avatar-upload-icon"><loading /></el-icon>
+                  <el-icon v-else class="avatar-upload-icon"><plus /></el-icon>
                   <span>{{ avatarUploading ? '上传中...' : '上传到 MinIO' }}</span>
                 </div>
               </div>
             </el-upload>
             <button v-if="form.avatar || avatarLocalPreview" class="remove-avatar-btn" type="button" @click="removeAvatar">
-              <el-icon><Close /></el-icon>
+              <el-icon><close /></el-icon>
             </button>
           </div>
           <div class="avatar-meta">
@@ -220,9 +220,9 @@
           <el-col :md="12" :span="24">
             <el-form-item label="用户平台" prop="userType">
               <el-select v-model="form.userType" placeholder="请选择用户平台" style="width: 100%">
-                <el-option :value="1" label="Web" />
-                <el-option :value="2" label="App" />
-                <el-option :value="3" label="其他" />
+                <el-option label="Web" :value="1" />
+                <el-option label="App" :value="2" />
+                <el-option label="其他" :value="3" />
               </el-select>
             </el-form-item>
           </el-col>

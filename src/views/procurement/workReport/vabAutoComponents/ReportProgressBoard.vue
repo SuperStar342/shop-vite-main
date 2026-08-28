@@ -26,7 +26,7 @@
           :class="`is-${step.status}`"
         >
           <div class="rpb__step-icon">
-            <el-icon v-if="step.status === 'done'"><CircleCheck /></el-icon>
+            <el-icon v-if="step.status === 'done'"><circle-check /></el-icon>
             <span v-else-if="step.status === 'active'" class="pulse" />
             <span v-else>{{ idx + 1 }}</span>
           </div>

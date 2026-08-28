@@ -52,8 +52,7 @@ const mapMenuTree = (nodes: any[] = [], level = 0): any[] =>
 /** 左侧 TreeNode：title → label；补齐 name 供 tree-select 显示 */
 const mapTreeNodes = (nodes: any[] = []): any[] =>
   nodes.map((n) => {
-    const children =
-      Array.isArray(n.children) && n.children.length ? mapTreeNodes(n.children) : undefined
+    const children = Array.isArray(n.children) && n.children.length ? mapTreeNodes(n.children) : undefined
     const title = n.title || n.label || n.name || ''
     return {
       ...n,
@@ -101,10 +100,7 @@ const enrichTreeWithMenuMeta = (tree: any[], menuList: any[]): any[] => {
 /** 编辑表单 → BladeX Menu 提交体 */
 const toBladeMenu = (data: any) => {
   const payload: Record<string, any> = {
-    parentId:
-      data.parentId === '' || data.parentId === undefined || data.parentId === null
-        ? 0
-        : data.parentId,
+    parentId: data.parentId === '' || data.parentId === undefined || data.parentId === null ? 0 : data.parentId,
     code: data.code,
     name: data.name || data.meta?.title || data.label,
     alias: data.alias || data.code,
@@ -241,9 +237,7 @@ const submitMenuPayload = async (
       ...payload,
       id: exist.id,
       // 旧版全局 name 唯一：与库中其它菜单重名时用编号区分
-      name: payload.name?.includes(String(payload.code))
-        ? payload.name
-        : `${payload.name}·${payload.code}`,
+      name: payload.name?.includes(String(payload.code)) ? payload.name : `${payload.name}·${payload.code}`,
       // 路径冲突时保留库中原 path，避免「菜单路径已存在」
       path: exist.path || payload.path,
     })
@@ -258,15 +252,11 @@ const submitMenuPayload = async (
 export async function syncCurrentMenusToBackend(options?: { onlyCodes?: string[] }) {
   const routeTree = routesToMenuTree(asyncRoutes)
   const flat = flattenMenus(routeTree)
-  const only = options?.onlyCodes?.length
-    ? new Set(options.onlyCodes.map(String))
-    : null
+  const only = options?.onlyCodes?.length ? new Set(options.onlyCodes.map(String)) : null
 
   let maps = await refreshBackendMenuMaps()
   let { byCode, byPath, byParentName, codeToId } = maps
-  const ordered = [...flat]
-    .filter((item) => !only || only.has(String(item.code)))
-    .sort((a, b) => a.level - b.level || a.sort - b.sort)
+  const ordered = [...flat].filter((item) => !only || only.has(String(item.code))).sort((a, b) => a.level - b.level || a.sort - b.sort)
 
   if (only) {
     const need = new Set(ordered.map((i) => String(i.code)))
@@ -285,9 +275,7 @@ export async function syncCurrentMenusToBackend(options?: { onlyCodes?: string[]
     ;[...need].forEach(addAncestors)
     ordered.length = 0
     ordered.push(
-      ...all
-        .filter((i) => need.has(String(i.code)) || need.has(String(i.id)))
-        .sort((a, b) => a.level - b.level || a.sort - b.sort)
+      ...all.filter((i) => need.has(String(i.code)) || need.has(String(i.id))).sort((a, b) => a.level - b.level || a.sort - b.sort)
     )
   }
 
@@ -303,10 +291,7 @@ export async function syncCurrentMenusToBackend(options?: { onlyCodes?: string[]
   }
 
   for (const item of ordered) {
-    const parentResolved =
-      !item.parentId || item.parentId === '0'
-        ? 0
-        : Number(codeToId.get(String(item.parentId)) || 0)
+    const parentResolved = !item.parentId || item.parentId === '0' ? 0 : Number(codeToId.get(String(item.parentId)) || 0)
 
     const exist =
       byCode.get(item.code) ||
@@ -582,9 +567,7 @@ export async function getRoleMenuCodes(roleIds: string) {
   }
   const [keysRes, maps] = await Promise.all([getRoleMenuTree(roleIds), buildMenuCodeMaps()])
   const menuIds = (keysRes?.data?.menu || []).map(String)
-  const codes = menuIds
-    .map((id) => maps.idToCode.get(id))
-    .filter(Boolean) as string[]
+  const codes = menuIds.map((id) => maps.idToCode.get(id)).filter(Boolean) as string[]
   menuIds.forEach((id) => {
     if (!maps.idToCode.has(id) && maps.codeToId.has(id)) codes.push(id)
   })
@@ -603,16 +586,8 @@ export async function getRoleMenuCodes(roleIds: string) {
 export async function grantRoleByMenuCodes(roleId: string, codes: string[]) {
   const requested = [...new Set(codes.map(String).filter(Boolean))]
   const { codeToId } = await buildMenuCodeMaps()
-  const menuIds = [
-    ...new Set(
-      requested
-        .map((c) => codeToId.get(c) || codeToId.get(toBladeMenuCode(c)))
-        .filter(Boolean) as string[]
-    ),
-  ]
-  const unresolved = requested.filter(
-    (c) => !codeToId.has(c) && !codeToId.has(toBladeMenuCode(c))
-  )
+  const menuIds = [...new Set(requested.map((c) => codeToId.get(c) || codeToId.get(toBladeMenuCode(c))).filter(Boolean) as string[])]
+  const unresolved = requested.filter((c) => !codeToId.has(c) && !codeToId.has(toBladeMenuCode(c)))
   if (unresolved.length) {
     throw new Error(
       `菜单未同步到后端，请先用管理员在「菜单管理」点击「同步当前菜单」后再授权。缺失：${unresolved
@@ -699,9 +674,7 @@ export async function getRoleMenuTree(roleIds: string) {
 const filterMenuByKeys = (nodes: any[] = [], keys: Set<string>, level = 0): any[] => {
   const result: any[] = []
   for (const node of nodes) {
-    const children = Array.isArray(node.children)
-      ? filterMenuByKeys(node.children, keys, level + 1)
-      : []
+    const children = Array.isArray(node.children) ? filterMenuByKeys(node.children, keys, level + 1) : []
     const selfMatch = keys.has(String(node.id))
     if (selfMatch || children.length) {
       result.push({

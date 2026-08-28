@@ -68,11 +68,7 @@ export async function getOssList(params?: any) {
     ossCode: params?.ossCode,
     category: params?.category,
   }
-  const page = await requestResourcePage(
-    '/api/blade-resource/oss/page',
-    pageParams,
-    '加载对象存储失败'
-  )
+  const page = await requestResourcePage('/api/blade-resource/oss/page', pageParams, '加载对象存储失败')
   return {
     ...page,
     data: {
@@ -200,11 +196,7 @@ export async function getAttachList(params?: any) {
     originalName: params?.originalName,
     extension: params?.extension,
   }
-  const page = await requestResourcePage(
-    '/api/blade-resource/attach/page',
-    pageParams,
-    '加载附件列表失败'
-  )
+  const page = await requestResourcePage('/api/blade-resource/attach/page', pageParams, '加载附件列表失败')
   return {
     ...page,
     data: {
@@ -282,12 +274,7 @@ export async function uploadAttachFile(file: File) {
       timeout: 120000,
     })
   } catch (e: any) {
-    const tip =
-      e?.msg ||
-      e?.message ||
-      e?.error_description ||
-      (typeof e === 'string' ? e : '') ||
-      '附件上传失败'
+    const tip = e?.msg || e?.message || e?.error_description || (typeof e === 'string' ? e : '') || '附件上传失败'
     const text = String(tip)
     if (/附件上传失败|MinIO|OSS|上传失败|对象存储/i.test(text)) {
       throw new Error(text)
@@ -346,11 +333,7 @@ export async function getSmsList(params?: any) {
     smsCode: params?.smsCode,
     category: params?.category,
   }
-  const page = await requestResourcePage(
-    '/api/blade-resource/sms/page',
-    pageParams,
-    '加载短信配置失败'
-  )
+  const page = await requestResourcePage('/api/blade-resource/sms/page', pageParams, '加载短信配置失败')
   return {
     ...page,
     data: {

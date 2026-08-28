@@ -57,10 +57,10 @@
           v-model:file-list="fileList"
           accept="image/*"
           :auto-upload="false"
-          list-type="picture-card"
           :limit="3"
+          list-type="picture-card"
         >
-          <el-icon><Plus /></el-icon>
+          <el-icon><plus /></el-icon>
         </el-upload>
       </el-form-item>
     </el-form>

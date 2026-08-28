@@ -61,9 +61,7 @@ function flattenDeptNameMap(nodes: any[], map = new Map<string, string>()) {
 function fillParentNames(nodes: any[], nameMap: Map<string, string>): any[] {
   return nodes.map((n) => {
     const parentId = String(n.parentId ?? '0')
-    const parentName = isTopParentId(parentId)
-      ? '顶级'
-      : n.parentName || nameMap.get(parentId) || '未知'
+    const parentName = isTopParentId(parentId) ? '顶级' : n.parentName || nameMap.get(parentId) || '未知'
     // 再次兜底名称，避免树合并后顶级节点 title/deptName 丢失
     const deptName = String(n.deptName || n.title || n.label || n.fullName || '').trim()
     return {
@@ -282,10 +280,7 @@ export async function doEdit(data: any) {
   if (!deptName) throw new Error('请输入部门名称')
 
   const rawParent = data.parentId ?? data.parentValue
-  const parentId =
-    rawParent === '' || rawParent === undefined || rawParent === null || rawParent === '0'
-      ? 0
-      : rawParent
+  const parentId = rawParent === '' || rawParent === undefined || rawParent === null || rawParent === '0' ? 0 : rawParent
 
   const payload: Record<string, any> = {
     parentId,
@@ -309,14 +304,8 @@ export async function doEdit(data: any) {
 
   // submit 可能返回实体 / true / null；必须 unwrap，勿读 AxiosResponse.data.id
   const entity = unwrap(res)
-  const entityObj =
-    entity && typeof entity === 'object' && !Array.isArray(entity) ? (entity as Record<string, any>) : {}
-  const savedId =
-    entityObj.id != null && entityObj.id !== ''
-      ? String(entityObj.id)
-      : data.id
-        ? String(data.id)
-        : ''
+  const entityObj = entity && typeof entity === 'object' && !Array.isArray(entity) ? (entity as Record<string, any>) : {}
+  const savedId = entityObj.id != null && entityObj.id !== '' ? String(entityObj.id) : data.id ? String(data.id) : ''
 
   return {
     ...adaptMsg(res, '保存成功'),
