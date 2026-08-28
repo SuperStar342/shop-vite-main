@@ -425,11 +425,9 @@ export async function copyTableText(text: string, kind: TableCopyKind = '单元�
     const { cellCount, rowCount, mode } = tableCopySelection
     let msg = `已复制${kind}：${tip}`
     if (kind === '选区' || (kind === '单元格' && mode === 'range' && cellCount > 1)) {
-      msg = `已复制选区 ${cellCount} 格（逗号分隔）：${tip}`
+      msg = `已复制选区 ${cellCount} 格：${tip}`
     } else if (kind === '多行' || (kind === '整行' && rowCount > 1)) {
-      msg = value.includes(',') && !value.includes('\t')
-        ? `已复制 ${rowCount} 行（逗号分隔）：${tip}`
-        : `已复制 ${rowCount} 行：${tip}`
+      msg = `已复制 ${rowCount} 行：${tip}`
     } else if (kind === '单元格') {
       msg = `已复制单元格：${tip}`
     } else if (kind === '整行') {

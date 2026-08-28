@@ -4,10 +4,10 @@
       <vab-query-form-left-panel :span="24">
         <el-form inline :model="queryForm" @submit.prevent>
           <el-form-item>
-            <el-input v-model.trim="queryForm.moNo" clearable placeholder="制令号，多个用逗号" style="width: 200px" @keyup.enter="loadPreview" />
+            <el-input v-model.trim="queryForm.moNo" clearable placeholder="制令号" style="width: 168px" @keyup.enter="loadPreview" />
           </el-form-item>
           <el-form-item>
-            <el-input v-model.trim="queryForm.woNo" clearable placeholder="工单号，多个用逗号" style="width: 200px" @keyup.enter="loadPreview" />
+            <el-input v-model.trim="queryForm.woNo" clearable placeholder="工单号" style="width: 148px" @keyup.enter="loadPreview" />
           </el-form-item>
           <el-form-item>
             <el-input v-model.trim="queryForm.goodsName" clearable placeholder="品名" style="width: 140px" @keyup.enter="loadPreview" />
