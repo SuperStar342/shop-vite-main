@@ -31,10 +31,10 @@ const menuOptions = computed(() => ({
 const cellLabel = computed(() => {
   const { mode, cellCount, rowCount, preview } = tableCopySelection
   if (mode === 'range' && cellCount > 1) {
-    return `复制选区（${cellCount} 格 / ${rowCount} 行）`
+    return `复制选区（${cellCount} 格，逗号分隔）`
   }
   if (mode === 'rows' && rowCount > 1) {
-    return `复制选中行（${rowCount} 行）`
+    return `复制选中行（${rowCount} 行，逗号分隔）`
   }
   if (!preview) return '复制单元格 (Ctrl+C)'
   const short = preview.length > 16 ? `${preview.slice(0, 16)}…` : preview

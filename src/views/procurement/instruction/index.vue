@@ -4,7 +4,7 @@
       <vab-query-form-left-panel :span="24">
         <el-form inline :model="queryForm" @submit.prevent>
           <el-form-item>
-            <el-input v-model.trim="queryForm.moNo" clearable placeholder="制令号" style="width: 160px" />
+            <el-input v-model.trim="queryForm.moNo" clearable placeholder="制令号，多个用逗号" style="width: 200px" />
           </el-form-item>
           <el-form-item>
             <el-input v-model.trim="queryForm.ordNo" clearable placeholder="订单号" style="width: 160px" />
@@ -41,15 +41,15 @@
       <!-- 上：制令主表 -->
       <div class="pane pane-master" :style="{ flex: `${paneRatios[0]} 1 0px` }">
         <div ref="masterWrapRef" class="vtable-wrap">
-          <ListTable
+          <list-table
             ref="masterTableRef"
+            :height="masterHeight"
             :options="masterOptions"
             :records="masterList"
-            :height="masterHeight"
             @on-click-cell="(args: any) => { onCopyTrack(args, masterTableRef); handleMasterClick(args) }"
-            @on-selected-cell="(args: any) => onCopyTrack(args, masterTableRef)"
             @on-context-menu-cell="(args: any) => onCopyContextMenu(args, masterTableRef)"
             @on-initialized="() => masterLayout.handleTableReady()"
+            @on-selected-cell="(args: any) => onCopyTrack(args, masterTableRef)"
           />
         </div>
         <vab-pagination
@@ -79,16 +79,16 @@
           <el-tab-pane label="制令生产计划" name="prodPlan" />
         </el-tabs>
         <div ref="midWrapRef" class="vtable-wrap">
-          <ListTable
-            ref="midTableRef"
+          <list-table
             :key="`mid-${activeTab}`"
+            ref="midTableRef"
+            :height="midHeight"
             :options="midOptions"
             :records="midList"
-            :height="midHeight"
             @on-click-cell="(args: any) => { onCopyTrack(args, midTableRef); handleMidClick(args) }"
-            @on-selected-cell="(args: any) => onCopyTrack(args, midTableRef)"
             @on-context-menu-cell="(args: any) => onCopyContextMenu(args, midTableRef)"
             @on-initialized="() => midLayout.handleTableReady()"
+            @on-selected-cell="(args: any) => onCopyTrack(args, midTableRef)"
           />
         </div>
       </div>
@@ -100,15 +100,15 @@
       <div class="pane pane-detail" :style="{ flex: `${paneRatios[2]} 1 0px` }">
         <div class="pane-title">{{ detailPaneTitle }}</div>
         <div ref="detailWrapRef" class="vtable-wrap">
-          <ListTable
+          <list-table
             ref="detailTableRef"
+            :height="detailHeight"
             :options="detailOptions"
             :records="detailList"
-            :height="detailHeight"
-            @on-context-menu-cell="(args: any) => onCopyContextMenu(args, detailTableRef)"
             @on-click-cell="(args: any) => onCopyTrack(args, detailTableRef)"
-            @on-selected-cell="(args: any) => onCopyTrack(args, detailTableRef)"
+            @on-context-menu-cell="(args: any) => onCopyContextMenu(args, detailTableRef)"
             @on-initialized="() => detailLayout.handleTableReady()"
+            @on-selected-cell="(args: any) => onCopyTrack(args, detailTableRef)"
           />
         </div>
       </div>

@@ -107,6 +107,8 @@ export const {
   //bladex
   key,
   tokenHeader,
+  tokenTime,
+  idleLogoutTime,
   captchaMode,
   captchaType,
   clientId,
@@ -114,5 +116,4 @@ export const {
   publicKey,
   statusWhiteList,
   tenantId,
-
 } = config

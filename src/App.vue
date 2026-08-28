@@ -8,6 +8,8 @@ import DisableDevtool from 'disable-devtool'
 import { disableDebugger } from '/@/config'
 import { useSettingsStore } from '/@/store/modules/settings'
 import TableCopyMenu from '/@/components/TableCopyMenu.vue'
+import { getToken } from '/@/utils/auth'
+import { startTokenKeepAlive, stopTokenKeepAlive } from '/@/utils/tokenKeepAlive'
 
 defineOptions({
   name: 'App',
@@ -33,7 +35,19 @@ onBeforeMount(() => {
   resizeContainer()
 })
 
+const syncTokenKeepAlive = () => {
+  if (getToken()) startTokenKeepAlive()
+  else stopTokenKeepAlive()
+}
+
+watch(
+  () => route.path,
+  () => syncTokenKeepAlive(),
+  { immediate: false }
+)
+
 onMounted(() => {
+  syncTokenKeepAlive()
   // 添加事件监听器
   globalThis.addEventListener('orientationchange', resizeContainer)
   globalThis.addEventListener('resize', resizeContainer)
@@ -57,6 +71,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  stopTokenKeepAlive()
   // 清理事件监听器
   globalThis.removeEventListener('orientationchange', resizeContainer)
   globalThis.removeEventListener('resize', resizeContainer)

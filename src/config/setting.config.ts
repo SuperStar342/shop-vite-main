@@ -103,7 +103,10 @@ export const settingConfig: {
   captchaType: 'behavior', // 验证码类型(image:首屏图形验证码 behavior:登录时弹出点选/滑块/旋转随机行为验证)
   switchMode: false, // 是否开启登录切换角色部门
   lockPage: '/lock', // 锁屏页面地址
-  tokenTime: 3000, // 定时刷新token间隔(单位:毫秒)
+  /** 登录态保活：检查/续期 token 的间隔（毫秒），默认 30 分钟 */
+  tokenTime: 30 * 60 * 1000,
+  /** 无操作超过该时长则退出登录（毫秒），默认 8 小时；操作期间会自动续期 */
+  idleLogoutTime: 8 * 60 * 60 * 1000,
   tokenHeader: 'Blade-Auth', // 请求头中携带的token名称
   tokenKey: 'saber3-access-token', // token存储的key(多个系统部署需要修改以免冲突)
   refreshTokenKey: 'saber3-refresh-token', // 刷新token存储的key(多个系统部署需要修改以免冲突)
@@ -111,6 +114,6 @@ export const settingConfig: {
   statusWhiteList: [],
   //oauth2配置
   // 必须与 Nacos blade.yaml → blade.oauth2.public-key 一致，否则登录报「认证信息错误或无效」
-  publicKey: '048b2583d3c8cd1be7eb6742365edb99a3405ea1a7d3f46fd349e59b35adc256bfe69211436730c2cb5959001a07c7779ec8a354894c40fced30f1b42ba68df1b5',
-
+  publicKey:
+    '048b2583d3c8cd1be7eb6742365edb99a3405ea1a7d3f46fd349e59b35adc256bfe69211436730c2cb5959001a07c7779ec8a354894c40fced30f1b42ba68df1b5',
 }

@@ -9,13 +9,8 @@ import axios from 'axios'
 import type { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 import router from '/@/router/'
 import { serialize } from '/@/utils/util'
-import {
-  getToken,
-  getRefreshToken,
-  removeToken,
-  removeRefreshToken,
-  isTokenNearExpiry,
-} from '/@/utils/auth'
+import { getToken, getRefreshToken, removeToken, removeRefreshToken, getTokenExpireAt, isTokenNearExpiry } from '/@/utils/auth'
+import { touchUserActivity } from '/@/utils/tokenKeepAlive'
 import { isURL, validatenull } from '/@/utils/validate'
 import { ElMessage } from 'element-plus'
 import { tokenHeader, clientId, clientSecret, statusWhiteList, tenantId as defaultTenantId } from '/@/config'
@@ -38,8 +33,7 @@ let lastPermissionToastAt = 0
 let lastPermissionToastMsg = ''
 const PERMISSION_TOAST_GAP_MS = 4000
 
-const shouldSilent = (config: AxiosRequestConfig) =>
-  !!(config as any).silentError || !!(config as any).meta?.silentError
+const shouldSilent = (config: AxiosRequestConfig) => !!(config as any).silentError || !!(config as any).meta?.silentError
 
 const notifyPermissionDenied = (message: string, config: AxiosRequestConfig) => {
   if (shouldSilent(config)) return
@@ -105,7 +99,11 @@ const ensureAccessTokenFresh = async (config: AxiosRequestConfig) => {
   if (isLoginRequest(config) || isRefreshTokenRequest(config)) return
   const meta = (config as any).meta || {}
   if (meta.isToken === false) return
-  if (!getToken() || validatenull(getRefreshToken() ?? '') || !isTokenNearExpiry()) return
+  if (!getToken() || validatenull(getRefreshToken() ?? '')) return
+  // 无过期记录时仍尝试续期；已过期也必须 refresh
+  const at = getTokenExpireAt()
+  const expired = at > 0 && Date.now() >= at
+  if (!expired && !isTokenNearExpiry()) return
 
   if (!isRefreshing) {
     isRefreshing = true
@@ -189,6 +187,7 @@ service.interceptors.request.use(
 
     await ensureAccessTokenFresh(config)
     applyToken(config)
+    if (getToken()) touchUserActivity()
 
     const cryptoData = (config as any).cryptoData === true
     if (cryptoData) {
@@ -240,10 +239,7 @@ service.interceptors.response.use(
     }
 
     // 参数绑定等业务 400/500 不应误判为登录失效
-    if (
-      status === 400 &&
-      /Name for argument of type|parameter name information not available|-parameters/i.test(message)
-    ) {
+    if (status === 400 && /Name for argument of type|parameter name information not available|-parameters/i.test(message)) {
       ElMessage({
         message: '后端接口参数绑定失败，请确认已使用 -parameters 编译并重启 blade-system',
         type: 'error',

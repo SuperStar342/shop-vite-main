@@ -51,9 +51,10 @@ export function getTokenExpireAt(): number {
   return Number.isFinite(n) ? n : 0
 }
 
-/** 是否临近过期（默认提前 10 分钟刷新） */
-export function isTokenNearExpiry(skewMs = 10 * 60 * 1000): boolean {
+/** 是否临近过期（默认提前 30 分钟刷新） */
+export function isTokenNearExpiry(skewMs = 30 * 60 * 1000): boolean {
   const at = getTokenExpireAt()
-  if (!at) return false
+  // 有 token 但无过期记录（冷启动/旧会话）时仍尝试续期，避免操作中途被踢
+  if (!at) return !!getToken()
   return Date.now() >= at - skewMs
 }

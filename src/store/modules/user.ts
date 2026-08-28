@@ -3,23 +3,10 @@
  */
 import { useTabsStore } from './tabs'
 import { useAclStore } from './acl'
-import {
-  setToken,
-  setRefreshToken,
-  removeToken,
-  removeRefreshToken,
-  getRefreshToken,
-  setTokenExpireAt,
-} from '/@/utils/auth'
+import { setToken, setRefreshToken, removeToken, removeRefreshToken, getToken, getRefreshToken, setTokenExpireAt } from '/@/utils/auth'
 import { setStore, getStore } from '/@/utils/store'
 import { deepClone } from '/@/utils/util'
-import {
-  loginByUsername,
-  getUserInfo,
-  logout,
-  refreshToken,
-  getButtons,
-} from '/@/api/user'
+import { loginByUsername, getUserInfo, logout, refreshToken, getButtons } from '/@/api/user'
 import { getRoutes, getTopMenu } from '/@/api/system/menu'
 import { getMyMenuCodes } from '/@/api/menuManagement'
 import { expandMenuCodesForRoutes } from '/@/utils/bladeMenuCodes'
@@ -75,6 +62,15 @@ const extractButtonCodes = (buttons: any): string[] => {
   return codes.filter(Boolean)
 }
 
+/** 启动时把 localStorage 中的 token 回写到 cookie，避免刷新后请求无 Blade-Auth 被当成「未分配菜单」 */
+const restoreAuthCookies = () => {
+  const token = getStore({ name: 'token' }) || ''
+  const refresh = getStore({ name: 'refreshToken' }) || ''
+  if (token && !getToken()) setToken(token)
+  if (refresh && !getRefreshToken()) setRefreshToken(refresh)
+}
+restoreAuthCookies()
+
 export const useUserStore = defineStore('user', {
   state: (): UserModuleType => ({
     tenantId: getStore({ name: 'tenantId' }) || '',
@@ -86,14 +82,14 @@ export const useUserStore = defineStore('user', {
     menuAll: getStore({ name: 'menuAll' }) || [],
     token: getStore({ name: 'token' }) || '',
     refreshToken: getStore({ name: 'refreshToken' }) || '',
-    username: (getStore({ name: 'userInfo' }) as any)?.user_name
-      || (getStore({ name: 'userInfo' }) as any)?.userName
-      || (getStore({ name: 'userInfo' }) as any)?.account
-      || '游客',
+    username:
+      (getStore({ name: 'userInfo' }) as any)?.user_name ||
+      (getStore({ name: 'userInfo' }) as any)?.userName ||
+      (getStore({ name: 'userInfo' }) as any)?.account ||
+      '游客',
     avatar: (getStore({ name: 'userInfo' }) as any)?.avatar || './static/svg/avatar.svg',
   }),
   actions: {
-
     /**
      * @description 登录
      * @param {*} userInfo
@@ -108,19 +104,19 @@ export const useUserStore = defineStore('user', {
           sm2Encrypt(userInfo.password),
           userInfo.type,
           userInfo.key,
-          userInfo.code)
+          userInfo.code
+        )
 
-        console.log("login res:")
+        console.log('login res:')
         console.log(res)
-        const data = res.data;
+        const data = res.data
 
         if (data.error_description) {
           ElMessage({
             message: data.error_description,
             type: 'error',
-          });
+          })
           throw new Error(data.msg)
-
         } else {
           // 换账号登录前先清掉上一会话的动态路由，强制重新 GetMenu
           try {
@@ -134,17 +130,22 @@ export const useUserStore = defineStore('user', {
           setTokenExpireAt(data.expires_in ?? 86400)
           this.SET_TENANT_ID(data.tenant_id)
           this.SET_USER_INFO(data)
+          try {
+            const { startTokenKeepAlive } = await import('/@/utils/tokenKeepAlive')
+            startTokenKeepAlive()
+          } catch {
+            /* ignore */
+          }
           // 登录响应即可识别超管，后续 GetUserInfo / GetButtons 再补全
           const roles = splitRoles(data.role_name || data.roleName)
           this.SET_ROLES(roles)
           applyAdminAccess(roles)
           this.DEL_ALL_TAG()
         }
-
       } catch (err: any) {
         ElMessage({
-          message: '登录失败：' + (err.message || err),
-          type: 'error'
+          message: `登录失败：${err.message || err}`,
+          type: 'error',
         })
         throw err
       }
@@ -153,9 +154,7 @@ export const useUserStore = defineStore('user', {
       const res = await getUserInfo()
       const data = (unwrap(res) || {}) as Record<string, any>
       // BladeX UserVO 多为 roleName 字符串；兼容 roles 数组
-      let roles = Array.isArray(data.roles)
-        ? data.roles.map(String)
-        : splitRoles(data.roleName || data.role_name)
+      let roles = Array.isArray(data.roles) ? data.roles.map(String) : splitRoles(data.roleName || data.role_name)
 
       // OAuth token 载荷里的 role_name 往往更准（administrator）
       if (!roles.length) {
@@ -233,12 +232,24 @@ export const useUserStore = defineStore('user', {
     },
 
     //注销session
+    /** 确保请求头 Cookie 与本地 token 一致（冷启动/刷新常见不同步） */
+    syncAuthCookies() {
+      if (this.token && !getToken()) setToken(this.token)
+      if (this.refreshToken && !getRefreshToken()) setRefreshToken(this.refreshToken)
+    },
+
     async FedLogOut() {
       await this.clearSession()
     },
 
     /** 清理登录态 + 动态路由，保证换账号后重新拉取菜单 */
     async clearSession() {
+      try {
+        const { stopTokenKeepAlive } = await import('/@/utils/tokenKeepAlive')
+        stopTokenKeepAlive()
+      } catch {
+        /* ignore */
+      }
       this.SET_TOKEN('')
       this.SET_MENUALL_NULL()
       this.SET_MENU([])
@@ -295,6 +306,12 @@ export const useUserStore = defineStore('user', {
         })
         .catch((e: any) => {
           console.error('[GetMenu] 加载菜单失败', e)
+          const status = Number(e?.response?.status ?? e?.status ?? e?.code ?? e?.response?.data?.code ?? 0)
+          const msg = String(e?.message || e?.msg || e?.response?.data?.msg || '')
+          const isAuth =
+            status === 401 || /401|未授权|认证|令牌|token|登录过期|Full authentication|invalid_token|Token expired|请求未授权/i.test(msg)
+          // 鉴权失败应交由路由守卫退登，勿当成「角色未分配菜单」
+          if (isAuth) return Promise.reject(e)
           const empty: any[] = []
           this.SET_MENU(empty)
           this.SET_MENU_ALL(empty)
@@ -315,7 +332,6 @@ export const useUserStore = defineStore('user', {
         })
     },
 
-
     SET_TOKEN(token: string) {
       this.token = token
       setToken(token)
@@ -335,36 +351,42 @@ export const useUserStore = defineStore('user', {
     },
     SET_USER_INFO(userInfo: any) {
       if (validatenull(userInfo.user_id) && validatenull(userInfo.account) && validatenull(userInfo.id)) {
-        this.userInfo = { user_name: 'unauth', role_name: 'unauth', authority: 'unauth' };
+        this.userInfo = { user_name: 'unauth', role_name: 'unauth', authority: 'unauth' }
       } else {
         if (validatenull(userInfo.avatar)) {
-          userInfo.avatar = '/img/bg/img-logo.png';
+          userInfo.avatar = '/img/bg/img-logo.png'
         }
         if (!validatenull(userInfo.role_name)) {
-          userInfo.roleName = userInfo.role_name;
-          userInfo.authority = userInfo.role_name;
+          userInfo.roleName = userInfo.role_name
+          userInfo.authority = userInfo.role_name
         }
         if (!validatenull(userInfo.user_id)) {
-          userInfo.userId = userInfo.user_id;
+          userInfo.userId = userInfo.user_id
         }
         if (!validatenull(userInfo.user_name)) {
-          userInfo.userName = userInfo.user_name;
+          userInfo.userName = userInfo.user_name
         }
         if (!validatenull(userInfo.tenant_id)) {
-          userInfo.tenantId = userInfo.tenant_id;
+          userInfo.tenantId = userInfo.tenant_id
         }
         if (!validatenull(userInfo.dept_id)) {
-          userInfo.deptId = userInfo.dept_id;
+          userInfo.deptId = userInfo.dept_id
         }
         if (!validatenull(userInfo.role_id)) {
-          userInfo.roleId = userInfo.role_id;
+          userInfo.roleId = userInfo.role_id
         }
         if (!validatenull(userInfo.oauth_id)) {
-          userInfo.oauthId = userInfo.oauth_id;
+          userInfo.oauthId = userInfo.oauth_id
         }
-        this.userInfo = userInfo;
+        this.userInfo = userInfo
         this.username =
-          userInfo.realName || userInfo.real_name || userInfo.name || userInfo.user_name || userInfo.userName || userInfo.account || this.username
+          userInfo.realName ||
+          userInfo.real_name ||
+          userInfo.name ||
+          userInfo.user_name ||
+          userInfo.userName ||
+          userInfo.account ||
+          this.username
         this.avatar = userInfo.avatar || this.avatar
       }
 
@@ -386,8 +408,8 @@ export const useUserStore = defineStore('user', {
     },
     SET_MENU_ALL(menuAll: any[]) {
       let menu = [...this.menuAll]
-      menuAll.forEach(ele => {
-        const index = menu.findIndex(item => item.path === ele.path)
+      menuAll.forEach((ele) => {
+        const index = menu.findIndex((item) => item.path === ele.path)
         if (index === -1) {
           menu.push(ele)
         } else {
@@ -411,7 +433,7 @@ export const useUserStore = defineStore('user', {
     SET_PERMISSION(permissionData: any) {
       const result = extractButtonCodes(permissionData)
       this.permission = {}
-      result.forEach(ele => {
+      result.forEach((ele) => {
         this.permission[ele] = true
       })
       setStore({ name: 'permission', content: this.permission, type: 'session' })
@@ -427,6 +449,5 @@ export const useUserStore = defineStore('user', {
       const tabsStore = useTabsStore()
       await tabsStore.delAllVisitedRoutes()
     },
-
   },
 })

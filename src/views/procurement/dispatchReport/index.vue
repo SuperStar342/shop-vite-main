@@ -7,13 +7,13 @@
       </div>
       <div v-if="showDetail" class="dr-hero__actions">
         <el-button type="primary" @click="openBatchReport">
-          <el-icon><Grid /></el-icon>
+          <el-icon><grid /></el-icon>
           批量报工
         </el-button>
       </div>
     </header>
 
-    <div class="dr-stats" v-if="showDetail">
+    <div v-if="showDetail" class="dr-stats">
       <article v-for="card in statCards" :key="card.key" class="dr-stat" :class="`dr-stat--${card.key}`">
         <em>{{ card.label }}</em>
         <strong>{{ card.value }}</strong>
@@ -24,10 +24,10 @@
       <vab-query-form-left-panel :span="24">
         <el-form inline :model="queryForm" @submit.prevent>
           <el-form-item>
-            <el-input v-model.trim="queryForm.wtNo" clearable placeholder="派工单号" style="width: 170px" />
+            <el-input v-model.trim="queryForm.wtNo" clearable placeholder="派工单号，多个用逗号" style="width: 200px" />
           </el-form-item>
           <el-form-item>
-            <el-input v-model.trim="queryForm.moNo" clearable placeholder="制令号" style="width: 170px" />
+            <el-input v-model.trim="queryForm.moNo" clearable placeholder="制令号，多个用逗号" style="width: 200px" />
           </el-form-item>
           <el-form-item>
             <el-select v-model="queryForm.finishFlag" clearable placeholder="完成状态" style="width: 120px">
@@ -65,9 +65,9 @@
             <strong>{{ selectedWt.wtNo }}</strong>
           </div>
           <div class="wt-summary__tags">
-            <el-tag size="small" effect="plain" :type="tagType(selectedWt.finishFlag)">{{ selectedWt.finishFlag || '-' }}</el-tag>
-            <el-tag size="small" effect="plain" :type="tagType(selectedWt.cFlag)">{{ selectedWt.cFlag || '-' }}</el-tag>
-            <el-tag size="small" effect="plain" :type="tagType(selectedWt.ifClose)">{{ selectedWt.ifClose || '-' }}</el-tag>
+            <el-tag effect="plain" size="small" :type="tagType(selectedWt.finishFlag)">{{ selectedWt.finishFlag || '-' }}</el-tag>
+            <el-tag effect="plain" size="small" :type="tagType(selectedWt.cFlag)">{{ selectedWt.cFlag || '-' }}</el-tag>
+            <el-tag effect="plain" size="small" :type="tagType(selectedWt.ifClose)">{{ selectedWt.ifClose || '-' }}</el-tag>
           </div>
           <div class="wt-summary__meta">
             <span>{{ selectedWt.wsName || selectedWt.wsCode }}</span>
@@ -115,9 +115,9 @@
               ref="masterTableRef"
               v-loading="listLoading"
               border
-              highlight-current-row
-              height="100%"
               :data="masterList"
+              height="100%"
+              highlight-current-row
               row-key="wtNo"
               @row-click="handleMasterClick"
             >
@@ -144,12 +144,12 @@
               <el-table-column v-if="visible('tpcPrcName')" label="代表工序名称" min-width="120" prop="tpcPrcName" show-overflow-tooltip />
               <el-table-column v-if="visible('finishFlag')" align="center" label="完成状态" min-width="100" prop="finishFlag">
                 <template #default="{ row }">
-                  <el-tag size="small" effect="plain" :type="tagType(row.finishFlag)">{{ row.finishFlag || '-' }}</el-tag>
+                  <el-tag effect="plain" size="small" :type="tagType(row.finishFlag)">{{ row.finishFlag || '-' }}</el-tag>
                 </template>
               </el-table-column>
               <el-table-column v-if="visible('cFlag')" align="center" label="审核状态" min-width="90" prop="cFlag">
                 <template #default="{ row }">
-                  <el-tag size="small" effect="plain" :type="tagType(row.cFlag)">{{ row.cFlag || '-' }}</el-tag>
+                  <el-tag effect="plain" size="small" :type="tagType(row.cFlag)">{{ row.cFlag || '-' }}</el-tag>
                 </template>
               </el-table-column>
               <el-table-column v-if="visible('creator')" label="建立人" min-width="80" prop="creator" />
@@ -205,15 +205,15 @@
                 ref="itemTableRef"
                 v-loading="itemLoading"
                 border
-                highlight-current-row
-                height="100%"
                 :data="itemList"
+                height="100%"
+                highlight-current-row
                 :row-key="itemRowKey"
                 @row-click="handleItemClick"
                 @selection-change="onItemSelectionChange"
               >
                 <el-table-column type="selection" width="42" />
-                <dispatch-wt-item-columns :fmt="fmtNum" show-progress selection />
+                <dispatch-wt-item-columns :fmt="fmtNum" selection show-progress />
                 <template #empty>
                   <el-empty description="暂无工序明细" />
                 </template>
@@ -245,8 +245,8 @@
                     <span class="name">{{ w.empName || w.empNo }}</span>
                     <el-progress
                       :percentage="progressOf(w)"
-                      :stroke-width="6"
                       :status="progressOf(w) >= 100 ? 'success' : undefined"
+                      :stroke-width="6"
                     />
                     <em>{{ fmtNum(w.fnQty) }}/{{ fmtNum(w.planQty) }}</em>
                   </li>
@@ -270,8 +270,8 @@
               <el-table
                 v-loading="workerLoading"
                 border
-                height="100%"
                 :data="workerList"
+                height="100%"
                 :row-key="workerRowKey"
               >
                 <el-table-column v-if="visibleWorker('empNo')" label="工号" min-width="100" prop="empNo" />
@@ -327,8 +327,8 @@
                   <template #default="{ row }">
                     <el-progress
                       :percentage="progressOf(row)"
-                      :stroke-width="8"
                       :status="progressOf(row) >= 100 ? 'success' : undefined"
+                      :stroke-width="8"
                     />
                   </template>
                 </el-table-column>
@@ -342,10 +342,10 @@
                     <el-input-number
                       v-model="workerDraft(row).reportQty"
                       controls-position="right"
+                      :disabled="!isAudited(selectedWt) || workerPending(row) <= 0"
                       :max="Math.max(workerPending(row), 0)"
                       :min="0"
                       size="small"
-                      :disabled="!isAudited(selectedWt) || workerPending(row) <= 0"
                     />
                   </template>
                 </el-table-column>
@@ -354,10 +354,10 @@
                     <el-input-number
                       v-model="workerDraft(row).passQty"
                       controls-position="right"
+                      :disabled="!workerDraft(row).reportQty"
                       :max="workerDraft(row).reportQty"
                       :min="0"
                       size="small"
-                      :disabled="!workerDraft(row).reportQty"
                     />
                   </template>
                 </el-table-column>
@@ -366,10 +366,10 @@
                     <el-input-number
                       v-model="workerDraft(row).defectQty"
                       controls-position="right"
+                      :disabled="!workerDraft(row).reportQty"
                       :max="workerDraft(row).reportQty"
                       :min="0"
                       size="small"
-                      :disabled="!workerDraft(row).reportQty"
                     />
                   </template>
                 </el-table-column>
@@ -378,20 +378,20 @@
                     <el-input-number
                       v-model="workerDraft(row).reworkQty"
                       controls-position="right"
+                      :disabled="!workerDraft(row).reportQty"
                       :max="workerDraft(row).reportQty"
                       :min="0"
                       size="small"
-                      :disabled="!workerDraft(row).reportQty"
                     />
                   </template>
                 </el-table-column>
                 <el-table-column align="center" fixed="right" label="操作" width="72">
                   <template #default="{ row }">
                     <el-button
-                      link
-                      type="primary"
                       :disabled="!workerDraft(row).reportQty"
+                      link
                       :loading="reporting"
+                      type="primary"
                       @click="submitOneWorker(row)"
                     >
                       报工

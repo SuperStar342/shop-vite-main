@@ -10,6 +10,7 @@ import { useSettingsStore } from '/@/store/modules/settings'
 import { useUserStore } from '/@/store/modules/user'
 import getPageTitle from '/@/utils/pageTitle'
 import { toLoginRoute } from '/@/utils/routes'
+import { getToken } from '/@/utils/auth'
 
 /** 取第一个可访问菜单 path，避免登录后跳 / 无路由白屏 */
 const firstMenuPath = (routes: any[]): string | null => {
@@ -44,16 +45,25 @@ export const setupPermissions = (router: Router) => {
     // 若仍用 routes.length 会反复 setRoutes，导致「未分配菜单」提示连弹
     const routesStore = useRoutesStore()
     const { setRoutes } = routesStore
-    const { token, GetUserInfo, FedLogOut } = useUserStore()
+    const userStore = useUserStore()
+    const { GetUserInfo, FedLogOut } = userStore
+    // 冷启动：localStorage 有 token、cookie 丢失时先回写，否则菜单接口 401 会被误判为「未分配菜单」
+    userStore.syncAuthCookies()
     if (showProgressBar) VabProgress.start()
 
-    let hasToken = token
+    let hasToken = !!(getToken() || userStore.token)
     //登陆拦截关闭时，没有token也进入
     // if (!loginInterception) hasToken = true
 
     const routesReady = routesStore.allRoutes.length > 0
 
     if (hasToken) {
+      try {
+        const { startTokenKeepAlive } = await import('/@/utils/tokenKeepAlive')
+        startTokenKeepAlive()
+      } catch {
+        /* ignore */
+      }
       if (routesReady) {
         // 禁止已登录用户返回登录页
         if (to.path === '/login') {
@@ -67,6 +77,12 @@ export const setupPermissions = (router: Router) => {
             await GetUserInfo()
           } catch (e) {
             console.warn('GetUserInfo 失败，继续用 token 载荷加载菜单', e)
+          }
+          // 仍无请求用 cookie：会话已失效，回登录而不是假 404
+          if (!getToken()) {
+            await FedLogOut()
+            next(toLoginRoute(to.fullPath))
+            return
           }
           await setRoutes(authentication)
 

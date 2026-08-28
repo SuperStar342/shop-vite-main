@@ -4,10 +4,10 @@
       <vab-query-form-left-panel :span="24">
         <el-form inline :model="queryForm" @submit.prevent>
           <el-form-item>
-            <el-input v-model.trim="queryForm.woNo" clearable placeholder="工单号" style="width: 160px" />
+            <el-input v-model.trim="queryForm.woNo" clearable placeholder="工单号，多个用逗号" style="width: 200px" />
           </el-form-item>
           <el-form-item>
-            <el-input v-model.trim="queryForm.moNo" clearable placeholder="制令号" style="width: 160px" />
+            <el-input v-model.trim="queryForm.moNo" clearable placeholder="制令号，多个用逗号" style="width: 200px" />
           </el-form-item>
           <el-form-item>
             <el-select v-model="queryForm.ifOpen" clearable placeholder="是否已开令" style="width: 120px">
@@ -40,7 +40,7 @@
             <el-button :icon="Refresh" @click="resetQuery">重置</el-button>
           </el-form-item>
           <el-form-item>
-            <el-button type="success" plain @click="goQuickDispatch">快捷派工</el-button>
+            <el-button plain type="success" @click="goQuickDispatch">快捷派工</el-button>
           </el-form-item>
         </el-form>
       </vab-query-form-left-panel>
@@ -52,11 +52,11 @@
         <strong>{{ selectedWo.woNo }}</strong>
       </div>
       <div class="wo-summary__tags">
-        <el-tag size="small" effect="plain" :type="tagType(selectedWo.cFlag, '已审核')">{{ selectedWo.cFlag || '-' }}</el-tag>
-        <el-tag size="small" effect="plain" :type="tagType(selectedWo.ifPick, '已领料')">{{ selectedWo.ifPick || '-' }}</el-tag>
-        <el-tag size="small" effect="plain" :type="tagType(selectedWo.ifProEnd, '已完成')">{{ selectedWo.ifProEnd || '-' }}</el-tag>
-        <el-tag size="small" effect="plain" :type="tagType(selectedWo.ifClose, '已结案')">{{ selectedWo.ifClose || '-' }}</el-tag>
-        <el-tag size="small" effect="plain" type="info">{{ selectedWo.ifWt || '未派工' }}</el-tag>
+        <el-tag effect="plain" size="small" :type="tagType(selectedWo.cFlag, '已审核')">{{ selectedWo.cFlag || '-' }}</el-tag>
+        <el-tag effect="plain" size="small" :type="tagType(selectedWo.ifPick, '已领料')">{{ selectedWo.ifPick || '-' }}</el-tag>
+        <el-tag effect="plain" size="small" :type="tagType(selectedWo.ifProEnd, '已完成')">{{ selectedWo.ifProEnd || '-' }}</el-tag>
+        <el-tag effect="plain" size="small" :type="tagType(selectedWo.ifClose, '已结案')">{{ selectedWo.ifClose || '-' }}</el-tag>
+        <el-tag effect="plain" size="small" type="info">{{ selectedWo.ifWt || '未派工' }}</el-tag>
       </div>
       <div class="wo-summary__meta">
         <span>{{ selectedWo.orgName || selectedWo.mkCode }}</span>
@@ -68,15 +68,15 @@
     <div class="pane-stack">
       <div class="pane pane-master" :style="{ flex: `${paneRatios[0]} 1 0px` }">
         <div ref="masterWrapRef" class="vtable-wrap">
-          <ListTable
+          <list-table
             ref="masterTableRef"
+            :height="masterHeight"
             :options="masterOptions"
             :records="masterList"
-            :height="masterHeight"
             @on-click-cell="(args: any) => { onCopyTrack(args, masterTableRef); handleMasterClick(args) }"
-            @on-selected-cell="(args: any) => onCopyTrack(args, masterTableRef)"
             @on-context-menu-cell="(args: any) => onCopyContextMenu(args, masterTableRef)"
             @on-initialized="() => masterLayout.handleTableReady()"
+            @on-selected-cell="(args: any) => onCopyTrack(args, masterTableRef)"
           />
         </div>
         <vab-pagination
@@ -102,16 +102,16 @@
           <el-tab-pane label="工单开料明细" name="wcs" />
         </el-tabs>
         <div ref="midWrapRef" class="vtable-wrap">
-          <ListTable
-            ref="midTableRef"
+          <list-table
             :key="`mid-${activeTab}`"
+            ref="midTableRef"
+            :height="midHeight"
             :options="midOptions"
             :records="midList"
-            :height="midHeight"
-            @on-context-menu-cell="(args: any) => onCopyContextMenu(args, midTableRef)"
             @on-click-cell="(args: any) => onCopyTrack(args, midTableRef)"
-            @on-selected-cell="(args: any) => onCopyTrack(args, midTableRef)"
+            @on-context-menu-cell="(args: any) => onCopyContextMenu(args, midTableRef)"
             @on-initialized="() => midLayout.handleTableReady()"
+            @on-selected-cell="(args: any) => onCopyTrack(args, midTableRef)"
           />
         </div>
       </div>

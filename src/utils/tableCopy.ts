@@ -60,6 +60,22 @@ const truncate = (text: string, max = 36) => {
   return `${s.slice(0, max)}…`
 }
 
+/** 多格/多行复制：逗号分隔，便于粘贴到条件查询做多单号检索 */
+const joinByComma = (values: string[]) =>
+  values
+    .map((v) => normalizeText(v))
+    .filter(Boolean)
+    .join(',')
+
+const matrixToComma = (matrixLines: string[]) =>
+  joinByComma(
+    matrixLines.flatMap((line) =>
+      String(line || '')
+        .split(/\t/)
+        .map((s) => s.trim())
+    )
+  )
+
 const ensureCopyStyles = () => {
   if (styleInjected || typeof document === 'undefined') return
   styleInjected = true
@@ -108,7 +124,10 @@ const isOperationTd = (td: HTMLElement) => {
     operationTdCache.set(td, false)
     return false
   }
-  const btnText = [...buttons].map((b) => normalizeText(b.textContent)).filter(Boolean).join('')
+  const btnText = [...buttons]
+    .map((b) => normalizeText(b.textContent))
+    .filter(Boolean)
+    .join('')
   const cellText = normalizeText(td.innerText)
   const result = !cellText || Boolean(btnText && (btnText === cellText || cellText.length <= btnText.length + 4))
   operationTdCache.set(td, result)
@@ -126,9 +145,7 @@ const isCopyableTd = (td: HTMLElement) => {
 const getCopyableTds = (tr: HTMLTableRowElement) => {
   const cached = copyableColsCache.get(tr)
   if (cached) return cached
-  const cols = [...tr.querySelectorAll(':scope > td.el-table__cell')].filter((c) =>
-    isCopyableTd(c as HTMLElement)
-  ) as HTMLElement[]
+  const cols = [...tr.querySelectorAll(':scope > td.el-table__cell')].filter((c) => isCopyableTd(c as HTMLElement)) as HTMLElement[]
   copyableColsCache.set(tr, cols)
   return cols
 }
@@ -219,9 +236,7 @@ const flashSelection = () => {
 const isEditableTarget = (target: EventTarget | null) => {
   const el = target as HTMLElement | null
   if (!el?.closest) return false
-  return Boolean(
-    el.closest('input, textarea, [contenteditable="true"], .el-input, .el-textarea, .el-select, .el-message-box')
-  )
+  return Boolean(el.closest('input, textarea, [contenteditable="true"], .el-input, .el-textarea, .el-select, .el-message-box'))
 }
 
 export const collectCheckedRowsText = (host: HTMLElement) => {
@@ -239,7 +254,11 @@ export const collectCheckedRowsText = (host: HTMLElement) => {
     cells.push(...tds)
     return tds.map((td) => normalizeText(td.innerText)).join('\t')
   })
-  return { text: lines.join('\n'), rowCount: rows.length, cells }
+  // 勾选多行：若每行仅一列可复制值，用逗号；否则整行仍用换行+制表符
+  const colCounts = new Set(rows.map((tr) => getCopyableTds(tr).length))
+  const singleCol = colCounts.size === 1 && [...colCounts][0] === 1
+  const text = singleCol ? matrixToComma(lines) : lines.join('\n')
+  return { text, rowCount: rows.length, cells }
 }
 
 const collectRangeCells = (from: CellPos, to: CellPos) => {
@@ -300,8 +319,11 @@ const buildRangePayload = (from: CellPos, to: CellPos) => {
   }
   const cellCount = cells.length
   const rowCount = r1 - r0 + 1
+  const tsvText = matrix.join('\n')
+  // 选区复制：多行/多列统一逗号分隔（粘贴到制令号/工单号等查询框）
+  const commaText = cellCount > 1 ? matrixToComma(matrix) : tsvText
   return {
-    cellText: matrix.join('\n'),
+    cellText: commaText,
     rowText: fullRows.join('\n'),
     mode: (cellCount > 1 ? 'range' : 'cell') as 'cell' | 'range',
     cellCount,
@@ -312,11 +334,7 @@ const buildRangePayload = (from: CellPos, to: CellPos) => {
 }
 
 /** 选中矩形区域；visualOnly 仅更新高亮（拖选过程用） */
-export function selectElTableRange(
-  from: CellPos,
-  to: CellPos,
-  opts?: { focus?: boolean; visualOnly?: boolean }
-) {
+export function selectElTableRange(from: CellPos, to: CellPos, opts?: { focus?: boolean; visualOnly?: boolean }) {
   ensureCopyStyles()
   if (from.table !== to.table) return
 
@@ -407,9 +425,11 @@ export async function copyTableText(text: string, kind: TableCopyKind = '单元�
     const { cellCount, rowCount, mode } = tableCopySelection
     let msg = `已复制${kind}：${tip}`
     if (kind === '选区' || (kind === '单元格' && mode === 'range' && cellCount > 1)) {
-      msg = `已复制选区 ${cellCount} 格（${rowCount} 行）：${tip}`
+      msg = `已复制选区 ${cellCount} 格（逗号分隔）：${tip}`
     } else if (kind === '多行' || (kind === '整行' && rowCount > 1)) {
-      msg = `已复制 ${rowCount} 行：${tip}`
+      msg = value.includes(',') && !value.includes('\t')
+        ? `已复制 ${rowCount} 行（逗号分隔）：${tip}`
+        : `已复制 ${rowCount} 行：${tip}`
     } else if (kind === '单元格') {
       msg = `已复制单元格：${tip}`
     } else if (kind === '整行') {
@@ -636,8 +656,11 @@ export function trackVTableCellForCopy(args: any, getInstance: () => any) {
           fullRows.push(buildVTableRowText(inst, r))
         }
         const copyVal = typeof inst.getCopyValue === 'function' ? normalizeText(inst.getCopyValue()) : ''
+        const tsvText = matrix.join('\n')
+        const commaText = cellCount > 1 ? matrixToComma(matrix) : tsvText
+        // VTable 自带 getCopyValue 多为 TSV；多格时改用逗号以便多单号查询
         setSelectionPayload({
-          cellText: copyVal || matrix.join('\n'),
+          cellText: cellCount > 1 ? commaText : copyVal || tsvText,
           rowText: fullRows.join('\n'),
           mode: cellCount > 1 ? 'range' : 'cell',
           cellCount,
