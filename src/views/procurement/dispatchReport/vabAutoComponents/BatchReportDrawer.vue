@@ -391,6 +391,7 @@ const buildPayloads = (): DispatchReportPayload[] => {
         goodsName: row.goodsName,
         prcCode: row.prcCode,
         prcName: row.prcName,
+        woBorSno: w.woBorSno || row.woBorSno || '',
         empNo: w.empNo,
         empName: w.empName,
         pendingQty: w.pendingQty,

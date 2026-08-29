@@ -98,7 +98,7 @@
         <span>工序 {{ itemList.length }}</span>
         <span>派工 {{ fmtNum(itemTotals.wtQty) }}</span>
         <span>完工 {{ fmtNum(itemTotals.fnQty) }}</span>
-        <span>完成率 {{ itemTotals.rate }}%</span>
+            <span>完成率 {{ Number(itemTotals.rate).toFixed(1) }}%</span>
       </div>
       <div class="wt-summary__actions">
         <el-tooltip
@@ -304,65 +304,66 @@
           </em>
         </div>
         <div v-show="detailTab === 'items'" class="table-wrap">
-          <el-table
-            ref="itemTableRef"
-            v-loading="itemLoading"
-            border
-            :data="itemList"
-            height="100%"
-            highlight-current-row
-            :row-key="itemRowKey"
-            @row-click="handleItemClick"
-            @selection-change="onItemSelectionChange"
-          >
-            <dispatch-wt-item-columns :fmt="fmtNum" selection />
-            <template #empty>
-              <el-empty :description="selectedWt ? '暂无工序明细' : '请先选择派工单'" />
-            </template>
-          </el-table>
-        </div>
-        <div v-show="detailTab === 'cards'" v-loading="cardLoading" class="dispatch-cards">
-          <div v-if="checkedItems.length" class="dispatch-cards__list">
-            <article
-              v-for="card in dispatchCards"
-              :key="card.key"
-              class="dispatch-card"
-              :class="{ 'is-active': selectedItemKey === card.key }"
-              @click="handleCardClick(card)"
-            >
-              <header class="dispatch-card__head">
-                <div class="dispatch-card__title">
-                  <span class="code">{{ card.prcCode || '-' }}</span>
-                  <strong>{{ card.prcName || '工序' }}</strong>
-                </div>
-                <b class="qty">{{ fmtNum(card.wtQty) }}</b>
-              </header>
-              <div class="dispatch-card__meta">
-                <span>工单 {{ card.woNo || '-' }}</span>
-                <span>制令 {{ card.moNo || '-' }}</span>
-                <span>{{ card.goodsName || card.goodsCode || '-' }}</span>
+              <el-table
+                ref="itemTableRef"
+                v-loading="itemLoading"
+                border
+                :data="itemList"
+                height="100%"
+                highlight-current-row
+                :row-key="itemRowKey"
+                @row-click="handleItemClick"
+                @selection-change="onItemSelectionChange"
+              >
+                <dispatch-wt-item-columns :fmt="fmtNum" selection />
+                <template #empty>
+                  <el-empty :description="selectedWt ? '暂无工序明细' : '请先选择派工单'" />
+                </template>
+              </el-table>
+            </div>
+            <div v-show="detailTab === 'cards'" v-loading="cardLoading" class="dispatch-cards">
+              <div v-if="checkedItems.length" class="dispatch-cards__list">
+                <article
+                  v-for="card in dispatchCards"
+                  :key="card.key"
+                  class="dispatch-card"
+                  :class="{ 'is-active': selectedItemKey === card.key }"
+                  @click="handleCardClick(card)"
+                >
+                  <header class="dispatch-card__head">
+                    <div class="dispatch-card__title">
+                      <span class="code">{{ card.prcCode || '-' }}</span>
+                      <strong>{{ card.prcName || '工序' }}</strong>
+                    </div>
+                    <b class="qty">{{ fmtNum(card.wtQty) }}</b>
+                  </header>
+                  <div class="dispatch-card__meta">
+                    <span>工单 {{ card.woNo || '-' }}</span>
+                    <span>制令 {{ card.moNo || '-' }}</span>
+                    <span>{{ card.goodsName || card.goodsCode || '-' }}</span>
+                  </div>
+                  <ul class="dispatch-card__workers">
+                    <li v-for="w in card.workers" :key="`${card.key}-${w.empNo}`">
+                      <div class="name">
+                        <strong>{{ w.empName || w.empNo }}</strong>
+                        <span>{{ w.empNo }}</span>
+                      </div>
+                      <div class="plan">
+                        <em>计划 {{ fmtNum(w.planQty) }}</em>
+                        <em>完工 {{ fmtNum(w.fnQty) }}</em>
+                      </div>
+                      <el-progress
+                        :format="(p: number) => `${Number(p).toFixed(1)}%`"
+                        :percentage="progressOf(w)"
+                        :status="progressOf(w) >= 100 ? 'success' : undefined"
+                        :stroke-width="8"
+                      />
+                    </li>
+                    <li v-if="!card.workers.length" class="is-empty">暂无人员派工</li>
+                  </ul>
+                </article>
               </div>
-              <ul class="dispatch-card__workers">
-                <li v-for="w in card.workers" :key="`${card.key}-${w.empNo}`">
-                  <div class="name">
-                    <strong>{{ w.empName || w.empNo }}</strong>
-                    <span>{{ w.empNo }}</span>
-                  </div>
-                  <div class="plan">
-                    <em>计划 {{ fmtNum(w.planQty) }}</em>
-                    <em>完工 {{ fmtNum(w.fnQty) }}</em>
-                  </div>
-                  <el-progress
-                    :percentage="progressOf(w)"
-                    :status="progressOf(w) >= 100 ? 'success' : undefined"
-                    :stroke-width="8"
-                  />
-                </li>
-                <li v-if="!card.workers.length" class="is-empty">暂无人员派工</li>
-              </ul>
-            </article>
-          </div>
-          <el-empty v-else description="勾选工序明细后，在此显示派工明细卡片" />
+              <el-empty v-else description="勾选工序明细后，在此显示派工明细卡片" />
         </div>
       </div>
 
@@ -375,12 +376,12 @@
         </div>
         <div class="table-wrap">
           <el-table
-            v-loading="workerLoading"
-            border
-            :data="workerList"
-            height="100%"
-            :row-key="workerRowKey"
-          >
+                v-loading="workerLoading"
+                border
+                :data="workerList"
+                height="100%"
+                :row-key="workerRowKey"
+              >
             <el-table-column v-if="visibleWorker('empNo')" label="工号" min-width="110" prop="empNo" />
             <el-table-column v-if="visibleWorker('empName')" label="姓名" min-width="90" prop="empName" />
             <el-table-column v-if="visibleWorker('deptCode')" label="实际生产部门代号" min-width="140" prop="deptCode" />
@@ -391,6 +392,7 @@
             <el-table-column v-if="visibleWorker('progress')" label="完工进度" min-width="140">
               <template #default="{ row }">
                 <el-progress
+                  :format="(p: number) => `${Number(p).toFixed(1)}%`"
                   :percentage="progressOf(row)"
                   :status="progressOf(row) >= 100 ? 'success' : undefined"
                   :stroke-width="8"
@@ -594,7 +596,7 @@ const fmtNum = (v: any, digits = 2) => {
 const progressOf = (row: any) => {
   const plan = num(row.planQty)
   if (plan <= 0) return num(row.fnQty) > 0 ? 100 : 0
-  return Math.min(100, Math.round((num(row.fnQty) / plan) * 100))
+  return Math.min(100, Math.round((num(row.fnQty) / plan) * 1000) / 10)
 }
 
 const tagType = (label: string) => {
@@ -1183,6 +1185,7 @@ onBeforeUnmount(() => {
     flex-wrap: wrap;
   }
 }
+
 
 .pane-stack {
   flex: 1;

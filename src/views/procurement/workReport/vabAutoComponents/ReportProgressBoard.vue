@@ -13,7 +13,12 @@
           <p>计划 {{ progress.planQty }} 套 · 交期 {{ progress.planEndDate }}</p>
         </div>
         <div class="rpb__ring">
-          <el-progress :percentage="progress.progress" type="circle" :width="72" />
+          <el-progress
+            :format="(p: number) => `${Number(p).toFixed(1)}%`"
+            :percentage="Number(progress.progress) || 0"
+            type="circle"
+            :width="72"
+          />
           <em>总进度</em>
         </div>
       </div>

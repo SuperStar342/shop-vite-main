@@ -79,7 +79,7 @@
             <span>人员 {{ workerTotalCount }}</span>
             <span>派工 {{ fmtNum(itemTotals.wtQty) }}</span>
             <span>完工 {{ fmtNum(itemTotals.fnQty) }}</span>
-            <span>完成率 {{ itemTotals.rate }}%</span>
+            <span>完成率 {{ Number(itemTotals.rate).toFixed(1) }}%</span>
           </div>
           <div class="wt-summary__actions">
             <el-button :disabled="!pendingWorkerCount" plain size="small" type="primary" @click="fillAllPendingWorkers">
@@ -182,8 +182,14 @@
           />
         </div>
 
-        <!-- 未选派工单：明细区隐藏 -->
-        <template v-if="showDetail">
+        <!-- 未选派工单：明细区隐藏；选中后丝滑展开下方明细 -->
+        <Transition name="dr-detail-soft">
+          <div
+            v-if="showDetail"
+            :key="detailRevealKey"
+            class="dr-lower-details"
+            :style="{ flex: `${paneRatios[1] + paneRatios[2]} 1 0px` }"
+          >
           <div class="resize-grip" @mousedown="(e: MouseEvent) => startPaneResize(e, 0)" />
 
           <div class="pane pane-items" :style="{ flex: `${paneRatios[1]} 1 0px` }">
@@ -196,7 +202,7 @@
                 {{
                   detailTab === 'items'
                     ? `${itemList.length} 行${checkedItems.length ? ` · 已选 ${checkedItems.length}` : ''}`
-                    : `完成率 ${itemTotals.rate}%`
+                    : `完成率 ${Number(itemTotals.rate).toFixed(1)}%`
                 }}
               </em>
             </div>
@@ -230,11 +236,15 @@
                 <header>
                   <strong>{{ row.prcName || row.prcCode }}</strong>
                   <el-tag effect="plain" size="small" :type="itemProgress(row) >= 100 ? 'success' : 'info'">
-                    {{ itemProgress(row) }}%
+                    {{ Number(itemProgress(row)).toFixed(1) }}%
                   </el-tag>
                 </header>
                 <p>{{ row.goodsName || row.goodsCode }} · {{ row.woNo }}</p>
-                <el-progress :percentage="itemProgress(row)" :stroke-width="10" />
+                <el-progress
+                  :format="(p: number) => `${Number(p).toFixed(1)}%`"
+                  :percentage="itemProgress(row)"
+                  :stroke-width="10"
+                />
                 <div class="progress-summary__nums">
                   <span>派工 {{ fmtNum(row.wtQty) }}</span>
                   <span>已报 {{ fmtNum(row.fnQty) }}</span>
@@ -244,6 +254,7 @@
                   <li v-for="w in workersByItem[itemRowKey(row)]" :key="workerRowKey(w)">
                     <span class="name">{{ w.empName || w.empNo }}</span>
                     <el-progress
+                      :format="(p: number) => `${Number(p).toFixed(1)}%`"
                       :percentage="progressOf(w)"
                       :status="progressOf(w) >= 100 ? 'success' : undefined"
                       :stroke-width="6"
@@ -326,6 +337,7 @@
                 <el-table-column v-if="visibleWorker('progress')" label="完工进度" min-width="140">
                   <template #default="{ row }">
                     <el-progress
+                      :format="(p: number) => `${Number(p).toFixed(1)}%`"
                       :percentage="progressOf(row)"
                       :status="progressOf(row) >= 100 ? 'success' : undefined"
                       :stroke-width="8"
@@ -337,7 +349,7 @@
                     <span class="wr-pending">{{ workerPending(row) }}</span>
                   </template>
                 </el-table-column>
-                <el-table-column align="center" label="本次报工" min-width="110">
+                <el-table-column align="center" label="本次报工" min-width="120">
                   <template #default="{ row }">
                     <el-input-number
                       v-model="workerDraft(row).reportQty"
@@ -346,56 +358,8 @@
                       :max="Math.max(workerPending(row), 0)"
                       :min="0"
                       size="small"
+                      @change="(v: number | undefined) => onReportQtyChange(row, v)"
                     />
-                  </template>
-                </el-table-column>
-                <el-table-column align="center" label="合格" min-width="90">
-                  <template #default="{ row }">
-                    <el-input-number
-                      v-model="workerDraft(row).passQty"
-                      controls-position="right"
-                      :disabled="!workerDraft(row).reportQty"
-                      :max="workerDraft(row).reportQty"
-                      :min="0"
-                      size="small"
-                    />
-                  </template>
-                </el-table-column>
-                <el-table-column align="center" label="不良" min-width="90">
-                  <template #default="{ row }">
-                    <el-input-number
-                      v-model="workerDraft(row).defectQty"
-                      controls-position="right"
-                      :disabled="!workerDraft(row).reportQty"
-                      :max="workerDraft(row).reportQty"
-                      :min="0"
-                      size="small"
-                    />
-                  </template>
-                </el-table-column>
-                <el-table-column align="center" label="返工" min-width="90">
-                  <template #default="{ row }">
-                    <el-input-number
-                      v-model="workerDraft(row).reworkQty"
-                      controls-position="right"
-                      :disabled="!workerDraft(row).reportQty"
-                      :max="workerDraft(row).reportQty"
-                      :min="0"
-                      size="small"
-                    />
-                  </template>
-                </el-table-column>
-                <el-table-column align="center" fixed="right" label="操作" width="72">
-                  <template #default="{ row }">
-                    <el-button
-                      :disabled="!workerDraft(row).reportQty"
-                      link
-                      :loading="reporting"
-                      type="primary"
-                      @click="submitOneWorker(row)"
-                    >
-                      报工
-                    </el-button>
                   </template>
                 </el-table-column>
                 <template #empty>
@@ -414,9 +378,10 @@
               </div>
             </footer>
           </div>
-        </template>
+          </div>
+        </Transition>
 
-        <div v-else class="dp-hint">
+        <div v-if="!showDetail" class="dp-hint">
           <el-empty description="点选上方派工单后，展开工序明细与报工区" :image-size="80" />
         </div>
       </div>
@@ -447,7 +412,6 @@ import ReportRecordsDialog from './vabAutoComponents/ReportRecordsDialog.vue'
 import { getWtItems, getWtList, getWtWorkers } from '/@/api/procurement/dispatch'
 import type { DispatchReportPayload } from '/@/api/procurement/workReport'
 import {
-  submitDispatchReport,
   submitDispatchReportBatch,
   validateDispatchReport,
 } from '/@/api/procurement/workReport'
@@ -486,6 +450,8 @@ const checkedItems = ref<any[]>([])
 const masterTableRef = ref<any>(null)
 const itemTableRef = ref<any>(null)
 const detailTab = ref<'items' | 'progress'>('items')
+/** 切换派工单时下方明细重渲染动画 */
+const detailRevealKey = ref(0)
 const workerDrafts = reactive<Record<string, { reportQty: number; passQty: number; defectQty: number; reworkQty: number }>>({})
 
 const recordsVisible = ref(false)
@@ -509,7 +475,7 @@ const pendingWorkerCount = computed(() => workerList.value.filter((w) => workerP
 const statCards = computed(() => [
   { key: 'items', label: '工序', value: itemList.value.length },
   { key: 'pending', label: '待报工序', value: pendingItemCount.value },
-  { key: 'rate', label: '完成率', value: `${itemTotals.value.rate}%` },
+  { key: 'rate', label: '完成率', value: `${Number(itemTotals.value.rate).toFixed(1)}%` },
   { key: 'workers', label: '当前人员', value: workerTotalCount.value },
 ])
 
@@ -544,13 +510,13 @@ const fmtNum = (v: any, digits = 2) => {
 const progressOf = (row: any) => {
   const plan = num(row.planQty)
   if (plan <= 0) return num(row.fnQty) > 0 ? 100 : 0
-  return Math.min(100, Math.round((num(row.fnQty) / plan) * 100))
+  return Math.min(100, Math.round((num(row.fnQty) / plan) * 1000) / 10)
 }
 
 const itemProgress = (row: any) => {
   const wt = num(row.wtQty)
   if (wt <= 0) return 0
-  return Math.min(100, Math.round((num(row.fnQty) / wt) * 100))
+  return Math.min(100, Math.round((num(row.fnQty) / wt) * 1000) / 10)
 }
 
 const workerPending = (row: any) => Math.max(0, num(row.planQty) - num(row.fnQty))
@@ -559,6 +525,7 @@ const workerPending = (row: any) => Math.max(0, num(row.planQty) - num(row.fnQty
 const fnPcsOf = (row: any) =>
   row?.fnPcsQty ?? row?.fnPieceQty ?? row?.pieceFnQty ?? row?.fnPcs ?? row?.pcsFnQty ?? 0
 
+/** 本次报工自动回填待报数量；合格=报工数，不良/返工=0 */
 const resetWorkerDraft = (row: any) => {
   const pending = workerPending(row)
   const qty = pending > 0 ? pending : 0
@@ -569,10 +536,17 @@ const resetWorkerDraft = (row: any) => {
   d.reworkQty = 0
 }
 
+const onReportQtyChange = (row: any, v: number | undefined) => {
+  const d = workerDraft(row)
+  const qty = Math.max(0, Math.min(workerPending(row), num(v)))
+  d.reportQty = qty
+  d.passQty = qty
+  d.defectQty = 0
+  d.reworkQty = 0
+}
+
 const initWorkerDraftsForList = (list: any[]) => {
-  for (const w of list) {
-    if (workerPending(w) > 0) resetWorkerDraft(w)
-  }
+  for (const w of list) resetWorkerDraft(w)
 }
 
 const workerDraft = (row: any) => {
@@ -605,7 +579,7 @@ const itemRowKey = (row: any) =>
 const selectedItemKey = computed(() => (selectedItem.value ? itemRowKey(selectedItem.value) : ''))
 
 const workerRowKey = (row: any) =>
-  `${row.empNo}-${row.moNo}-${row.goodsId}-${row.prcCode}-${row.woNo}`
+  `${row.empNo}-${row.moNo}-${row.goodsId}-${row.prcCode}-${row.woNo}-${row.woBorSno || ''}`
 
 const startPaneResize = (e: MouseEvent, gripIdx: number) => {
   paneResizing.value = gripIdx
@@ -742,8 +716,8 @@ const handleMasterClick = (row: any) => {
     masterTableRef.value?.setCurrentRow?.(row)
   })
   if (!same) {
+    detailRevealKey.value += 1
     loadItems(row.wtNo)
-    // 抽屉打开时切换单号会由 BatchReportDrawer watch(wtNo) 自动 reload
   }
 }
 
@@ -770,15 +744,22 @@ const nowStr = () => {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:00`
 }
 
+/** 本地累加完工数（不刷新列表） */
 const applyLocalReport = (qty: number, empNo?: string) => {
+  if (qty <= 0) return
   if (selectedItem.value) {
     selectedItem.value.fnQty = num(selectedItem.value.fnQty) + qty
     const idx = itemList.value.findIndex((r) => itemRowKey(r) === itemRowKey(selectedItem.value))
-    if (idx >= 0) itemList.value[idx] = { ...selectedItem.value }
+    if (idx >= 0 && itemList.value[idx] !== selectedItem.value) {
+      itemList.value[idx].fnQty = num(itemList.value[idx].fnQty) + qty
+    }
   }
   if (empNo) {
     const w = workerList.value.find((x) => x.empNo === empNo)
-    if (w) w.fnQty = num(w.fnQty) + qty
+    if (w) {
+      w.fnQty = num(w.fnQty) + qty
+      resetWorkerDraft(w)
+    }
   }
 }
 
@@ -793,6 +774,7 @@ const openRecords = (item: any) => {
 const buildWorkerPayload = (row: any): DispatchReportPayload | string => {
   if (!selectedWt.value || !selectedItem.value) return '请先选择工序'
   const draft = workerDraft(row)
+  const reportQty = num(draft.reportQty)
   const payload: DispatchReportPayload = {
     wtNo: selectedWt.value.wtNo,
     woNo: selectedItem.value.woNo,
@@ -800,18 +782,16 @@ const buildWorkerPayload = (row: any): DispatchReportPayload | string => {
     goodsName: selectedItem.value.goodsName,
     prcCode: selectedItem.value.prcCode,
     prcName: selectedItem.value.prcName,
+    woBorSno: row.woBorSno || selectedItem.value.woBorSno || '',
     empNo: row.empNo,
     empName: row.empName,
     pendingQty: workerPending(row),
-    reportQty: num(draft.reportQty),
-    passQty: num(draft.passQty),
-    defectQty: num(draft.defectQty),
-    reworkQty: num(draft.reworkQty),
+    reportQty,
+    passQty: reportQty,
+    defectQty: 0,
+    reworkQty: 0,
     reportTime: nowStr(),
-    reportMethod: '批量报工',
-  }
-  if (payload.passQty + payload.defectQty + payload.reworkQty !== payload.reportQty) {
-    payload.passQty = Math.max(0, payload.reportQty - payload.defectQty - payload.reworkQty)
+    reportMethod: '手工报工',
   }
   return validateDispatchReport(payload) || payload
 }
@@ -822,48 +802,12 @@ const fillAllPendingWorkers = () => {
   }
 }
 
-const applyBatchLocalReport = (payloads: DispatchReportPayload[]) => {
-  for (const p of payloads) {
-    if (selectedItem.value && p.woNo === selectedItem.value.woNo && p.prcCode === selectedItem.value.prcCode) {
-      applyLocalReport(p.reportQty, p.empNo)
-    }
-    const item = itemList.value.find((r) => r.woNo === p.woNo && r.prcCode === p.prcCode)
-    if (item) item.fnQty = num(item.fnQty) + p.reportQty
-    const key = item ? itemRowKey(item) : ''
-    const workers = key ? workersByItem[key] : []
-    const w = workers?.find((x) => x.empNo === p.empNo)
-    if (w) w.fnQty = num(w.fnQty) + p.reportQty
-  }
-}
-
-const submitOneWorker = async (row: any) => {
-  if (!isAudited(selectedWt.value)) {
-    $baseMessage('请先审核派工单后再报工', 'warning', 'hey')
-    return
-  }
-  const built = buildWorkerPayload(row)
-  if (typeof built === 'string') {
-    $baseMessage(built, 'warning', 'hey')
-    return
-  }
-  reporting.value = true
-  try {
-    const res = await submitDispatchReport(built)
-    applyLocalReport(built.reportQty, row.empNo)
-    resetWorkerDraft(row)
-    $baseMessage(`报工成功：${res.reportNo}`, 'success', 'hey')
-  } catch (e: any) {
-    $baseMessage(e?.message || '报工失败', 'error', 'hey')
-  } finally {
-    reporting.value = false
-  }
-}
-
 const submitBatchWorkers = async () => {
   if (!isAudited(selectedWt.value)) {
     $baseMessage('请先审核派工单后再报工', 'warning', 'hey')
     return
   }
+  if (reporting.value) return
   const rows = workerList.value.filter((w) => num(workerDraft(w).reportQty) > 0)
   if (!rows.length) {
     $baseMessage('请先填写本次报工数量', 'warning', 'hey')
@@ -876,6 +820,7 @@ const submitBatchWorkers = async () => {
       $baseMessage(`${row.empName || row.empNo}：${built}`, 'warning', 'hey')
       continue
     }
+    built.reportMethod = '批量报工'
     payloads.push(built)
   }
   if (!payloads.length) return
@@ -883,8 +828,9 @@ const submitBatchWorkers = async () => {
   reporting.value = true
   try {
     const res = await submitDispatchReportBatch({ payloads })
-    applyBatchLocalReport(payloads)
-    for (const row of rows) resetWorkerDraft(row)
+    for (const p of payloads) {
+      applyLocalReport(p.reportQty, p.empNo)
+    }
     $baseMessage(`已提交 ${res.successCount} 人报工`, 'success', 'hey')
   } catch (e: any) {
     $baseMessage(e?.message || '批量报工失败', 'error', 'hey')
@@ -1041,6 +987,48 @@ onBeforeUnmount(() => {
   min-height: 0;
   display: flex;
   flex-direction: column;
+}
+
+.dr-lower-details {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.dr-detail-soft-enter-active {
+  transition:
+    opacity 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.dr-detail-soft-leave-active {
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
+}
+
+.dr-detail-soft-enter-from {
+  opacity: 0;
+  transform: translateY(28px);
+}
+
+.dr-detail-soft-leave-to {
+  opacity: 0;
+  transform: translateY(12px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dr-detail-soft-enter-active,
+  .dr-detail-soft-leave-active {
+    transition: none;
+  }
+
+  .dr-detail-soft-enter-from,
+  .dr-detail-soft-leave-to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .dp-hint {

@@ -1,4 +1,4 @@
-import { adaptPage, unwrap } from '/@/utils/bladeAdapter'
+import { adaptPage, unwrap, getEnvelope } from '/@/utils/bladeAdapter'
 import request from '/@/utils/request'
 import { getWtItems, getWtWorkers } from './dispatch'
 
@@ -95,6 +95,8 @@ export type DispatchReportPayload = {
   goodsName?: string
   prcCode?: string
   prcName?: string
+  /** 与派工人员/工序行对齐，避免后端更新错行 */
+  woBorSno?: string
   empNo?: string
   empName?: string
   pendingQty: number
@@ -114,7 +116,7 @@ const mkTask = (
   row: Partial<WorkReportTask> & Pick<WorkReportTask, 'id' | 'wtNo' | 'woNo' | 'moNo' | 'goodsName' | 'prcName' | 'wtQty' | 'fnQty'>
 ): WorkReportTask => {
   const pendingQty = Math.max(0, row.wtQty - row.fnQty)
-  const progress = row.wtQty > 0 ? Math.round((row.fnQty / row.wtQty) * 100) : 0
+  const progress = row.wtQty > 0 ? Math.round((row.fnQty / row.wtQty) * 1000) / 10 : 0
   const status: ReportTaskStatus = pendingQty <= 0 ? '已完工' : row.fnQty > 0 ? '部分完工' : '待报工'
   return {
     goodsCode: '',
@@ -357,7 +359,17 @@ export async function getPendingReportTasks(params?: any) {
       scope: params?.scope,
     },
   })
-  return adaptPage(res)
+  return adaptPage(res, (row: any) => {
+    const wtQty = Number(row?.wtQty) || 0
+    const fnQty = Number(row?.fnQty) || 0
+    const progress =
+      row?.progress != null && Number.isFinite(Number(row.progress))
+        ? Math.round(Number(row.progress) * 10) / 10
+        : wtQty > 0
+          ? Math.round((fnQty / wtQty) * 1000) / 10
+          : 0
+    return { ...row, wtQty, fnQty, progress }
+  })
 }
 
 export async function getReportRecords(params?: any) {
@@ -398,7 +410,14 @@ export async function getMoProgress(moNo: string) {
     )
   }
   const res: any = await request({ url: '/api/blade-system/work-report/mo-progress', method: 'get', params: { moNo } })
-  return unwrap(res) as MoProgress
+  const data = unwrap(res) as MoProgress
+  if (!data) return data
+  const round1 = (v: any) => Math.round((Number(v) || 0) * 10) / 10
+  return {
+    ...data,
+    progress: round1(data.progress),
+    steps: (data.steps || []).map((s) => ({ ...s, progress: round1(s.progress) })),
+  }
 }
 
 export function validateReportPayload(task: WorkReportTask | null, payload: SubmitWorkReportPayload) {
@@ -447,11 +466,11 @@ export async function submitWorkReport(payload: SubmitWorkReportPayload) {
       const step = prog.steps.find((s) => task.prcName.includes(s.name) || task.prcCode === s.code)
       if (step) {
         step.doneQty = Math.min(step.planQty, step.doneQty + payload.passQty)
-        step.progress = step.planQty > 0 ? Math.round((step.doneQty / step.planQty) * 100) : 0
+        step.progress = step.planQty > 0 ? Math.round((step.doneQty / step.planQty) * 1000) / 10 : 0
         step.status = step.progress >= 100 ? 'done' : 'active'
       }
       prog.doneQty = Math.min(prog.planQty, prog.doneQty + payload.passQty)
-      prog.progress = prog.planQty > 0 ? Math.round((prog.doneQty / prog.planQty) * 100) : 0
+      prog.progress = prog.planQty > 0 ? Math.round((prog.doneQty / prog.planQty) * 1000) / 10 : 0
     }
 
     return { reportNo, task: mockTasks[idx] }
@@ -495,6 +514,7 @@ export type BatchReportWorkerRow = {
   empNo: string
   empName: string
   deptName?: string
+  woBorSno?: string
   planQty: number
   fnQty: number
   pendingQty: number
@@ -565,7 +585,7 @@ export async function submitDispatchReport(payload: DispatchReportPayload) {
       remark: payload.remark,
       reportMethod: payload.reportMethod || '手工报工',
     } as WorkReportRecord & { reportMethod?: string })
-    return { reportNo }
+    return { reportNo, reportQty: payload.reportQty }
   }
 
   const res: any = await request({
@@ -573,8 +593,15 @@ export async function submitDispatchReport(payload: DispatchReportPayload) {
     method: 'post',
     data: payload,
   })
-  if (res?.success === false) throw new Error(res?.msg || '报工失败')
-  return unwrap(res)
+  const envelope = getEnvelope(res) || {}
+  if (envelope.success === false || (envelope.code != null && Number(envelope.code) !== 200)) {
+    throw new Error(envelope.msg || envelope.error_description || '报工失败')
+  }
+  const data = unwrap(res)
+  if (!data?.reportNo) {
+    throw new Error(envelope.msg || '报工失败：未返回报工单号')
+  }
+  return data
 }
 
 /** 批量/一键报工：单次请求提交多笔人员报工 */
@@ -634,7 +661,10 @@ export async function submitDispatchReportBatch(batch: DispatchReportBatchPayloa
     method: 'post',
     data: batch,
   })
-  if (res?.success === false) throw new Error(res?.msg || '批量报工失败')
+  const envelope = getEnvelope(res) || {}
+  if (envelope.success === false || (envelope.code != null && Number(envelope.code) !== 200)) {
+    throw new Error(envelope.msg || envelope.error_description || '批量报工失败')
+  }
   const data = unwrap(res) as DispatchReportBatchResult
   if (!data || (data.successCount == null && !Array.isArray((data as any).reportNos))) {
     throw new Error('批量报工接口无返回有效结果，请确认已部署 work-report 并重启 blade-system')
@@ -705,6 +735,7 @@ async function composeBatchPrepFromDispatch(wtNo: string, wtInfo?: Record<string
           empNo: w.empNo || '',
           empName: w.empName || '',
           deptName: w.deptName,
+          woBorSno: w.woBorSno || item.woBorSno || '',
           planQty: batchNum(w.planQty),
           fnQty: batchNum(w.fnQty),
           pendingQty: wPending,

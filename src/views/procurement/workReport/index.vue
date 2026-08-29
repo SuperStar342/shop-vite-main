@@ -94,7 +94,12 @@
             </el-table-column>
             <el-table-column label="进度" min-width="120">
               <template #default="{ row }">
-                <el-progress :color="progressColor(row.progress)" :percentage="row.progress" :stroke-width="8" />
+                <el-progress
+                  :color="progressColor(row.progress)"
+                  :format="(p: number) => `${Number(p).toFixed(1)}%`"
+                  :percentage="Number(row.progress) || 0"
+                  :stroke-width="8"
+                />
               </template>
             </el-table-column>
             <el-table-column align="center" label="状态" min-width="90">
@@ -114,13 +119,16 @@
         </div>
       </section>
 
-      <report-quick-form
-        class="wr-panel wr-panel--form"
-        :submitting="submitting"
-        :task="selectedTask"
-        @reset="selectedTask = null"
-        @submit="onSubmitReport"
-      />
+      <Transition mode="out-in" name="wr-detail-soft">
+        <report-quick-form
+          :key="selectedTask?.id || 'empty'"
+          class="wr-panel wr-panel--form"
+          :submitting="submitting"
+          :task="selectedTask"
+          @reset="selectedTask = null"
+          @submit="onSubmitReport"
+        />
+      </Transition>
     </div>
 
     <!-- 报工记录 -->
@@ -153,7 +161,14 @@
     </section>
 
     <!-- 进度看板 -->
-    <report-progress-board v-if="viewTab !== 'records'" class="wr-board" :progress="moProgress" />
+    <Transition mode="out-in" name="wr-detail-soft">
+      <report-progress-board
+        v-if="viewTab !== 'records'"
+        :key="moProgress?.moNo || selectedTask?.moNo || 'board-empty'"
+        class="wr-board"
+        :progress="moProgress"
+      />
+    </Transition>
 
     <footer v-if="viewTab !== 'records'" class="wr-tips">
       <el-icon><info-filled /></el-icon>
@@ -343,6 +358,10 @@ const loadMoProgress = async (moNo?: string) => {
 
 const onTaskSelect = async (row: WorkReportTask | null) => {
   if (!row?.id) return
+  if (selectedTask.value?.id === row.id) {
+    await loadMoProgress(row.moNo)
+    return
+  }
   selectedTask.value = row
   await loadMoProgress(row.moNo)
 }
@@ -584,6 +603,41 @@ onMounted(() => {
 
 .wr-board {
   flex-shrink: 0;
+}
+
+.wr-detail-soft-enter-active {
+  transition:
+    opacity 0.42s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.wr-detail-soft-leave-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+
+.wr-detail-soft-enter-from {
+  opacity: 0;
+  transform: translateY(20px) scale(0.98);
+}
+
+.wr-detail-soft-leave-to {
+  opacity: 0;
+  transform: translateY(-10px) scale(0.99);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wr-detail-soft-enter-active,
+  .wr-detail-soft-leave-active {
+    transition: none;
+  }
+
+  .wr-detail-soft-enter-from,
+  .wr-detail-soft-leave-to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .wr-tips {

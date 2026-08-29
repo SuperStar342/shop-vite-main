@@ -71,9 +71,13 @@
   <el-table-column v-if="visible('sku')" label="SKU" min-width="140" prop="sku" show-overflow-tooltip />
   <el-table-column v-if="visible('woNo')" label="工单号" min-width="120" prop="woNo" show-overflow-tooltip />
   <el-table-column v-if="visible('remark')" label="备注" min-width="120" prop="remark" show-overflow-tooltip />
-  <el-table-column v-if="showProgress && visible('progress')" label="完成率" min-width="100">
+  <el-table-column v-if="showProgress && visible('progress')" label="完成率" min-width="110">
     <template #default="{ row }">
-      <el-progress :percentage="progressOf(row)" :stroke-width="8" />
+      <el-progress
+        :format="(p: number) => `${Number(p).toFixed(1)}%`"
+        :percentage="progressOf(row)"
+        :stroke-width="8"
+      />
     </template>
   </el-table-column>
 </template>
@@ -93,6 +97,6 @@ const progressOf = (row: any) => {
   const wt = Number(row?.wtQty) || 0
   const fn = Number(row?.fnQty) || 0
   if (wt <= 0) return fn > 0 ? 100 : 0
-  return Math.min(100, Math.round((fn / wt) * 100))
+  return Math.min(100, Math.round((fn / wt) * 1000) / 10)
 }
 </script>
