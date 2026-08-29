@@ -4,19 +4,25 @@
 import router from '/@/router/'
 import { idleLogoutTime, tokenTime } from '/@/config'
 import { getRefreshToken, getToken, isTokenNearExpiry } from '/@/utils/auth'
+import { refreshSessionIfNeeded } from '/@/utils/sessionRefresh'
 import { useUserStore } from '/@/store/modules/user'
 import { ElMessage } from 'element-plus'
 
-const ACTIVITY_EVENTS = ['mousedown', 'keydown', 'touchstart', 'scroll', 'click'] as const
-const CHECK_INTERVAL_MS = 5 * 60 * 1000
+const ACTIVITY_EVENTS = ['mousedown', 'mousemove', 'keydown', 'touchstart', 'scroll', 'click', 'wheel'] as const
+/** 比 access(1h) 更短，保证临近过期窗口内至少检查数次 */
+const CHECK_INTERVAL_MS = 2 * 60 * 1000
+const ACTIVITY_THROTTLE_MS = 1000
 
 let timer: ReturnType<typeof setInterval> | null = null
 let lastActivityAt = Date.now()
-let refreshing = false
+let lastActivityWriteAt = 0
 let listenersBound = false
 
 const onUserActivity = () => {
-  lastActivityAt = Date.now()
+  const now = Date.now()
+  if (now - lastActivityWriteAt < ACTIVITY_THROTTLE_MS) return
+  lastActivityWriteAt = now
+  lastActivityAt = now
 }
 
 const resolveIntervalMs = () => {
@@ -33,34 +39,30 @@ const resolveIdleMs = () => {
 
 export const touchUserActivity = () => {
   lastActivityAt = Date.now()
+  lastActivityWriteAt = lastActivityAt
+}
+
+const onVisibilityChange = () => {
+  if (typeof document === 'undefined') return
+  if (document.visibilityState !== 'visible') return
+  touchUserActivity()
+  if (getToken() && isTokenNearExpiry()) {
+    refreshSessionIfNeeded().catch(() => undefined)
+  }
 }
 
 const bindActivityListeners = () => {
   if (listenersBound || typeof window === 'undefined') return
   listenersBound = true
   ACTIVITY_EVENTS.forEach((evt) => window.addEventListener(evt, onUserActivity, { passive: true }))
+  document.addEventListener('visibilitychange', onVisibilityChange)
 }
 
 const unbindActivityListeners = () => {
   if (!listenersBound || typeof window === 'undefined') return
   listenersBound = false
   ACTIVITY_EVENTS.forEach((evt) => window.removeEventListener(evt, onUserActivity))
-}
-
-const refreshSession = async () => {
-  if (refreshing || !getToken() || !getRefreshToken()) return
-  if (router.currentRoute.value.path === '/login') return
-  if (!isTokenNearExpiry()) return
-
-  refreshing = true
-  try {
-    const userStore = useUserStore()
-    await userStore.RefreshToken()
-  } catch {
-    /* 失败时由 request 拦截器统一跳转登录 */
-  } finally {
-    refreshing = false
-  }
+  document.removeEventListener('visibilitychange', onVisibilityChange)
 }
 
 const tick = async () => {
@@ -87,9 +89,9 @@ const tick = async () => {
     return
   }
 
-  // 近 30 分钟内有操作且 token 临近过期时续期
-  if (idleMs < 30 * 60 * 1000 && isTokenNearExpiry()) {
-    await refreshSession()
+  // 未到空闲退出阈值且临近过期 → 续期（与 axios 共用 singleflight，避免并发互踢）
+  if (isTokenNearExpiry()) {
+    await refreshSessionIfNeeded()
   }
 }
 

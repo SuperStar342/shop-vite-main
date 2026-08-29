@@ -127,7 +127,7 @@ export const useUserStore = defineStore('user', {
           }
           this.SET_TOKEN(data.access_token)
           this.SET_REFRESH_TOKEN(data.refresh_token)
-          setTokenExpireAt(data.expires_in ?? 86400)
+          setTokenExpireAt(data.expires_in ?? 3600)
           this.SET_TENANT_ID(data.tenant_id)
           this.SET_USER_INFO(data)
           try {
@@ -206,10 +206,14 @@ export const useUserStore = defineStore('user', {
         !validatenull(userInfo) ? userInfo.roleId : this.userInfo.role_id
       )
 
-      const data = res.data
+      const data = res.data || {}
+      const status = Number(data.error_code ?? data.code ?? res.status ?? 0)
+      if (data.error_description || data.error || !data.access_token || (status && status !== 200)) {
+        throw new Error(data.error_description || data.msg || data.error || '刷新令牌失败')
+      }
       this.SET_TOKEN(data.access_token)
-      this.SET_REFRESH_TOKEN(data.refresh_token)
-      setTokenExpireAt(data.expires_in ?? 86400)
+      this.SET_REFRESH_TOKEN(data.refresh_token || getRefreshToken())
+      setTokenExpireAt(data.expires_in ?? 3600)
       this.SET_USER_INFO(data)
       const roles = splitRoles(data.role_name || data.roleName)
       if (roles.length) {

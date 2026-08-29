@@ -103,7 +103,7 @@ export const settingConfig: {
   captchaType: 'behavior', // 验证码类型(image:首屏图形验证码 behavior:登录时弹出点选/滑块/旋转随机行为验证)
   switchMode: false, // 是否开启登录切换角色部门
   lockPage: '/lock', // 锁屏页面地址
-  /** 登录态保活：检查/续期 token 的间隔（毫秒），默认 30 分钟 */
+  /** 登录态保活：检查/续期 token 的间隔（毫秒）；实际检查上限为 2 分钟 */
   tokenTime: 30 * 60 * 1000,
   /** 无操作超过该时长则退出登录（毫秒），默认 8 小时；操作期间会自动续期 */
   idleLogoutTime: 8 * 60 * 60 * 1000,

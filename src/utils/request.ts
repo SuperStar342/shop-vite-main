@@ -11,6 +11,7 @@ import router from '/@/router/'
 import { serialize } from '/@/utils/util'
 import { getToken, getRefreshToken, removeToken, removeRefreshToken, getTokenExpireAt, isTokenNearExpiry } from '/@/utils/auth'
 import { touchUserActivity } from '/@/utils/tokenKeepAlive'
+import { refreshSessionIfNeeded } from '/@/utils/sessionRefresh'
 import { isURL, validatenull } from '/@/utils/validate'
 import { ElMessage } from 'element-plus'
 import { tokenHeader, clientId, clientSecret, statusWhiteList, tenantId as defaultTenantId } from '/@/config'
@@ -25,8 +26,6 @@ import { useSettingsStore } from '/@/store/modules/settings'
 
 const REFRESH_GRANT_TYPE = 'refresh_token'
 let isSessionExpired = false
-let isRefreshing = false
-let refreshTokenPromise: Promise<any> | null = null
 
 /** 权限类 401 弹窗去重，避免刷新时多接口并行连弹「请求未授权」 */
 let lastPermissionToastAt = 0
@@ -100,27 +99,16 @@ const ensureAccessTokenFresh = async (config: AxiosRequestConfig) => {
   const meta = (config as any).meta || {}
   if (meta.isToken === false) return
   if (!getToken() || validatenull(getRefreshToken() ?? '')) return
-  // 无过期记录时仍尝试续期；已过期也必须 refresh
-  const at = getTokenExpireAt()
-  const expired = at > 0 && Date.now() >= at
-  if (!expired && !isTokenNearExpiry()) return
 
-  if (!isRefreshing) {
-    isRefreshing = true
-    const userStore = useUserStore()
-    refreshTokenPromise = userStore
-      .RefreshToken()
-      .catch(async (err) => {
-        await redirectToLogin('登录已过期，请重新登录')
-        return Promise.reject(err)
-      })
-      .finally(() => {
-        isRefreshing = false
-        refreshTokenPromise = null
-      })
-  }
-  if (refreshTokenPromise) {
-    await refreshTokenPromise
+  const ok = await refreshSessionIfNeeded()
+  if (!ok) {
+    const at = getTokenExpireAt()
+    const expired = at > 0 && Date.now() >= at
+    // 仅在确实需要续期却失败时踢登录；仍在有效期内则放行
+    if (expired || isTokenNearExpiry()) {
+      await redirectToLogin('登录已过期，请重新登录')
+      return Promise.reject(new Error('登录已过期，请重新登录'))
+    }
   }
 }
 
@@ -221,7 +209,6 @@ service.interceptors.request.use(
 service.interceptors.response.use(
   async (res: AxiosResponse) => {
     NProgress.done()
-    const userStore = useUserStore()
     const config = res.config as AxiosRequestConfig & { _retry?: boolean; cryptoData?: boolean }
     if (config.cryptoData === true) {
       res.data = JSON.parse(crypto.decryptAES(res.data, crypto.aesKey))
@@ -269,26 +256,23 @@ service.interceptors.response.use(
           notifyPermissionDenied(message, config)
           return Promise.reject(new Error(message))
         }
+        // refresh 请求失败：若并发续期已成功拿到新 token，勿误踢
+        if (isRefreshTokenRequest(config)) {
+          const at = getTokenExpireAt()
+          if (getToken() && getRefreshToken() && at > Date.now() + 30_000) {
+            return Promise.reject(new Error(message))
+          }
+        }
         await redirectToLogin(isTokenExpiredMessage(message) ? message : undefined)
         return Promise.reject(new Error(message))
       }
       config._retry = true
 
-      if (!isRefreshing) {
-        isRefreshing = true
-        refreshTokenPromise = userStore
-          .RefreshToken()
-          .catch(async (err) => {
-            await redirectToLogin('登录已过期，请重新登录')
-            return Promise.reject(err)
-          })
-          .finally(() => {
-            isRefreshing = false
-            refreshTokenPromise = null
-          })
+      const ok = await refreshSessionIfNeeded(true)
+      if (!ok) {
+        await redirectToLogin('登录已过期，请重新登录')
+        return Promise.reject(new Error(message))
       }
-
-      await refreshTokenPromise
       applyToken(config)
       return service.request(config)
     }
@@ -304,6 +288,11 @@ service.interceptors.response.use(
     }
 
     if (isRefreshTokenRequest(config) && status !== 200) {
+      const at = getTokenExpireAt()
+      // 并发 refresh 时旧 refresh_token 可能已失效，但新会话已建立
+      if (getToken() && getRefreshToken() && at > Date.now() + 30_000) {
+        return Promise.reject(new Error(message))
+      }
       await redirectToLogin(isTokenExpiredMessage(message) ? message : undefined)
       return Promise.reject(new Error(message))
     }
