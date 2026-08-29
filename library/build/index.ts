@@ -1,3 +1,4 @@
+import { fileViewerRenderers } from '@file-viewer/vite-plugin'
 import vue from '@vitejs/plugin-vue'
 import vueJsx from '@vitejs/plugin-vue-jsx'
 import chokidar from 'chokidar'
@@ -34,7 +35,9 @@ export const createVitePlugin = (env: Record<string, string>) => {
     createUnPlugin(env),
     createMock(localEnabled, prodEnabled),
     createSvgIcons(),
-    createBanner()
+    createBanner(),
+    // File Viewer：dev/build 自动发布同版本 Worker/WASM 等到 /file-viewer/
+    fileViewerRenderers({ copyAssets: true })
     // ,createUnoCSSPlugin() // 如需开启UnoCSS，请取消注释
   )
   if (compress) vitePlugins.push(createCompress(compress))

@@ -113,12 +113,21 @@
         </div>
       </div>
     </div>
+
+    <attachment-drawer
+      v-model="attachVisible"
+      biz-type="instruction"
+      :biz-id="attachBizId"
+      :subtitle="attachSubtitle"
+      @change="onAttachChange"
+    />
   </div>
 </template>
 
 <script lang="ts" setup>
 import { Refresh, Search } from '@element-plus/icons-vue'
 import { ListTable } from '@visactor/vue-vtable'
+import { getAttachmentCounts } from '/@/api/procurement/attachment'
 import {
   getMoBomMrItems,
   getMoBomUsages,
@@ -132,6 +141,7 @@ import {
 import { useVTableLayout } from '/@/hooks/useVTableLayout'
 import { sortNewestFirst } from '/@/utils/bladeAdapter'
 import { getVTableInstance, handleVTableContextMenuCell, trackVTableCellForCopy } from '/@/utils/tableCopy'
+import AttachmentDrawer from '/@/views/procurement/shared/attachment/AttachmentDrawer.vue'
 
 defineOptions({ name: 'InstructionManagement' })
 
@@ -159,6 +169,15 @@ const activeTab = ref('content')
 const selectedMo = ref<any>(null)
 const selectedItem = ref<any>(null)
 const midLoading = ref(false)
+
+const attachVisible = ref(false)
+const attachBizId = ref('')
+const attachSubtitle = computed(() => {
+  const row = masterList.value.find((r) => r.moNo === attachBizId.value)
+  if (!row) return '制令附件'
+  const parts = [row.orgName, row.moLineName, row.fgName].filter(Boolean)
+  return parts.length ? parts.join(' · ') : '制令附件'
+})
 
 const queryForm = reactive({
   pageNo: 1,
@@ -267,9 +286,22 @@ const emptyTip = (text: string) => ({
   icon: { width: 28, height: 28, image: EMPTY_TIP_SVG },
 })
 
+const attachCol = {
+  field: 'attachLabel',
+  title: '操作',
+  width: 88,
+  style: {
+    color: '#409eff',
+    cursor: 'pointer',
+    textAlign: 'center',
+  },
+  fieldFormat: (r: any) => `附件(${Number(r?.attachCount) || 0})`,
+}
+
 const masterOptions = computed(() => ({
   ...baseTableOpts,
   frozenColCount: 2,
+  rightFrozenColCount: 1,
   columns: [
     col('ifSuspend', '是否暂停', 80),
     col('moNo', '制令号', 140),
@@ -308,6 +340,7 @@ const masterOptions = computed(() => ({
     col('custOrdNo', '客户订单号', 120),
     col('fgCode', '成品代号', 120),
     col('fgName', '成品名称', 140),
+    attachCol,
   ],
   emptyTip: emptyTip('暂无制令数据'),
 }))
@@ -505,11 +538,38 @@ const srcTypeByTab = (tab: string) => {
   return undefined
 }
 
+const mergeAttachCounts = async (rows: any[]) => {
+  const ids = rows.map((r) => r?.moNo).filter(Boolean)
+  if (!ids.length) return rows
+  try {
+    const counts = await getAttachmentCounts('instruction', ids)
+    return rows.map((r) => ({ ...r, attachCount: counts[r.moNo] || 0 }))
+  } catch {
+    return rows.map((r) => ({ ...r, attachCount: Number(r.attachCount) || 0 }))
+  }
+}
+
+const openAttachment = (row: any) => {
+  if (!row?.moNo) return
+  selectedMo.value = row
+  attachBizId.value = row.moNo
+  attachVisible.value = true
+}
+
+const onAttachChange = (count: number) => {
+  const row = masterList.value.find((r) => r.moNo === attachBizId.value)
+  if (!row) return
+  row.attachCount = count
+  // 触发表格刷新显示
+  masterList.value = [...masterList.value]
+}
+
 const fetchMaster = async () => {
   listLoading.value = true
   try {
     const { data } = await getMoList(queryForm)
-    masterList.value = sortNewestFirst(data.list || [], 'moNo')
+    const rows = sortNewestFirst(data.list || [], 'moNo')
+    masterList.value = await mergeAttachCounts(rows)
     total.value = data.total || 0
     selectedMo.value = null
     selectedItem.value = null
@@ -583,6 +643,14 @@ const loadDetail = async () => {
 const handleMasterClick = (args: any) => {
   const record = getRecord(masterTableRef, args, masterList.value)
   if (!record?.moNo) return
+  const vtable = masterTableRef.value?.vTableInstance
+  const colDef =
+    vtable?.getBodyColumnDefine?.(args.col) ||
+    vtable?.getColumnDefine?.(args.col) ||
+    masterOptions.value.columns?.[args.col]
+  if (colDef?.field === 'attachLabel') {
+    openAttachment(record)
+  }
   selectedMo.value = record
   loadMid()
 }
