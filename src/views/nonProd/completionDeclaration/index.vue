@@ -268,86 +268,119 @@
             </el-timeline>
           </section>
 
-          <section class="cd-detail-tabs">
-            <el-tabs v-model="detailTab">
-              <el-tab-pane :label="`派工明细 (${detail.items?.length || 0})`" name="items">
-                <el-table
-                  border
-                  :data="detail.items || []"
-                  highlight-current-row
-                  max-height="320"
-                  size="small"
-                  stripe
-                  @current-change="onItemSelect"
-                >
-                  <el-table-column fixed label="派工单号" min-width="150" prop="owtNo" />
-                  <el-table-column label="序号" prop="sNo" width="60" />
-                  <el-table-column label="派工类型解释" min-width="110" prop="pwSortName" />
-                  <el-table-column label="单据名称" min-width="100" prop="receiptName" show-overflow-tooltip />
-                  <el-table-column label="品号" min-width="110" prop="goodsCode" show-overflow-tooltip />
-                  <el-table-column label="计价类型" min-width="90" prop="pieceType" />
-                  <el-table-column label="单位" prop="unit" width="60" />
-                  <el-table-column align="right" label="本次完工数量" prop="fnQty" width="110">
-                    <template #default="{ row }">{{ formatNum(row.fnQty) }}</template>
-                  </el-table-column>
-                  <el-table-column align="right" label="派工数量" prop="planQty" width="90">
-                    <template #default="{ row }">{{ formatNum(row.planQty) }}</template>
-                  </el-table-column>
-                  <el-table-column label="分配方式" min-width="130" prop="assignType" show-overflow-tooltip />
-                  <el-table-column label="是否超外发分配" prop="ifRedivide" width="120" />
-                  <el-table-column label="行号" prop="owtFnSNo" width="60" />
-                  <el-table-column label="单据代码" min-width="100" prop="receiptCode" />
-                  <el-table-column label="加工说明" min-width="120" prop="madeDesc" show-overflow-tooltip />
-                  <el-table-column label="计划完工日期" min-width="120" prop="planDate" />
-                  <el-table-column label="备注" min-width="100" prop="itemRemark" show-overflow-tooltip />
-                  <el-table-column label="壳外品定制线号" min-width="130" prop="cstlotNo" show-overflow-tooltip />
-                  <el-table-column label="品名" min-width="140" prop="goodsName" show-overflow-tooltip />
-                  <el-table-column label="作业属性" min-width="90" prop="workAttr" />
-                  <el-table-column align="right" label="工序单价" prop="prcUp" width="90">
-                    <template #default="{ row }">{{ formatNum(row.prcUp) }}</template>
-                  </el-table-column>
-                </el-table>
-              </el-tab-pane>
-              <el-tab-pane :label="`人员明细 (${filteredWorkers.length})`" name="workers">
-                <div v-if="selectedItem" class="cd-worker-filter">
-                  当前派工：{{ selectedItem.owtNo }}
-                  <el-button link type="primary" @click="clearItemSelect">显示全部人员</el-button>
+          <section class="cd-link-panels">
+            <div class="cd-link-panel">
+              <div class="cd-link-panel__head">
+                <h3>派工明细</h3>
+                <span class="cd-link-panel__hint">共 {{ detail.items?.length || 0 }} 行 · 点击行查看参与人员</span>
+              </div>
+              <el-table
+                ref="itemTableRef"
+                border
+                :data="detail.items || []"
+                highlight-current-row
+                max-height="240"
+                size="small"
+                stripe
+                @current-change="onItemSelect"
+                @row-click="onItemSelect"
+              >
+                <el-table-column fixed label="派工单号" min-width="150" prop="owtNo" />
+                <el-table-column label="序号" prop="sNo" width="60" />
+                <el-table-column label="派工类型解释" min-width="110" prop="pwSortName" />
+                <el-table-column align="center" label="参与人数" width="90">
+                  <template #default="{ row }">
+                    <el-tag effect="plain" round size="small" type="primary">
+                      {{ workerCountOf(row) }}
+                    </el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column label="单据名称" min-width="100" prop="receiptName" show-overflow-tooltip />
+                <el-table-column label="品号" min-width="110" prop="goodsCode" show-overflow-tooltip />
+                <el-table-column label="计价类型" min-width="90" prop="pieceType" />
+                <el-table-column label="单位" prop="unit" width="60" />
+                <el-table-column align="right" label="本次完工数量" prop="fnQty" width="110">
+                  <template #default="{ row }">{{ formatNum(row.fnQty) }}</template>
+                </el-table-column>
+                <el-table-column align="right" label="派工数量" prop="planQty" width="90">
+                  <template #default="{ row }">{{ formatNum(row.planQty) }}</template>
+                </el-table-column>
+                <el-table-column label="分配方式" min-width="130" prop="assignType" show-overflow-tooltip />
+                <el-table-column label="是否超外发分配" prop="ifRedivide" width="120" />
+                <el-table-column label="行号" prop="owtFnSNo" width="60" />
+                <el-table-column label="单据代码" min-width="100" prop="receiptCode" />
+                <el-table-column label="加工说明" min-width="120" prop="madeDesc" show-overflow-tooltip />
+                <el-table-column label="计划完工日期" min-width="120" prop="planDate" />
+                <el-table-column label="备注" min-width="100" prop="itemRemark" show-overflow-tooltip />
+                <el-table-column label="壳外品定制线号" min-width="130" prop="cstlotNo" show-overflow-tooltip />
+                <el-table-column label="品名" min-width="140" prop="goodsName" show-overflow-tooltip />
+                <el-table-column label="作业属性" min-width="90" prop="workAttr" />
+                <el-table-column align="right" label="工序单价" prop="prcUp" width="90">
+                  <template #default="{ row }">{{ formatNum(row.prcUp) }}</template>
+                </el-table-column>
+              </el-table>
+            </div>
+
+            <div class="cd-link-panel cd-link-panel--workers">
+              <div class="cd-link-panel__head">
+                <h3>人员明细</h3>
+                <div class="cd-link-panel__meta">
+                  <template v-if="selectedItem">
+                    <el-tag effect="light" round size="small" type="success">
+                      {{ selectedItem.owtNo }} · 序号 {{ selectedItem.sNo }}
+                    </el-tag>
+                    <span>{{ selectedItem.pwSortName || '派工' }} · {{ filteredWorkers.length }} 人</span>
+                  </template>
+                  <span v-else class="cd-link-panel__hint">请先选择上方一条派工明细</span>
                 </div>
-                <el-table border :data="filteredWorkers" max-height="320" size="small" stripe>
-                  <el-table-column label="部门名称" min-width="110" prop="deptName" />
-                  <el-table-column label="员工代码" min-width="100" prop="empNo" />
-                  <el-table-column label="姓名" min-width="80" prop="empName" />
-                  <el-table-column align="right" label="派工数量" prop="planQty" width="90">
-                    <template #default="{ row }">{{ formatNum(row.planQty) }}</template>
-                  </el-table-column>
-                  <el-table-column align="right" label="完工余量" prop="remainQty" width="90">
-                    <template #default="{ row }">{{ formatNum(row.remainQty) }}</template>
-                  </el-table-column>
-                  <el-table-column align="right" label="本次完工数量" prop="fnQty" width="110">
-                    <template #default="{ row }">{{ formatNum(row.fnQty) }}</template>
-                  </el-table-column>
-                  <el-table-column label="最后远计单据号" min-width="130" prop="wagePeriod" show-overflow-tooltip />
-                  <el-table-column label="计价规则" min-width="90" prop="ifWage" />
-                  <el-table-column align="right" label="本次计件数量" prop="wageQty" width="110">
-                    <template #default="{ row }">{{ formatNum(row.wageQty) }}</template>
-                  </el-table-column>
-                  <el-table-column align="right" label="分配系数" prop="allotmentRate" width="90">
-                    <template #default="{ row }">{{ formatNum(row.allotmentRate) }}</template>
-                  </el-table-column>
-                  <el-table-column align="right" label="单价系数" prop="upRate" width="90">
-                    <template #default="{ row }">{{ formatNum(row.upRate) }}</template>
-                  </el-table-column>
-                  <el-table-column align="right" label="计价金额" prop="wageAmt" width="90">
-                    <template #default="{ row }">{{ formatNum(row.wageAmt) }}</template>
-                  </el-table-column>
-                  <el-table-column align="right" label="实际工时(小时)" prop="workTime" width="120">
-                    <template #default="{ row }">{{ formatNum(row.workTime) }}</template>
-                  </el-table-column>
-                  <el-table-column label="加工单元名称" min-width="120" prop="workGpName" show-overflow-tooltip />
-                  <el-table-column label="加工单元代码" min-width="120" prop="workGpCode" />
-                </el-table>
-              </el-tab-pane>
-            </el-tabs>
+              </div>
+              <el-table
+                border
+                :data="filteredWorkers"
+                max-height="280"
+                size="small"
+                stripe
+              >
+                <el-table-column fixed label="派工单号" min-width="140" prop="owtNo" />
+                <el-table-column label="行号" prop="owtFnSNo" width="60" />
+                <el-table-column label="部门名称" min-width="110" prop="deptName" />
+                <el-table-column label="员工代码" min-width="100" prop="empNo" />
+                <el-table-column label="姓名" min-width="80" prop="empName" />
+                <el-table-column align="right" label="派工数量" prop="planQty" width="90">
+                  <template #default="{ row }">{{ formatNum(row.planQty) }}</template>
+                </el-table-column>
+                <el-table-column align="right" label="完工余量" prop="remainQty" width="90">
+                  <template #default="{ row }">{{ formatNum(row.remainQty) }}</template>
+                </el-table-column>
+                <el-table-column align="right" label="本次完工数量" prop="fnQty" width="110">
+                  <template #default="{ row }">{{ formatNum(row.fnQty) }}</template>
+                </el-table-column>
+                <el-table-column label="最后远计单据号" min-width="130" prop="wagePeriod" show-overflow-tooltip />
+                <el-table-column label="计价规则" min-width="90" prop="ifWage" />
+                <el-table-column align="right" label="本次计件数量" prop="wageQty" width="110">
+                  <template #default="{ row }">{{ formatNum(row.wageQty) }}</template>
+                </el-table-column>
+                <el-table-column align="right" label="分配系数" prop="allotmentRate" width="90">
+                  <template #default="{ row }">{{ formatNum(row.allotmentRate) }}</template>
+                </el-table-column>
+                <el-table-column align="right" label="单价系数" prop="upRate" width="90">
+                  <template #default="{ row }">{{ formatNum(row.upRate) }}</template>
+                </el-table-column>
+                <el-table-column align="right" label="计价金额" prop="wageAmt" width="90">
+                  <template #default="{ row }">{{ formatNum(row.wageAmt) }}</template>
+                </el-table-column>
+                <el-table-column align="right" label="实际工时(小时)" prop="workTime" width="120">
+                  <template #default="{ row }">{{ formatNum(row.workTime) }}</template>
+                </el-table-column>
+                <el-table-column label="加工单元名称" min-width="120" prop="workGpName" show-overflow-tooltip />
+                <el-table-column label="加工单元代码" min-width="120" prop="workGpCode" />
+              </el-table>
+              <el-empty
+                v-if="selectedItem && filteredWorkers.length === 0"
+                description="该派工行暂无人员明细"
+                :image-size="64"
+              />
+            </div>
           </section>
         </template>
       </div>
@@ -401,9 +434,9 @@ const list = ref<CompletionRow[]>([])
 const total = ref(0)
 const activeTab = ref('list')
 const drawerOpen = ref(false)
-const detailTab = ref('items')
 const detail = ref<CompletionRow | null>(null)
 const selectedItem = ref<CompletionItemRow | null>(null)
+const itemTableRef = ref<{ setCurrentRow?: (row?: CompletionItemRow) => void } | null>(null)
 const editingRemark = ref(false)
 const remarkDraft = ref('')
 const deptOptions = ref<DeptOption[]>([])
@@ -482,15 +515,31 @@ const auditPercent = computed(() => {
   return Math.round((stats.value.auditedCount / t) * 100)
 })
 
-const filteredWorkers = computed(() => {
+/** 派工行 ↔ 人员：优先完工行号 fOWTFnSNo，否则派工单号 + 序号 */
+const isWorkerOfItem = (item: CompletionItemRow, worker: CompletionWorkerRow) => {
+  if (worker.owtNo !== item.owtNo) return false
+  if (item.owtFnSNo > 0 && worker.owtFnSNo > 0) {
+    return worker.owtFnSNo === item.owtFnSNo
+  }
+  return worker.sNo === item.sNo
+}
+
+const workersOf = (item: CompletionItemRow | null | undefined) => {
   const workers = detail.value?.workers || []
-  if (!selectedItem.value) return workers
-  return workers.filter(
-    (w: CompletionWorkerRow) =>
-      w.owtNo === selectedItem.value!.owtNo &&
-      (w.owtFnSNo === selectedItem.value!.sNo || w.sNo === selectedItem.value!.sNo)
-  )
-})
+  if (!item) return []
+  return workers.filter((w) => isWorkerOfItem(item, w))
+}
+
+const workerCountOf = (item: CompletionItemRow) => workersOf(item).length
+
+const filteredWorkers = computed(() => workersOf(selectedItem.value))
+
+const selectItem = (row: CompletionItemRow | null | undefined) => {
+  selectedItem.value = row || null
+  nextTick(() => {
+    itemTableRef.value?.setCurrentRow?.(row || undefined)
+  })
+}
 
 const statCards = computed(() => [
   { key: 'total', label: '申报总数', value: stats.value.totalCount, hint: '与 ERP 全量一致（可按日期筛选）', icon: Document },
@@ -581,11 +630,12 @@ const openDetail = async (row: CompletionRow) => {
   drawerOpen.value = true
   detailLoading.value = true
   editingRemark.value = false
-  detailTab.value = 'items'
   selectedItem.value = null
   try {
     detail.value = await getCompletionDetail(row.fnNo)
     remarkDraft.value = detail.value?.remark || ''
+    const first = detail.value?.items?.[0] || null
+    selectItem(first)
   } catch (e: any) {
     detail.value = null
     ElMessage.error(e?.message || '加载详情失败')
@@ -595,12 +645,8 @@ const openDetail = async (row: CompletionRow) => {
 }
 
 const onItemSelect = (row: CompletionItemRow | undefined) => {
-  selectedItem.value = row || null
-  if (row) detailTab.value = 'workers'
-}
-
-const clearItemSelect = () => {
-  selectedItem.value = null
+  if (!row) return
+  selectedItem.value = row
 }
 
 const onDrawerClosed = () => {
@@ -972,14 +1018,59 @@ onMounted(async () => {
 }
 
 .cd-timeline,
-.cd-info,
-.cd-detail-tabs {
+.cd-info {
   margin-bottom: 20px;
 
   h3 {
     margin: 0 0 12px;
     font-size: 14px;
     font-weight: 600;
+  }
+}
+
+.cd-link-panels {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.cd-link-panel {
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 10px;
+  padding: 12px;
+  background: #fafcff;
+
+  &--workers {
+    background: #f7fbf8;
+    border-color: color-mix(in srgb, var(--el-color-success) 22%, var(--el-border-color-lighter));
+  }
+
+  &__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+
+    h3 {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 600;
+    }
+  }
+
+  &__hint {
+    font-size: 12px;
+    color: var(--el-text-color-placeholder);
+  }
+
+  &__meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
   }
 }
 
@@ -992,15 +1083,6 @@ onMounted(async () => {
     font-family: ui-monospace, monospace;
     color: var(--el-color-primary);
   }
-}
-
-.cd-worker-filter {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 8px;
-  font-size: 13px;
-  color: var(--el-text-color-secondary);
 }
 
 @media (max-width: 1200px) {
