@@ -74,13 +74,21 @@
             height="100%"
             highlight-current-row
             stripe
-            @row-click="(row: CompletionRow) => openDetail(row)"
             @row-dblclick="(row: CompletionRow) => openDetail(row)"
           >
             <el-table-column label="序号" type="index" width="54" />
-            <el-table-column fixed label="完工确认单号" min-width="160" prop="fnNo">
+            <el-table-column fixed label="完工确认单号" min-width="190" prop="fnNo">
               <template #default="{ row }">
-                <el-button link type="primary" @click.stop="openDetail(row)">{{ row.fnNo }}</el-button>
+                <span class="cd-fnno" title="双击行打开详情">
+                  <span class="cd-fnno__text">{{ row.fnNo }}</span>
+                  <el-button
+                    :icon="DocumentCopy"
+                    link
+                    title="复制单号"
+                    type="primary"
+                    @click.stop="copyFnNo(row.fnNo)"
+                  />
+                </span>
               </template>
             </el-table-column>
             <el-table-column label="部门名称" min-width="130" prop="deptName" show-overflow-tooltip />
@@ -162,17 +170,32 @@
     <el-drawer
       v-model="drawerOpen"
       class="cd-drawer"
+      :class="{ 'is-resizing': drawerResizing }"
       :destroy-on-close="false"
       direction="rtl"
-      size="86%"
+      :size="drawerSize"
       :title="drawerTitle"
       @closed="onDrawerClosed"
     >
+      <div
+        class="cd-drawer__resizer"
+        title="拖拽调整宽度"
+        @mousedown.prevent="startDrawerResize"
+      />
       <div v-loading="detailLoading" class="cd-drawer__body">
         <template v-if="detail">
           <header class="cd-drawer__hero">
             <div>
-              <p class="cd-drawer__no">{{ detail.fnNo }}</p>
+              <p class="cd-drawer__no">
+                <span>{{ detail.fnNo }}</span>
+                <el-button
+                  :icon="DocumentCopy"
+                  link
+                  title="复制单号"
+                  type="primary"
+                  @click="copyFnNo(detail.fnNo)"
+                />
+              </p>
               <p class="cd-drawer__sub">{{ detail.deptName }} · {{ detail.fnDate }}</p>
             </div>
             <div class="cd-drawer__tags">
@@ -192,8 +215,19 @@
 
           <section class="cd-info">
             <h3>申报信息</h3>
-            <el-descriptions :column="3" border size="small">
-              <el-descriptions-item label="完工确认单号">{{ detail.fnNo }}</el-descriptions-item>
+            <el-descriptions :column="2" border size="small">
+              <el-descriptions-item label="完工确认单号">
+                <span class="cd-fnno">
+                  {{ detail.fnNo }}
+                  <el-button
+                    :icon="DocumentCopy"
+                    link
+                    title="复制单号"
+                    type="primary"
+                    @click="copyFnNo(detail.fnNo)"
+                  />
+                </span>
+              </el-descriptions-item>
               <el-descriptions-item label="部门名称">{{ detail.deptName }}</el-descriptions-item>
               <el-descriptions-item label="完工日期">{{ detail.fnDate }}</el-descriptions-item>
               <el-descriptions-item label="审核状态">{{ detail.auditStatus }}</el-descriptions-item>
@@ -338,7 +372,7 @@
 </template>
 
 <script lang="ts" setup>
-import { CircleCheck, Clock, Document, Refresh, Search, TrendCharts } from '@element-plus/icons-vue'
+import { CircleCheck, Clock, Document, DocumentCopy, Refresh, Search, TrendCharts } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   auditCompletion,
@@ -353,6 +387,7 @@ import {
   type CompletionWorkerRow,
   type DeptOption,
 } from '/@/api/nonProd/completionDeclaration'
+import handleClipboard from '/@/utils/clipboard'
 
 defineOptions({
   name: 'CompletionDeclaration',
@@ -376,6 +411,60 @@ const stats = ref<CompletionStats>({ totalCount: 0, auditedCount: 0, pendingCoun
 
 /** 默认不限日期，总数与 ERP 全量一致 */
 const dateRange = ref<[string, string] | null>(null)
+
+const DRAWER_MIN_W = 420
+const DRAWER_DEFAULT_W = 560
+const DRAWER_MAX_RATIO = 0.95
+const DRAWER_WIDTH_KEY = 'cd-drawer-width-v2'
+
+const readDefaultDrawerWidth = () => {
+  const max = Math.floor(window.innerWidth * DRAWER_MAX_RATIO)
+  const fallback = Math.min(max, DRAWER_DEFAULT_W)
+  try {
+    const saved = Number(sessionStorage.getItem(DRAWER_WIDTH_KEY))
+    if (Number.isFinite(saved) && saved >= DRAWER_MIN_W) {
+      return Math.min(max, Math.round(saved))
+    }
+  } catch {
+    // ignore
+  }
+  return fallback
+}
+
+const drawerWidth = ref(typeof window === 'undefined' ? DRAWER_DEFAULT_W : readDefaultDrawerWidth())
+const drawerSize = computed(() => `${drawerWidth.value}px`)
+const drawerResizing = ref(false)
+
+const copyFnNo = (fnNo: string) => {
+  if (!fnNo) return
+  handleClipboard(fnNo)
+}
+
+const startDrawerResize = (e: MouseEvent) => {
+  drawerResizing.value = true
+  const startX = e.clientX
+  const startW = drawerWidth.value
+  const onMove = (ev: MouseEvent) => {
+    const max = Math.floor(window.innerWidth * DRAWER_MAX_RATIO)
+    // 右侧抽屉：向左拖加宽，向右拖变窄
+    const next = startW + (startX - ev.clientX)
+    drawerWidth.value = Math.min(max, Math.max(DRAWER_MIN_W, next))
+  }
+  const onUp = () => {
+    drawerResizing.value = false
+    document.body.classList.remove('cd-drawer-resizing')
+    document.removeEventListener('mousemove', onMove)
+    document.removeEventListener('mouseup', onUp)
+    try {
+      sessionStorage.setItem(DRAWER_WIDTH_KEY, String(drawerWidth.value))
+    } catch {
+      // ignore
+    }
+  }
+  document.body.classList.add('cd-drawer-resizing')
+  document.addEventListener('mousemove', onMove)
+  document.addEventListener('mouseup', onUp)
+}
 
 const queryForm = reactive({
   keyword: '',
@@ -759,7 +848,57 @@ onMounted(async () => {
   }
 
   :deep(.el-drawer__body) {
+    position: relative;
     padding: 0;
+  }
+
+  &__resizer {
+    position: absolute;
+    top: -56px;
+    bottom: -68px;
+    left: 0;
+    z-index: 30;
+    width: 10px;
+    cursor: col-resize;
+    touch-action: none;
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      width: 2px;
+      background: transparent;
+      transition: background 0.15s;
+    }
+
+    &::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 3px;
+      width: 4px;
+      height: 48px;
+      margin-top: -24px;
+      border-radius: 2px;
+      background: var(--el-border-color);
+      box-shadow: 6px 0 0 var(--el-border-color);
+      opacity: 0.55;
+      transition: background 0.15s, opacity 0.15s, box-shadow 0.15s;
+    }
+
+    &:hover::before,
+    .is-resizing &::before {
+      background: var(--el-color-primary-light-5);
+    }
+
+    &:hover::after,
+    .is-resizing &::after {
+      opacity: 1;
+      background: var(--el-color-primary);
+      box-shadow: 6px 0 0 var(--el-color-primary);
+    }
   }
 
   &__body {
@@ -775,6 +914,9 @@ onMounted(async () => {
   }
 
   &__no {
+    display: flex;
+    align-items: center;
+    gap: 4px;
     margin: 0;
     font-size: 18px;
     font-weight: 700;
@@ -801,7 +943,7 @@ onMounted(async () => {
 
 .cd-kpi {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 10px;
   margin-bottom: 20px;
 
@@ -841,6 +983,17 @@ onMounted(async () => {
   }
 }
 
+.cd-fnno {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+
+  &__text {
+    font-family: ui-monospace, monospace;
+    color: var(--el-color-primary);
+  }
+}
+
 .cd-worker-filter {
   display: flex;
   align-items: center;
@@ -855,6 +1008,19 @@ onMounted(async () => {
   .cd-stats-grid,
   .cd-kpi {
     grid-template-columns: repeat(2, 1fr);
+  }
+}
+</style>
+
+<style lang="scss">
+/* 拖拽调宽时禁止选中文本，光标保持 col-resize */
+body.cd-drawer-resizing {
+  cursor: col-resize !important;
+  user-select: none !important;
+
+  * {
+    cursor: col-resize !important;
+    user-select: none !important;
   }
 }
 </style>
