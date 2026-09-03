@@ -21,6 +21,7 @@ export const ROUTE_TO_BLADE_CODE: Record<string, string> = {
   UnitPriceSetting: 'unitPriceSetting',
   DispatchTypeSetting: 'dispatchTypeSetting',
   CompletionDeclaration: 'completionDeclaration',
+  OtherDispatch: 'otherDispatch',
   // 资源：路由 name 与 PreAuth code 一致
   oss: 'oss',
   attach: 'attach',
