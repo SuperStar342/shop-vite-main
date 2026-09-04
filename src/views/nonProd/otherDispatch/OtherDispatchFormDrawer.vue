@@ -324,12 +324,10 @@
                 filterable
                 :loading="empLoading"
                 placeholder="工号 / 姓名"
-                remote
-                :remote-method="remoteEmpSearch"
                 size="small"
                 style="width: 100%"
                 @change="(empNo: string) => onEmpChange(row, empNo)"
-                @focus="() => ensureEmpOptions()"
+                @focus="() => ensureEmpOptions(row.deptId || undefined)"
               >
                 <el-option
                   v-for="e in empOptions"
@@ -677,11 +675,20 @@ const createEmptyWorker = (item: OtherDispatchItemRow): OtherDispatchWorkerRow =
   workGpName: '',
 })
 
-const onWorkerDeptChange = (row: OtherDispatchWorkerRow, deptId: number) => {
+const onWorkerDeptChange = async (row: OtherDispatchWorkerRow, deptId: number) => {
   const d = depts.value.find((x) => x.deptId === deptId)
   row.deptId = deptId || 0
   row.deptCode = d?.deptCode || ''
   row.deptName = d?.deptName || ''
+  // 切换实际生产部门 → 人员按该部门过滤；已选人员不在部门内则清空
+  await ensureEmpOptions(deptId || undefined)
+  if (row.empNo) {
+    const emp = empOptions.value.find((e) => e.empNo === row.empNo)
+    if (!emp) {
+      row.empNo = ''
+      row.empName = ''
+    }
+  }
 }
 
 const addWorker = () => {
@@ -759,31 +766,35 @@ const recalcItemWage = (row: OtherDispatchItemRow) => {
   }
 }
 
-const ensureEmpOptions = async (keyword = '') => {
+const empLoadedDeptKey = ref<string>('')
+
+const ensureEmpOptions = async (deptId?: number) => {
+  const key = String(deptId || 0)
+  // 同部门已加载则不重复请求；关键词在前端 filterable 本地过滤
+  if (empLoadedDeptKey.value === key && empOptions.value.length > 0) return
   empLoading.value = true
   try {
-    // 不传成本承担部门：与 ERP 一致，可选全部启用员工
-    empOptions.value = await getOtherDispatchEmployees(undefined, keyword || undefined)
+    empOptions.value = await getOtherDispatchEmployees(deptId || undefined)
+    empLoadedDeptKey.value = key
   } catch {
     empOptions.value = []
+    empLoadedDeptKey.value = ''
   } finally {
     empLoading.value = false
   }
 }
 
-let empSearchTimer: ReturnType<typeof setTimeout> | null = null
-const remoteEmpSearch = (keyword: string) => {
-  if (empSearchTimer) clearTimeout(empSearchTimer)
-  empSearchTimer = setTimeout(() => {
-    ensureEmpOptions(keyword)
-  }, 250)
-}
-
 const onEmpChange = (row: OtherDispatchWorkerRow, empNo: string) => {
+  if (!empNo) {
+    row.empNo = ''
+    row.empName = ''
+    row.sNo = selectedItem.value?.sNo || row.sNo
+    return
+  }
   const emp = empOptions.value.find((e) => e.empNo === empNo)
-  row.empNo = empNo || ''
+  row.empNo = empNo
   row.empName = emp?.empName || ''
-  // 选工号后带回员工所属实际生产部门（与成本承担部门无关）
+  // 选工号 → 联动实际生产部门代号/名称（与成本承担部门无关）
   if (emp?.deptId) {
     row.deptId = emp.deptId
     row.deptCode = emp.deptCode || ''
@@ -1010,6 +1021,7 @@ const reset = () => {
   selectedItem.value = null
   selectedWorker.value = null
   empOptions.value = []
+  empLoadedDeptKey.value = ''
   goodsOptions.value = []
   unitOptions.value = []
   formRef.value?.clearValidate()
