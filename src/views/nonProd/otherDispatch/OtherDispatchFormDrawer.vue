@@ -293,7 +293,27 @@
           @current-change="onWorkerSelect"
           @row-click="onWorkerSelect"
         >
-          <el-table-column label="实际生产部门代号" min-width="140" prop="deptCode" show-overflow-tooltip />
+          <el-table-column min-width="150">
+            <template #header><span class="od-th-req">实际生产部门代号</span></template>
+            <template #default="{ row }">
+              <el-select
+                v-model="row.deptId"
+                clearable
+                filterable
+                placeholder="部门代号"
+                size="small"
+                style="width: 100%"
+                @change="(deptId: number) => onWorkerDeptChange(row, deptId)"
+              >
+                <el-option
+                  v-for="d in depts"
+                  :key="d.deptId"
+                  :label="`${d.deptCode || d.deptId} · ${d.deptName}`"
+                  :value="d.deptId"
+                />
+              </el-select>
+            </template>
+          </el-table-column>
           <el-table-column label="实际生产部门名称" min-width="130" prop="deptName" show-overflow-tooltip />
           <el-table-column min-width="160">
             <template #header><span class="od-th-req">工号</span></template>
@@ -320,7 +340,7 @@
               </el-select>
             </template>
           </el-table-column>
-          <el-table-column label="姓名" min-width="90" prop="empName" />
+          <el-table-column label="姓名" min-width="90" prop="empName" show-overflow-tooltip />
           <el-table-column align="right" min-width="110">
             <template #header><span class="od-th-req">派工数量</span></template>
             <template #default="{ row }">
@@ -337,21 +357,11 @@
           <el-table-column align="right" label="完工数量" min-width="90">
             <template #default="{ row }">{{ formatNum(row.fnQty) }}</template>
           </el-table-column>
-          <el-table-column align="right" label="计件数量" min-width="110">
-            <template #default="{ row }">
-              <el-input-number v-model="row.wageQty" :controls="false" :min="0" :precision="4" size="small" />
-            </template>
+          <el-table-column align="right" label="计件数量" min-width="90">
+            <template #default="{ row }">{{ formatNum(row.wageQty) }}</template>
           </el-table-column>
-          <el-table-column label="加工单元代号" min-width="120">
-            <template #default="{ row }">
-              <el-input v-model="row.workGpCode" size="small" />
-            </template>
-          </el-table-column>
-          <el-table-column label="加工单元名称" min-width="120">
-            <template #default="{ row }">
-              <el-input v-model="row.workGpName" size="small" />
-            </template>
-          </el-table-column>
+          <el-table-column label="加工单元代号" min-width="110" prop="workGpCode" show-overflow-tooltip />
+          <el-table-column label="加工单元名称" min-width="120" prop="workGpName" show-overflow-tooltip />
         </el-table>
         <el-empty
           v-if="selectedItem && filteredWorkers.length === 0"
@@ -573,9 +583,8 @@ const onOwtDateChange = async () => {
 const onDeptChange = async (deptId: number) => {
   const d = depts.value.find((x) => x.deptId === deptId)
   form.deptName = d?.deptName || ''
-  empOptions.value = []
+  // 成本承担部门仅用于单号/主表，不联动下方派工人员
   await refreshOwtNo()
-  await ensureEmpOptions()
 }
 
 const onItemSelect = (row: OtherDispatchItemRow | undefined) => {
@@ -653,22 +662,26 @@ const removeSelectedItem = () => {
   selectFirstItem()
 }
 
-const createEmptyWorker = (item: OtherDispatchItemRow): OtherDispatchWorkerRow => {
-  const dept = depts.value.find((d) => d.deptId === form.deptId)
-  return {
-    owtNo: form.owtNo || '',
-    sNo: item.sNo,
-    deptId: form.deptId || 0,
-    deptCode: dept?.deptCode || '',
-    deptName: form.deptName || dept?.deptName || '',
-    empNo: '',
-    empName: '',
-    planQty: Number(item.planQty) || 0,
-    fnQty: 0,
-    wageQty: Number(item.planQty) || 0,
-    workGpCode: '',
-    workGpName: '',
-  }
+const createEmptyWorker = (item: OtherDispatchItemRow): OtherDispatchWorkerRow => ({
+  owtNo: form.owtNo || '',
+  sNo: item.sNo,
+  deptId: 0,
+  deptCode: '',
+  deptName: '',
+  empNo: '',
+  empName: '',
+  planQty: Number(item.planQty) || 0,
+  fnQty: 0,
+  wageQty: Number(item.planQty) || 0,
+  workGpCode: '',
+  workGpName: '',
+})
+
+const onWorkerDeptChange = (row: OtherDispatchWorkerRow, deptId: number) => {
+  const d = depts.value.find((x) => x.deptId === deptId)
+  row.deptId = deptId || 0
+  row.deptCode = d?.deptCode || ''
+  row.deptName = d?.deptName || ''
 }
 
 const addWorker = () => {
@@ -749,7 +762,8 @@ const recalcItemWage = (row: OtherDispatchItemRow) => {
 const ensureEmpOptions = async (keyword = '') => {
   empLoading.value = true
   try {
-    empOptions.value = await getOtherDispatchEmployees(form.deptId, keyword || undefined)
+    // 不传成本承担部门：与 ERP 一致，可选全部启用员工
+    empOptions.value = await getOtherDispatchEmployees(undefined, keyword || undefined)
   } catch {
     empOptions.value = []
   } finally {
@@ -769,9 +783,12 @@ const onEmpChange = (row: OtherDispatchWorkerRow, empNo: string) => {
   const emp = empOptions.value.find((e) => e.empNo === empNo)
   row.empNo = empNo || ''
   row.empName = emp?.empName || ''
-  row.deptId = emp?.deptId || form.deptId || 0
-  row.deptCode = emp?.deptCode || depts.value.find((d) => d.deptId === row.deptId)?.deptCode || ''
-  row.deptName = emp?.deptName || form.deptName || ''
+  // 选工号后带回员工所属实际生产部门（与成本承担部门无关）
+  if (emp?.deptId) {
+    row.deptId = emp.deptId
+    row.deptCode = emp.deptCode || ''
+    row.deptName = emp.deptName || ''
+  }
   row.sNo = selectedItem.value?.sNo || row.sNo
 }
 
@@ -862,11 +879,15 @@ const handleSave = async () => {
       return
     }
     for (const w of workers) {
+      if (!w.deptId && !w.deptCode) {
+        ElMessage.warning(`序号 ${item.sNo}：人员明细请选择实际生产部门`)
+        return
+      }
       if (!w.empNo) {
         ElMessage.warning(`序号 ${item.sNo}：人员明细请选择工号`)
         return
       }
-      if (w.planQty == null || Number(w.planQty) <= 0) {
+      if (w.planQty == null || Number(w.planQty) < 0) {
         ElMessage.warning(`序号 ${item.sNo}：人员「${w.empName || w.empNo}」请填写派工数量`)
         return
       }
@@ -885,6 +906,7 @@ const handleSave = async () => {
       items: form.items.map((i) => ({
         ...i,
         owtNo: form.owtNo,
+        sNo: Number(i.sNo) || 0,
         assignTypeCode: i.assignTypeCode || '1',
         assignType: i.assignType || '按个人实时分配',
         planDate: i.planDate || form.planDate || form.owtDate || '',
@@ -894,6 +916,7 @@ const handleSave = async () => {
       workers: form.workers.map((w) => ({
         ...w,
         owtNo: form.owtNo,
+        sNo: Number(w.sNo) || Number(selectedItem.value?.sNo) || 0,
         deptId: w.deptId || form.deptId || 0,
         deptName: w.deptName || form.deptName || '',
         fnQty: Number(w.fnQty) || 0,
@@ -945,6 +968,13 @@ const loadEdit = async (owtNo: string) => {
           deptId: w.deptId,
           deptCode: w.deptCode,
           deptName: w.deptName,
+        })
+      }
+      if (w.deptId && !depts.value.some((d) => d.deptId === w.deptId)) {
+        depts.value.push({
+          deptId: w.deptId,
+          deptCode: w.deptCode || '',
+          deptName: w.deptName || '',
         })
       }
     }

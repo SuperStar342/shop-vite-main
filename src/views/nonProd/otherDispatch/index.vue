@@ -328,13 +328,13 @@ const detailHeightCap = ref(360)
 let layoutRo: ResizeObserver | null = null
 
 const syncTableHeights = () => {
-  const masterH = masterWrapRef.value?.clientHeight || 0
-  if (masterH > 0) masterTableHeight.value = Math.max(120, masterH)
   const paneH = listPaneRef.value?.clientHeight || 0
   if (paneH > 0) {
-    // 明细区最多约占列表可用高度的 42%，保证左右两表都能完整露出
-    detailHeightCap.value = Math.max(140, Math.floor(paneH * 0.42))
+    // 明细区固定预留，避免主表把下方派工/人员明细挤出可视区
+    detailHeightCap.value = Math.max(160, Math.floor(paneH * 0.38))
   }
+  const masterH = masterWrapRef.value?.clientHeight || 0
+  if (masterH > 0) masterTableHeight.value = Math.max(120, masterH)
 }
 
 /** 默认不限日期 */
@@ -635,13 +635,19 @@ const handleRowAction = async (cmd: string, row: OtherDispatchRow) => {
 
 const onFormSaved = async (owtNo: string) => {
   editOwtNo.value = undefined
+  const savedNo = String(owtNo || '').trim()
   await refreshAll()
-  if (owtNo) {
-    const row = list.value.find((r) => r.owtNo === owtNo)
+  if (savedNo) {
+    const row = list.value.find((r) => String(r.owtNo || '').trim() === savedNo)
     if (row) {
       nextTick(() => masterTableRef.value?.setCurrentRow?.(row))
       await loadDetail(row)
+      return
     }
+  }
+  if (list.value[0]) {
+    nextTick(() => masterTableRef.value?.setCurrentRow?.(list.value[0]))
+    await loadDetail(list.value[0])
   }
 }
 
@@ -780,7 +786,8 @@ onBeforeUnmount(() => {
 
 .od-table-wrap {
   flex: 1 1 0;
-  min-height: 160px;
+  min-height: 120px;
+  max-height: 55%;
   width: 100%;
   overflow: hidden;
 }
@@ -790,7 +797,8 @@ onBeforeUnmount(() => {
   grid-template-columns: 1.2fr 1fr;
   gap: 12px;
   margin-top: 12px;
-  flex: none;
+  flex: 0 0 auto;
+  min-height: 180px;
   align-items: start;
 }
 
