@@ -12,7 +12,7 @@
     <div class="od-create-drawer__resizer" title="拖拽调整宽度" @mousedown.prevent="startResize" />
 
     <div v-loading="loadingEdit" class="od-create">
-      <el-form ref="formRef" class="od-create__form" label-width="100px" :model="form" :rules="rules">
+      <el-form ref="formRef" class="od-create__form" label-width="120px" :model="form" :rules="rules">
         <el-row :gutter="12">
           <el-col :span="12">
             <el-form-item label="派工单号">
@@ -20,18 +20,7 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="派工日期" prop="owtDate" required>
-              <el-date-picker
-                v-model="form.owtDate"
-                style="width: 100%"
-                type="date"
-                value-format="YYYY-MM-DD"
-                @change="onOwtDateChange"
-              />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="部门" prop="deptId" required>
+            <el-form-item label="成本承担部门" prop="deptId" required>
               <el-select
                 v-model="form.deptId"
                 filterable
@@ -49,6 +38,17 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
+            <el-form-item label="派工日期" prop="owtDate" required>
+              <el-date-picker
+                v-model="form.owtDate"
+                style="width: 100%"
+                type="date"
+                value-format="YYYY-MM-DD"
+                @change="onOwtDateChange"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
             <el-form-item label="计划完工日期">
               <el-date-picker
                 v-model="form.planDate"
@@ -62,6 +62,11 @@
           <el-col :span="12">
             <el-form-item label="审核状态">
               <el-input model-value="未审核" disabled />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="结案状态">
+              <el-input model-value="未结案" disabled />
             </el-form-item>
           </el-col>
           <el-col :span="24">
@@ -92,66 +97,130 @@
           border
           :data="form.items"
           highlight-current-row
-          max-height="260"
+          max-height="320"
           size="small"
           stripe
           @current-change="onItemSelect"
           @row-click="onItemSelect"
         >
-          <el-table-column label="序号" prop="sNo" width="56" />
-          <el-table-column label="派工类型" min-width="140">
+          <el-table-column min-width="140">
+            <template #header><span class="od-th-req">派工类型代号</span></template>
             <template #default="{ row }">
               <el-select
                 v-model="row.pwSortCode"
                 filterable
-                placeholder="派工类型"
+                placeholder="代号"
                 size="small"
                 style="width: 100%"
                 @change="(code: string) => onPwSortChange(row, code)"
               >
-                <el-option
-                  v-for="t in typeOptions"
-                  :key="t.code"
-                  :label="t.name"
-                  :value="t.code"
-                />
+                <el-option v-for="t in typeOptions" :key="t.code" :label="`${t.code} · ${t.name}`" :value="t.code" />
               </el-select>
             </template>
           </el-table-column>
-          <el-table-column label="派工类型名称" min-width="110" prop="pwSortName" show-overflow-tooltip />
-          <el-table-column label="计件类型" min-width="90" prop="pieceType" show-overflow-tooltip />
-          <el-table-column label="分配方式" min-width="130">
+          <el-table-column label="派工类型名称" min-width="120" prop="pwSortName" show-overflow-tooltip />
+          <el-table-column label="序号" prop="sNo" width="56" />
+          <el-table-column label="控制属性" min-width="110" prop="controlAttr" show-overflow-tooltip />
+          <el-table-column label="单据代号" min-width="100" prop="receiptCode" show-overflow-tooltip />
+          <el-table-column label="单据名称" min-width="110" prop="receiptName" show-overflow-tooltip />
+          <el-table-column label="计件类型" min-width="110">
             <template #default="{ row }">
               <el-select
-                v-model="row.assignTypeCode"
-                placeholder="分配方式"
+                v-model="row.pieceTypeCode"
+                placeholder="计件类型"
                 size="small"
                 style="width: 100%"
-                @change="(code: string) => onAssignTypeChange(row, code)"
+                @change="(code: string) => onPieceTypeChange(row, code)"
               >
                 <el-option
-                  v-for="a in assignTypeOptions"
-                  :key="a.code"
-                  :label="a.label"
-                  :value="a.code"
+                  v-for="p in pieceTypeOptions"
+                  :key="p.code"
+                  :label="p.label"
+                  :value="p.code"
                 />
               </el-select>
             </template>
           </el-table-column>
-          <el-table-column label="单位" min-width="80">
+          <el-table-column label="来源单号" min-width="120" prop="oriNo" show-overflow-tooltip />
+          <el-table-column min-width="180">
+            <template #header><span>品号</span></template>
             <template #default="{ row }">
-              <el-input v-model="row.unit" size="small" />
+              <el-select
+                v-model="row.goodsCode"
+                clearable
+                filterable
+                :loading="goodsLoading"
+                placeholder="品号 / 品名"
+                remote
+                :remote-method="remoteGoodsSearch"
+                size="small"
+                style="width: 100%"
+                @change="(code: string) => onGoodsChange(row, code)"
+                @focus="() => ensureGoodsOptions()"
+              >
+                <el-option
+                  v-for="g in goodsOptions"
+                  :key="g.goodsCode"
+                  :label="`${g.goodsCode} · ${g.goodsName}`"
+                  :value="g.goodsCode"
+                />
+              </el-select>
             </template>
           </el-table-column>
-          <el-table-column align="right" label="派工数量" min-width="110">
+          <el-table-column label="单位" min-width="110">
             <template #default="{ row }">
-              <el-input-number v-model="row.planQty" :controls="false" :min="0" :precision="4" size="small" />
+              <el-select
+                v-if="isHourType(row)"
+                v-model="row.unit"
+                clearable
+                filterable
+                :loading="unitLoading"
+                placeholder="选择单位"
+                remote
+                :remote-method="remoteUnitSearch"
+                size="small"
+                style="width: 100%"
+                @change="() => onUnitChange(row)"
+                @focus="() => ensureUnitOptions()"
+              >
+                <el-option
+                  v-for="u in unitOptions"
+                  :key="u.unitCode"
+                  :label="u.unitName ? `${u.unitCode} · ${u.unitName}` : u.unitCode"
+                  :value="u.unitCode"
+                />
+              </el-select>
+              <span v-else>{{ row.unit || '—' }}</span>
             </template>
           </el-table-column>
-          <el-table-column align="right" label="工序单价" min-width="100">
+          <el-table-column label="工资单位" min-width="80" prop="wageUnit" show-overflow-tooltip />
+          <el-table-column align="right" min-width="110">
+            <template #header><span class="od-th-req">派工数量</span></template>
             <template #default="{ row }">
-              <el-input-number v-model="row.prcUp" :controls="false" :min="0" :precision="4" size="small" />
+              <el-input-number
+                v-model="row.planQty"
+                :controls="false"
+                :min="0"
+                :precision="4"
+                size="small"
+                @change="() => recalcItemWage(row)"
+              />
             </template>
+          </el-table-column>
+          <el-table-column align="right" label="完工数量" min-width="90">
+            <template #default="{ row }">{{ formatNum(row.fnQty) }}</template>
+          </el-table-column>
+          <el-table-column label="分配方式" min-width="130" prop="assignType" show-overflow-tooltip />
+          <el-table-column align="right" label="表单数量" min-width="90">
+            <template #default="{ row }">{{ formatNum(row.srcBillQty) }}</template>
+          </el-table-column>
+          <el-table-column label="备注" min-width="110">
+            <template #default="{ row }">
+              <el-input v-model="row.itemRemark" size="small" />
+            </template>
+          </el-table-column>
+          <el-table-column align="right" label="流水号" min-width="80">
+            <template #default="{ row }">{{ row.flowNo || 0 }}</template>
           </el-table-column>
           <el-table-column label="加工说明" min-width="120">
             <template #default="{ row }">
@@ -170,6 +239,30 @@
               />
             </template>
           </el-table-column>
+          <el-table-column label="最后完工日期" min-width="120">
+            <template #default="{ row }">{{ row.fnDate || '—' }}</template>
+          </el-table-column>
+          <el-table-column align="right" label="工序单价" min-width="100">
+            <template #default="{ row }">
+              <el-input-number
+                v-model="row.prcUp"
+                :controls="false"
+                :min="0"
+                :precision="4"
+                size="small"
+                @change="() => recalcItemWage(row)"
+              />
+            </template>
+          </el-table-column>
+          <el-table-column align="right" label="计件金额" min-width="100">
+            <template #default="{ row }">{{ formatNum(row.wageAmt) }}</template>
+          </el-table-column>
+          <el-table-column label="客制批号" min-width="110">
+            <template #default="{ row }">
+              <el-input v-model="row.cstlotNo" size="small" />
+            </template>
+          </el-table-column>
+          <el-table-column label="品名" min-width="140" prop="goodsName" show-overflow-tooltip />
           <el-table-column align="center" label="参与人数" width="80">
             <template #default="{ row }">{{ workerCountOf(row) }}</template>
           </el-table-column>
@@ -194,13 +287,16 @@
           border
           :data="filteredWorkers"
           highlight-current-row
-          max-height="260"
+          max-height="280"
           size="small"
           stripe
           @current-change="onWorkerSelect"
           @row-click="onWorkerSelect"
         >
-          <el-table-column label="员工" min-width="180">
+          <el-table-column label="实际生产部门代号" min-width="140" prop="deptCode" show-overflow-tooltip />
+          <el-table-column label="实际生产部门名称" min-width="130" prop="deptName" show-overflow-tooltip />
+          <el-table-column min-width="160">
+            <template #header><span class="od-th-req">工号</span></template>
             <template #default="{ row }">
               <el-select
                 v-model="row.empNo"
@@ -225,8 +321,8 @@
             </template>
           </el-table-column>
           <el-table-column label="姓名" min-width="90" prop="empName" />
-          <el-table-column label="部门" min-width="110" prop="deptName" show-overflow-tooltip />
-          <el-table-column align="right" label="派工数量" min-width="110">
+          <el-table-column align="right" min-width="110">
+            <template #header><span class="od-th-req">派工数量</span></template>
             <template #default="{ row }">
               <el-input-number
                 v-model="row.planQty"
@@ -238,9 +334,22 @@
               />
             </template>
           </el-table-column>
+          <el-table-column align="right" label="完工数量" min-width="90">
+            <template #default="{ row }">{{ formatNum(row.fnQty) }}</template>
+          </el-table-column>
           <el-table-column align="right" label="计件数量" min-width="110">
             <template #default="{ row }">
               <el-input-number v-model="row.wageQty" :controls="false" :min="0" :precision="4" size="small" />
+            </template>
+          </el-table-column>
+          <el-table-column label="加工单元代号" min-width="120">
+            <template #default="{ row }">
+              <el-input v-model="row.workGpCode" size="small" />
+            </template>
+          </el-table-column>
+          <el-table-column label="加工单元名称" min-width="120">
+            <template #default="{ row }">
+              <el-input v-model="row.workGpName" size="small" />
             </template>
           </el-table-column>
         </el-table>
@@ -270,14 +379,18 @@ import {
   getOtherDispatchDeptOptions,
   getOtherDispatchDetail,
   getOtherDispatchEmployees,
+  getOtherDispatchGoodsOptions,
   getOtherDispatchTypeOptions,
+  getOtherDispatchUnitOptions,
   submitOtherDispatch,
   updateOtherDispatch,
   type DeptOption,
   type DispatchTypeOption,
   type EmpOption,
+  type GoodsOption,
   type OtherDispatchItemRow,
   type OtherDispatchWorkerRow,
+  type UnitOption,
 } from '/@/api/nonProd/otherDispatch'
 
 const props = defineProps<{
@@ -297,11 +410,17 @@ const visible = computed({
 
 const isEdit = computed(() => Boolean(props.editOwtNo))
 
-const assignTypeOptions = [
-  { code: '1', label: '平均分配' },
-  { code: '2', label: '按数量分配' },
-  { code: '3', label: '指定分配' },
+/** 与 SF fn_getbasedatadesc('assigntype') / ERP 一致；新建默认「按个人实时分配」，不手改 */
+const DEFAULT_ASSIGN = { code: '1', label: '按个人实时分配' }
+
+const pieceTypeOptions = [
+  { code: '2', label: '个人计件' },
+  { code: '1', label: '团体计件' },
 ]
+
+/** 工时报工：可选手动选单位、自行设工序单价与派工数量 */
+const HOUR_TYPE_CODE = '1001'
+const HOUR_TYPE_NAME = '工时报工'
 
 const DRAWER_MIN = 480
 const DRAWER_DEFAULT = 780
@@ -328,23 +447,33 @@ const workerTableRef = ref<{ setCurrentRow?: (row?: OtherDispatchWorkerRow) => v
 const depts = ref<DeptOption[]>([])
 const typeOptions = ref<DispatchTypeOption[]>([])
 const empOptions = ref<EmpOption[]>([])
+const goodsOptions = ref<GoodsOption[]>([])
+const unitOptions = ref<UnitOption[]>([])
 const empLoading = ref(false)
+const goodsLoading = ref(false)
+const unitLoading = ref(false)
 const saving = ref(false)
 const loadingEdit = ref(false)
 const selectedItem = ref<OtherDispatchItemRow | null>(null)
 const selectedWorker = ref<OtherDispatchWorkerRow | null>(null)
 
-const emptyForm = () => ({
-  owtNo: '',
-  owtDate: new Date().toISOString().slice(0, 10),
-  planDate: '',
-  deptId: undefined as number | undefined,
-  deptName: '',
-  remark: '',
-  auditStatus: '未审核',
-  items: [] as OtherDispatchItemRow[],
-  workers: [] as OtherDispatchWorkerRow[],
-})
+const todayStr = () => new Date().toISOString().slice(0, 10)
+
+const emptyForm = () => {
+  const owtDate = todayStr()
+  return {
+    owtNo: '',
+    owtDate,
+    /** ERP 新建时计划完工日期默认等于派工日期 */
+    planDate: owtDate,
+    deptId: undefined as number | undefined,
+    deptName: '',
+    remark: '',
+    auditStatus: '未审核',
+    items: [] as OtherDispatchItemRow[],
+    workers: [] as OtherDispatchWorkerRow[],
+  }
+}
 
 const form = reactive(emptyForm())
 
@@ -433,6 +562,11 @@ const refreshOwtNo = async () => {
 }
 
 const onOwtDateChange = async () => {
+  // 计划完工日期为空时跟随派工日期（与 ERP 默认一致）
+  if (!form.planDate) form.planDate = form.owtDate
+  for (const item of form.items) {
+    if (!item.planDate) item.planDate = form.planDate || form.owtDate || ''
+  }
   await refreshOwtNo()
 }
 
@@ -473,24 +607,31 @@ const createEmptyItem = (): OtherDispatchItemRow => ({
   sNo: nextSNo(),
   pwSortCode: '',
   pwSortName: '',
+  controlModeCode: '',
+  controlAttr: '',
   receiptCode: '',
   receiptName: '',
   oriNo: '',
   oriSNo: 0,
-  pieceTypeCode: '',
-  pieceType: '',
-  assignTypeCode: '1',
-  assignType: '平均分配',
+  pieceTypeCode: '2',
+  pieceType: '个人计件',
+  assignTypeCode: DEFAULT_ASSIGN.code,
+  assignType: DEFAULT_ASSIGN.label,
   unit: '',
+  wageUnit: '',
   planQty: 0,
   fnQty: 0,
   prcUp: 0,
+  srcBillQty: 0,
+  wageAmt: 0,
   goodsId: 0,
   goodsCode: '',
   goodsName: '',
   cstlotNo: '',
   madeDesc: '',
+  flowNo: 0,
   planDate: form.planDate || form.owtDate || '',
+  fnDate: '',
   itemRemark: '',
 })
 
@@ -512,19 +653,23 @@ const removeSelectedItem = () => {
   selectFirstItem()
 }
 
-const createEmptyWorker = (item: OtherDispatchItemRow): OtherDispatchWorkerRow => ({
-  owtNo: form.owtNo || '',
-  sNo: item.sNo,
-  deptId: form.deptId || 0,
-  deptName: form.deptName || '',
-  empNo: '',
-  empName: '',
-  planQty: Number(item.planQty) || 0,
-  fnQty: 0,
-  wageQty: Number(item.planQty) || 0,
-  workGpCode: '',
-  workGpName: '',
-})
+const createEmptyWorker = (item: OtherDispatchItemRow): OtherDispatchWorkerRow => {
+  const dept = depts.value.find((d) => d.deptId === form.deptId)
+  return {
+    owtNo: form.owtNo || '',
+    sNo: item.sNo,
+    deptId: form.deptId || 0,
+    deptCode: dept?.deptCode || '',
+    deptName: form.deptName || dept?.deptName || '',
+    empNo: '',
+    empName: '',
+    planQty: Number(item.planQty) || 0,
+    fnQty: 0,
+    wageQty: Number(item.planQty) || 0,
+    workGpCode: '',
+    workGpName: '',
+  }
+}
 
 const addWorker = () => {
   if (!selectedItem.value) {
@@ -544,18 +689,61 @@ const removeSelectedWorker = () => {
   selectedWorker.value = null
 }
 
+const isHourType = (row: OtherDispatchItemRow) =>
+  row.pwSortCode === HOUR_TYPE_CODE || row.pwSortName === HOUR_TYPE_NAME
+
 const onPwSortChange = (row: OtherDispatchItemRow, code: string) => {
   const t = typeOptions.value.find((x) => x.code === code)
   row.pwSortCode = code
   row.pwSortName = t?.name || ''
-  row.pieceTypeCode = t?.pieceTypeCode || ''
-  row.pieceType = t?.pieceType || ''
+  row.pieceTypeCode = t?.pieceTypeCode || '2'
+  row.pieceType = t?.pieceType || '个人计件'
+  row.controlModeCode = t?.controlModeCode || '1'
+  row.controlAttr = t?.controlAttr || '无关联'
+  row.assignTypeCode = DEFAULT_ASSIGN.code
+  row.assignType = DEFAULT_ASSIGN.label
+  // 非工时报工：单位由品号带出，切换类型时若已选品号则重刷单位
+  if (!isHourType(row) && row.goodsCode) {
+    const g = goodsOptions.value.find((x) => x.goodsCode === row.goodsCode)
+    if (g?.unitCode) {
+      row.unit = g.unitCode
+      row.wageUnit = g.unitCode
+    }
+  }
 }
 
-const onAssignTypeChange = (row: OtherDispatchItemRow, code: string) => {
-  const a = assignTypeOptions.find((x) => x.code === code)
-  row.assignTypeCode = code
-  row.assignType = a?.label || ''
+const onPieceTypeChange = (row: OtherDispatchItemRow, code: string) => {
+  const p = pieceTypeOptions.find((x) => x.code === code)
+  row.pieceTypeCode = code
+  row.pieceType = p?.label || ''
+}
+
+const formatNum = (v: number | undefined) => {
+  if (v == null || Number.isNaN(v)) return '0'
+  return Number(v).toLocaleString('zh-CN', { maximumFractionDigits: 4 })
+}
+
+const onUnitChange = (row: OtherDispatchItemRow) => {
+  row.wageUnit = row.unit || ''
+}
+
+const syncWageQty = (row: OtherDispatchWorkerRow) => {
+  // 与 ERP 一致：计件数量默认跟随派工数量
+  row.wageQty = Number(row.planQty) || 0
+}
+
+const recalcItemWage = (row: OtherDispatchItemRow) => {
+  const qty = Number(row.planQty) || 0
+  const up = Number(row.prcUp) || 0
+  row.wageAmt = Math.round(qty * up * 1e6) / 1e6
+  // 仅一人且分配方式为按个人实时分配时，人员派工数量跟随明细
+  if (row.assignTypeCode === '1') {
+    const workers = form.workers.filter((w) => isWorkerOfItem(row, w))
+    if (workers.length === 1) {
+      workers[0].planQty = qty
+      workers[0].wageQty = qty
+    }
+  }
 }
 
 const ensureEmpOptions = async (keyword = '') => {
@@ -582,14 +770,69 @@ const onEmpChange = (row: OtherDispatchWorkerRow, empNo: string) => {
   row.empNo = empNo || ''
   row.empName = emp?.empName || ''
   row.deptId = emp?.deptId || form.deptId || 0
+  row.deptCode = emp?.deptCode || depts.value.find((d) => d.deptId === row.deptId)?.deptCode || ''
   row.deptName = emp?.deptName || form.deptName || ''
   row.sNo = selectedItem.value?.sNo || row.sNo
 }
 
-const syncWageQty = (row: OtherDispatchWorkerRow) => {
-  if (row.wageQty == null || row.wageQty === 0) {
-    row.wageQty = Number(row.planQty) || 0
+const ensureGoodsOptions = async (keyword = '') => {
+  goodsLoading.value = true
+  try {
+    goodsOptions.value = await getOtherDispatchGoodsOptions(keyword || undefined)
+  } catch {
+    goodsOptions.value = []
+  } finally {
+    goodsLoading.value = false
   }
+}
+
+let goodsSearchTimer: ReturnType<typeof setTimeout> | null = null
+const remoteGoodsSearch = (keyword: string) => {
+  if (goodsSearchTimer) clearTimeout(goodsSearchTimer)
+  goodsSearchTimer = setTimeout(() => {
+    ensureGoodsOptions(keyword)
+  }, 250)
+}
+
+const onGoodsChange = (row: OtherDispatchItemRow, code: string) => {
+  if (!code) {
+    row.goodsId = 0
+    row.goodsCode = ''
+    row.goodsName = ''
+    if (!isHourType(row)) {
+      row.unit = ''
+      row.wageUnit = ''
+    }
+    return
+  }
+  const g = goodsOptions.value.find((x) => x.goodsCode === code)
+  row.goodsId = g?.goodsId || 0
+  row.goodsCode = code
+  row.goodsName = g?.goodsName || ''
+  // 非工时报工：单位随品号标准单位带出；工时报工可自选单位，不覆盖已选手动单位
+  if (!isHourType(row) || !row.unit) {
+    row.unit = g?.unitCode || row.unit || ''
+    row.wageUnit = row.unit
+  }
+}
+
+const ensureUnitOptions = async (keyword = '') => {
+  unitLoading.value = true
+  try {
+    unitOptions.value = await getOtherDispatchUnitOptions(keyword || undefined)
+  } catch {
+    unitOptions.value = []
+  } finally {
+    unitLoading.value = false
+  }
+}
+
+let unitSearchTimer: ReturnType<typeof setTimeout> | null = null
+const remoteUnitSearch = (keyword: string) => {
+  if (unitSearchTimer) clearTimeout(unitSearchTimer)
+  unitSearchTimer = setTimeout(() => {
+    ensureUnitOptions(keyword)
+  }, 250)
 }
 
 const handleSave = async () => {
@@ -600,8 +843,33 @@ const handleSave = async () => {
   }
   for (const item of form.items) {
     if (!item.pwSortCode) {
-      ElMessage.warning(`序号 ${item.sNo} 请选择派工类型`)
+      ElMessage.warning(`序号 ${item.sNo}：请选择派工类型代号`)
       return
+    }
+    if (item.planQty == null || Number(item.planQty) <= 0) {
+      ElMessage.warning(`序号 ${item.sNo}：请填写派工数量`)
+      return
+    }
+    if (!item.pieceTypeCode) {
+      ElMessage.warning(`序号 ${item.sNo}：请选择计件类型`)
+      return
+    }
+    item.assignTypeCode = item.assignTypeCode || DEFAULT_ASSIGN.code
+    item.assignType = item.assignType || DEFAULT_ASSIGN.label
+    const workers = form.workers.filter((w) => isWorkerOfItem(item, w))
+    if (!workers.length) {
+      ElMessage.warning(`序号 ${item.sNo}：请至少添加一名人员`)
+      return
+    }
+    for (const w of workers) {
+      if (!w.empNo) {
+        ElMessage.warning(`序号 ${item.sNo}：人员明细请选择工号`)
+        return
+      }
+      if (w.planQty == null || Number(w.planQty) <= 0) {
+        ElMessage.warning(`序号 ${item.sNo}：人员「${w.empName || w.empNo}」请填写派工数量`)
+        return
+      }
     }
   }
   saving.value = true
@@ -609,17 +877,26 @@ const handleSave = async () => {
     const payload = {
       owtNo: form.owtNo,
       owtDate: form.owtDate,
-      planDate: form.planDate || undefined,
+      planDate: form.planDate || form.owtDate || undefined,
       deptId: form.deptId,
       deptName: form.deptName,
       remark: form.remark,
       auditStatus: '未审核',
-      items: form.items.map((i) => ({ ...i, owtNo: form.owtNo })),
+      items: form.items.map((i) => ({
+        ...i,
+        owtNo: form.owtNo,
+        assignTypeCode: i.assignTypeCode || '1',
+        assignType: i.assignType || '按个人实时分配',
+        planDate: i.planDate || form.planDate || form.owtDate || '',
+        fnQty: Number(i.fnQty) || 0,
+        srcBillQty: Number(i.srcBillQty) || 0,
+      })),
       workers: form.workers.map((w) => ({
         ...w,
         owtNo: form.owtNo,
         deptId: w.deptId || form.deptId || 0,
         deptName: w.deptName || form.deptName || '',
+        fnQty: Number(w.fnQty) || 0,
         wageQty: w.wageQty ?? w.planQty ?? 0,
       })),
     }
@@ -658,16 +935,35 @@ const loadEdit = async (owtNo: string) => {
     form.auditStatus = '未审核'
     form.items = data.items || []
     form.workers = data.workers || []
-    await ensureEmpOptions()
-    // 编辑回显时补齐已选员工到下拉选项
+    await Promise.all([ensureEmpOptions(), ensureGoodsOptions(), ensureUnitOptions()])
+    // 编辑回显时补齐已选员工 / 品号 / 单位到下拉选项
     for (const w of form.workers) {
       if (w.empNo && !empOptions.value.some((e) => e.empNo === w.empNo)) {
         empOptions.value.push({
           empNo: w.empNo,
           empName: w.empName,
           deptId: w.deptId,
+          deptCode: w.deptCode,
           deptName: w.deptName,
         })
+      }
+    }
+    for (const item of form.items) {
+      if (item.goodsCode && !goodsOptions.value.some((g) => g.goodsCode === item.goodsCode)) {
+        goodsOptions.value.unshift({
+          goodsId: item.goodsId || 0,
+          goodsCode: item.goodsCode,
+          goodsName: item.goodsName || '',
+          unitCode: item.unit || '',
+          unitName: '',
+        })
+      }
+      if (item.unit && !unitOptions.value.some((u) => u.unitCode === item.unit)) {
+        unitOptions.value.unshift({ unitCode: item.unit, unitName: item.wageUnit || item.unit })
+      }
+      if (!item.assignTypeCode) {
+        item.assignTypeCode = DEFAULT_ASSIGN.code
+        item.assignType = DEFAULT_ASSIGN.label
       }
     }
     selectFirstItem()
@@ -684,6 +980,8 @@ const reset = () => {
   selectedItem.value = null
   selectedWorker.value = null
   empOptions.value = []
+  goodsOptions.value = []
+  unitOptions.value = []
   formRef.value?.clearValidate()
 }
 
@@ -707,6 +1005,12 @@ watch(
 <style lang="scss" scoped>
 .od-create {
   padding: 4px 8px 16px;
+}
+
+.od-create__form {
+  :deep(.el-form-item__label) {
+    white-space: nowrap;
+  }
 }
 
 .od-create__actions {
@@ -790,6 +1094,11 @@ watch(
 
 :deep(.el-form-item.is-required:not(.is-no-asterisk) > .el-form-item__label) {
   color: #c45656;
+}
+
+.od-th-req {
+  color: #c45656;
+  white-space: nowrap;
 }
 </style>
 

@@ -10,6 +10,8 @@ export interface OtherDispatchItemRow {
   sNo: number
   pwSortCode: string
   pwSortName: string
+  controlModeCode: string
+  controlAttr: string
   receiptCode: string
   receiptName: string
   oriNo: string
@@ -19,15 +21,20 @@ export interface OtherDispatchItemRow {
   assignTypeCode: string
   assignType: string
   unit: string
+  wageUnit: string
   planQty: number
   fnQty: number
   prcUp: number
+  srcBillQty: number
+  wageAmt: number
   goodsId: number
   goodsCode: string
   goodsName: string
   cstlotNo: string
   madeDesc: string
+  flowNo: number
   planDate: string
+  fnDate: string
   itemRemark: string
 }
 
@@ -35,6 +42,7 @@ export interface OtherDispatchWorkerRow {
   owtNo: string
   sNo: number
   deptId: number
+  deptCode: string
   deptName: string
   empNo: string
   empName: string
@@ -63,11 +71,16 @@ export interface OtherDispatchRow {
   creatorCode: string
   createDate: string
   modifier: string
+  modifierCode: string
   modifyDate: string
   approver: string
   approverCode: string
   appDate: string
   ifCancel: string
+  ifCancelText: string
+  closer: string
+  closerCode: string
+  closeDate: string
   itemCount: number
   totalPlanQty: number
   workerCount: number
@@ -104,13 +117,29 @@ export interface DispatchTypeOption {
   name: string
   pieceTypeCode: string
   pieceType: string
+  controlModeCode: string
+  controlAttr: string
 }
 
 export interface EmpOption {
   empNo: string
   empName: string
   deptId: number
+  deptCode?: string
   deptName: string
+}
+
+export interface GoodsOption {
+  goodsId: number
+  goodsCode: string
+  goodsName: string
+  unitCode: string
+  unitName: string
+}
+
+export interface UnitOption {
+  unitCode: string
+  unitName: string
 }
 
 const BASE = '/api/blade-system/non-prod/other-dispatch'
@@ -133,11 +162,16 @@ const mapMaster = (row: any): OtherDispatchRow => ({
   creatorCode: row?.creatorCode || '',
   createDate: row?.createDate || '',
   modifier: row?.modifier || '',
+  modifierCode: row?.modifierCode || '',
   modifyDate: row?.modifyDate || '',
   approver: row?.approver || '',
   approverCode: row?.approverCode || '',
   appDate: row?.appDate || '',
   ifCancel: row?.ifCancel || '',
+  ifCancelText: row?.ifCancelText || (String(row?.ifCancel) === '1' ? '是' : '否'),
+  closer: row?.closer || '',
+  closerCode: row?.closerCode || '',
+  closeDate: row?.closeDate || '',
   itemCount: Number(row?.itemCount) || 0,
   totalPlanQty: Number(row?.totalPlanQty) || 0,
   workerCount: Number(row?.workerCount) || 0,
@@ -145,36 +179,49 @@ const mapMaster = (row: any): OtherDispatchRow => ({
 
 const pickSNo = (row: any) => Number(row?.sNo ?? row?.SNo ?? row?.fSNo ?? row?.sno) || 0
 
-const mapItem = (row: any): OtherDispatchItemRow => ({
-  owtNo: String(row?.owtNo || row?.OWTNo || '').trim(),
-  sNo: pickSNo(row),
-  pwSortCode: String(row?.pwSortCode || '').trim(),
-  pwSortName: row?.pwSortName || '',
-  receiptCode: String(row?.receiptCode || '').trim(),
-  receiptName: row?.receiptName || '',
-  oriNo: row?.oriNo || '',
-  oriSNo: Number(row?.oriSNo) || 0,
-  pieceTypeCode: String(row?.pieceTypeCode || '').trim(),
-  pieceType: row?.pieceType || '',
-  assignTypeCode: String(row?.assignTypeCode || '').trim(),
-  assignType: row?.assignType || '',
-  unit: String(row?.unit || '').trim(),
-  planQty: Number(row?.planQty) || 0,
-  fnQty: Number(row?.fnQty) || 0,
-  prcUp: Number(row?.prcUp) || 0,
-  goodsId: Number(row?.goodsId) || 0,
-  goodsCode: row?.goodsCode || '',
-  goodsName: row?.goodsName || '',
-  cstlotNo: row?.cstlotNo || '',
-  madeDesc: row?.madeDesc || '',
-  planDate: row?.planDate || '',
-  itemRemark: row?.itemRemark || '',
-})
+const mapItem = (row: any): OtherDispatchItemRow => {
+  const planQty = Number(row?.planQty) || 0
+  const prcUp = Number(row?.prcUp) || 0
+  const unit = String(row?.unit || '').trim()
+  return {
+    owtNo: String(row?.owtNo || row?.OWTNo || '').trim(),
+    sNo: pickSNo(row),
+    pwSortCode: String(row?.pwSortCode || '').trim(),
+    pwSortName: row?.pwSortName || '',
+    controlModeCode: String(row?.controlModeCode || '').trim(),
+    controlAttr: row?.controlAttr || '',
+    receiptCode: String(row?.receiptCode || '').trim(),
+    receiptName: row?.receiptName || '',
+    oriNo: row?.oriNo || '',
+    oriSNo: Number(row?.oriSNo) || 0,
+    pieceTypeCode: String(row?.pieceTypeCode || '').trim(),
+    pieceType: row?.pieceType || '',
+    assignTypeCode: String(row?.assignTypeCode || '').trim(),
+    assignType: row?.assignType || '',
+    unit,
+    wageUnit: String(row?.wageUnit || unit || '').trim(),
+    planQty,
+    fnQty: Number(row?.fnQty) || 0,
+    prcUp,
+    srcBillQty: Number(row?.srcBillQty) || 0,
+    wageAmt: Number(row?.wageAmt) || planQty * prcUp,
+    goodsId: Number(row?.goodsId) || 0,
+    goodsCode: row?.goodsCode || '',
+    goodsName: row?.goodsName || '',
+    cstlotNo: row?.cstlotNo || '',
+    madeDesc: row?.madeDesc || '',
+    flowNo: Number(row?.flowNo) || 0,
+    planDate: row?.planDate || '',
+    fnDate: row?.fnDate || '',
+    itemRemark: row?.itemRemark || '',
+  }
+}
 
 const mapWorker = (row: any): OtherDispatchWorkerRow => ({
   owtNo: String(row?.owtNo || row?.OWTNo || '').trim(),
   sNo: pickSNo(row),
   deptId: Number(row?.deptId) || 0,
+  deptCode: String(row?.deptCode || '').trim(),
   deptName: row?.deptName || '',
   empNo: String(row?.empNo || '').trim(),
   empName: row?.empName || '',
@@ -272,6 +319,8 @@ export async function getOtherDispatchTypeOptions() {
     name: row.name || '',
     pieceTypeCode: row.pieceTypeCode || '2',
     pieceType: row.pieceType || '',
+    controlModeCode: row.controlModeCode || '1',
+    controlAttr: row.controlAttr || '',
   })) as DispatchTypeOption[]
 }
 
@@ -286,8 +335,38 @@ export async function getOtherDispatchEmployees(deptId?: number, keyword?: strin
     empNo: row.empNo || '',
     empName: row.empName || '',
     deptId: Number(row.deptId) || 0,
+    deptCode: row.deptCode || '',
     deptName: row.deptName || '',
   })) as EmpOption[]
+}
+
+export async function getOtherDispatchGoodsOptions(keyword?: string) {
+  const res: any = await request({
+    url: `${BASE}/goods-options`,
+    method: 'get',
+    params: { keyword: keyword || undefined },
+  })
+  const arr = Array.isArray(unwrap(res)) ? unwrap(res) : []
+  return arr.map((row: any) => ({
+    goodsId: Number(row.goodsId) || 0,
+    goodsCode: String(row.goodsCode || '').trim(),
+    goodsName: row.goodsName || '',
+    unitCode: String(row.unitCode || '').trim(),
+    unitName: row.unitName || '',
+  })) as GoodsOption[]
+}
+
+export async function getOtherDispatchUnitOptions(keyword?: string) {
+  const res: any = await request({
+    url: `${BASE}/unit-options`,
+    method: 'get',
+    params: { keyword: keyword || undefined },
+  })
+  const arr = Array.isArray(unwrap(res)) ? unwrap(res) : []
+  return arr.map((row: any) => ({
+    unitCode: String(row.unitCode || '').trim(),
+    unitName: row.unitName || '',
+  })) as UnitOption[]
 }
 
 export async function submitOtherDispatch(payload: Partial<OtherDispatchRow>) {

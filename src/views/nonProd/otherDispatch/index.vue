@@ -21,8 +21,8 @@
         </div>
       </header>
 
-      <div class="od-list-pane">
-        <div class="od-filter">
+      <div ref="listPaneRef" class="od-list-pane">
+        <div ref="filterRef" class="od-filter">
           <el-form inline :model="queryForm" @submit.prevent>
             <el-form-item label="派工日期">
               <el-date-picker
@@ -69,15 +69,15 @@
           </el-form>
         </div>
 
-        <div class="od-table-wrap">
+        <div ref="masterWrapRef" class="od-table-wrap">
           <el-table
             ref="masterTableRef"
             v-loading="loading"
             border
             class="od-table"
             :data="list"
+            :height="masterTableHeight"
             highlight-current-row
-            :max-height="masterMaxHeight"
             stripe
             @current-change="onMasterCurrentChange"
             @row-click="(row: OtherDispatchRow) => loadDetail(row)"
@@ -90,6 +90,7 @@
             </el-table-column>
             <el-table-column label="部门名称" min-width="130" prop="deptName" show-overflow-tooltip />
             <el-table-column label="派工日期" min-width="110" prop="owtDate" />
+            <el-table-column label="实际完工日期" min-width="120" prop="fnDate" />
             <el-table-column label="审核状态" min-width="90" prop="auditStatus">
               <template #default="{ row }">
                 <el-tag effect="light" round size="small" :type="auditTagType(row.auditStatus)">
@@ -104,16 +105,29 @@
                 </el-tag>
               </template>
             </el-table-column>
+            <el-table-column align="center" label="是否作废" min-width="90" prop="ifCancelText" />
             <el-table-column label="备注" min-width="140" prop="remark" show-overflow-tooltip />
-            <el-table-column label="创建人" min-width="90" prop="creator" />
-            <el-table-column label="创建日期" min-width="160" prop="createDate" />
+            <el-table-column label="审核日期" min-width="160" prop="appDate" />
             <el-table-column label="审核人" min-width="90" prop="approver" />
+            <el-table-column label="审核人代号" min-width="110" prop="approverCode" />
+            <el-table-column label="建立日期" min-width="160" prop="createDate" />
+            <el-table-column label="修改人" min-width="90" prop="modifier" />
+            <el-table-column label="修改人代号" min-width="110" prop="modifierCode" />
+            <el-table-column label="建立人" min-width="90" prop="creator" />
+            <el-table-column label="建立人代号" min-width="110" prop="creatorCode" />
+            <el-table-column label="修改日期" min-width="160" prop="modifyDate" />
+            <el-table-column label="结案人" min-width="90" prop="closer" />
+            <el-table-column label="结案人代号" min-width="110" prop="closerCode" />
+            <el-table-column label="结案日期" min-width="160" prop="closeDate" />
+            <el-table-column label="计划完工日期" min-width="120" prop="planDate" />
+            <el-table-column align="right" label="计件金额" min-width="110" prop="wageAmt">
+              <template #default="{ row }">{{ formatNum(row.wageAmt) }}</template>
+            </el-table-column>
             <el-table-column align="center" label="明细行数" min-width="90" prop="itemCount" />
             <el-table-column align="center" label="人员数" min-width="80" prop="workerCount" />
             <el-table-column fixed="right" label="操作" width="160">
               <template #default="{ row }">
                 <div class="od-row-ops">
-                  <el-button link type="primary" @click.stop="viewRow(row)">查看</el-button>
                   <el-dropdown trigger="click" @command="(cmd: string) => handleRowAction(cmd, row)">
                     <el-button link type="primary" @click.stop>更多</el-button>
                     <template #dropdown>
@@ -149,43 +163,61 @@
                 <template v-else>请选择上方派工单</template>
               </span>
             </div>
-            <el-table
-              ref="itemTableRef"
-              v-loading="detailLoading"
-              border
-              :data="detailItems"
-              highlight-current-row
-              :max-height="itemMaxHeight"
-              row-key="sNo"
-              size="small"
-              stripe
-              @current-change="onItemCurrentChange"
-              @row-click="onItemRowClick"
-            >
-              <el-table-column label="序号" prop="sNo" width="56" />
-              <el-table-column label="派工类型" min-width="110" prop="pwSortName" show-overflow-tooltip />
-              <el-table-column label="计件类型" min-width="90" prop="pieceType" />
-              <el-table-column label="分配方式" min-width="110" prop="assignType" show-overflow-tooltip />
-              <el-table-column label="单位" prop="unit" width="60" />
-              <el-table-column align="right" label="派工数量" prop="planQty" width="90">
-                <template #default="{ row }">{{ formatNum(row.planQty) }}</template>
-              </el-table-column>
-              <el-table-column align="right" label="完工数量" prop="fnQty" width="90">
-                <template #default="{ row }">{{ formatNum(row.fnQty) }}</template>
-              </el-table-column>
-              <el-table-column align="right" label="工序单价" prop="prcUp" width="90">
-                <template #default="{ row }">{{ formatNum(row.prcUp) }}</template>
-              </el-table-column>
-              <el-table-column label="加工说明" min-width="120" prop="madeDesc" show-overflow-tooltip />
-              <el-table-column label="计划完工日期" min-width="120" prop="planDate" />
-              <el-table-column align="center" label="参与人数" width="90">
-                <template #default="{ row }">
-                  <el-tag effect="plain" round size="small" type="primary">
-                    {{ workerCountOf(row) }}
-                  </el-tag>
-                </template>
-              </el-table-column>
-            </el-table>
+            <div class="od-link-panel__body">
+              <el-table
+                ref="itemTableRef"
+                v-loading="detailLoading"
+                border
+                :data="detailItems"
+                highlight-current-row
+                :max-height="itemMaxHeight"
+                row-key="sNo"
+                size="small"
+                stripe
+                @current-change="onItemCurrentChange"
+                @row-click="onItemRowClick"
+              >
+                <el-table-column label="派工类型代号" min-width="110" prop="pwSortCode" />
+                <el-table-column label="派工类型名称" min-width="120" prop="pwSortName" show-overflow-tooltip />
+                <el-table-column label="序号" prop="sNo" width="56" />
+                <el-table-column label="控制属性" min-width="110" prop="controlAttr" show-overflow-tooltip />
+                <el-table-column label="单据代号" min-width="100" prop="receiptCode" />
+                <el-table-column label="单据名称" min-width="110" prop="receiptName" show-overflow-tooltip />
+                <el-table-column label="计件类型" min-width="90" prop="pieceType" />
+                <el-table-column label="来源单号" min-width="120" prop="oriNo" show-overflow-tooltip />
+                <el-table-column label="品号" min-width="110" prop="goodsCode" show-overflow-tooltip />
+                <el-table-column label="单位" prop="unit" width="60" />
+                <el-table-column label="工资单位" prop="wageUnit" width="80" />
+                <el-table-column align="right" label="派工数量" prop="planQty" width="90">
+                  <template #default="{ row }">{{ formatNum(row.planQty) }}</template>
+                </el-table-column>
+                <el-table-column align="right" label="完工数量" prop="fnQty" width="90">
+                  <template #default="{ row }">{{ formatNum(row.fnQty) }}</template>
+                </el-table-column>
+                <el-table-column label="分配方式" min-width="120" prop="assignType" show-overflow-tooltip />
+                <el-table-column align="right" label="表单数量" prop="srcBillQty" width="90">
+                  <template #default="{ row }">{{ formatNum(row.srcBillQty) }}</template>
+                </el-table-column>
+                <el-table-column label="备注" min-width="100" prop="itemRemark" show-overflow-tooltip />
+                <el-table-column label="流水号" prop="flowNo" width="80" />
+                <el-table-column label="加工说明" min-width="120" prop="madeDesc" show-overflow-tooltip />
+                <el-table-column label="计划完工日期" min-width="120" prop="planDate" />
+                <el-table-column label="最后完工日期" min-width="120" prop="fnDate" />
+                <el-table-column align="right" label="工序单价" prop="prcUp" width="90">
+                  <template #default="{ row }">{{ formatNum(row.prcUp) }}</template>
+                </el-table-column>
+                <el-table-column align="right" label="计件金额" prop="wageAmt" width="100">
+                  <template #default="{ row }">{{ formatNum(row.wageAmt) }}</template>
+                </el-table-column>
+                <el-table-column align="center" label="参与人数" width="90">
+                  <template #default="{ row }">
+                    <el-tag effect="plain" round size="small" type="primary">
+                      {{ workerCountOf(row) }}
+                    </el-tag>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
           </div>
 
           <div class="od-link-panel od-link-panel--workers">
@@ -198,33 +230,39 @@
                   </el-tag>
                   <span>{{ filteredWorkers.length }} 人</span>
                 </template>
-                <span v-else class="od-link-panel__hint">请先选择上方一条派工明细</span>
+                <span v-else class="od-link-panel__hint">请先选择左侧一条派工明细</span>
               </div>
             </div>
-            <el-table border :data="filteredWorkers" :max-height="workerMaxHeight" size="small" stripe>
-              <el-table-column label="员工代码" min-width="100" prop="empNo" />
-              <el-table-column label="姓名" min-width="80" prop="empName" />
-              <el-table-column label="部门名称" min-width="110" prop="deptName" show-overflow-tooltip />
-              <el-table-column align="right" label="派工数量" prop="planQty" width="90">
-                <template #default="{ row }">{{ formatNum(row.planQty) }}</template>
-              </el-table-column>
-              <el-table-column align="right" label="完工数量" prop="fnQty" width="90">
-                <template #default="{ row }">{{ formatNum(row.fnQty) }}</template>
-              </el-table-column>
-              <el-table-column align="right" label="计件数量" prop="wageQty" width="90">
-                <template #default="{ row }">{{ formatNum(row.wageQty) }}</template>
-              </el-table-column>
-              <el-table-column label="加工单元" min-width="120" prop="workGpName" show-overflow-tooltip />
-            </el-table>
-            <el-empty
-              v-if="selectedItem && filteredWorkers.length === 0"
-              description="该派工行暂无人员明细"
-              :image-size="56"
-            />
+            <div class="od-link-panel__body">
+              <el-table
+                border
+                :data="filteredWorkers"
+                empty-text="该派工行暂无人员明细"
+                :max-height="workerMaxHeight"
+                size="small"
+                stripe
+              >
+                <el-table-column label="实际生产部门代号" min-width="130" prop="deptCode" />
+                <el-table-column label="实际生产部门名称" min-width="130" prop="deptName" show-overflow-tooltip />
+                <el-table-column label="工号" min-width="100" prop="empNo" />
+                <el-table-column label="姓名" min-width="80" prop="empName" />
+                <el-table-column align="right" label="派工数量" prop="planQty" width="90">
+                  <template #default="{ row }">{{ formatNum(row.planQty) }}</template>
+                </el-table-column>
+                <el-table-column align="right" label="完工数量" prop="fnQty" width="90">
+                  <template #default="{ row }">{{ formatNum(row.fnQty) }}</template>
+                </el-table-column>
+                <el-table-column align="right" label="计件数量" prop="wageQty" width="90">
+                  <template #default="{ row }">{{ formatNum(row.wageQty) }}</template>
+                </el-table-column>
+                <el-table-column label="加工单元代号" min-width="110" prop="workGpCode" />
+                <el-table-column label="加工单元名称" min-width="120" prop="workGpName" show-overflow-tooltip />
+              </el-table>
+            </div>
           </div>
         </section>
 
-        <footer class="od-pager">
+        <footer ref="pagerRef" class="od-pager">
           <vab-pagination
             :current-page="queryForm.pageNo"
             :page-size="queryForm.pageSize"
@@ -277,8 +315,27 @@ const detailWorkers = ref<OtherDispatchWorkerRow[]>([])
 const selectedItem = ref<OtherDispatchItemRow | null>(null)
 const masterTableRef = ref<{ setCurrentRow?: (row?: OtherDispatchRow) => void } | null>(null)
 const itemTableRef = ref<{ setCurrentRow?: (row?: OtherDispatchItemRow) => void } | null>(null)
+const listPaneRef = ref<HTMLElement | null>(null)
+const filterRef = ref<HTMLElement | null>(null)
+const pagerRef = ref<HTMLElement | null>(null)
+const masterWrapRef = ref<HTMLElement | null>(null)
 const deptOptions = ref<DeptOption[]>([])
 const stats = ref<OtherDispatchStats>({ totalCount: 0, auditedCount: 0, pendingCount: 0, recentCount: 0 })
+
+/** 主表随窗口填满剩余区域；明细按行数伸缩，窗口变小时同步压低上限 */
+const masterTableHeight = ref(280)
+const detailHeightCap = ref(360)
+let layoutRo: ResizeObserver | null = null
+
+const syncTableHeights = () => {
+  const masterH = masterWrapRef.value?.clientHeight || 0
+  if (masterH > 0) masterTableHeight.value = Math.max(120, masterH)
+  const paneH = listPaneRef.value?.clientHeight || 0
+  if (paneH > 0) {
+    // 明细区最多约占列表可用高度的 42%，保证左右两表都能完整露出
+    detailHeightCap.value = Math.max(140, Math.floor(paneH * 0.42))
+  }
+}
 
 /** 默认不限日期 */
 const dateRange = ref<[string, string] | null>(null)
@@ -305,6 +362,17 @@ const filteredWorkers = computed(() => {
   if (!selectedItem.value) return []
   return detailWorkers.value.filter((w) => isWorkerOfItem(selectedItem.value!, w))
 })
+
+const calcDetailMaxHeight = (rowCount: number) => {
+  const header = 40
+  const rowH = 36
+  const rows = Math.max(rowCount, 0)
+  const content = header + Math.max(rows, 1) * rowH + (rows === 0 ? 8 : 0)
+  return Math.min(content, detailHeightCap.value)
+}
+
+const itemMaxHeight = computed(() => calcDetailMaxHeight(detailItems.value.length))
+const workerMaxHeight = computed(() => calcDetailMaxHeight(filteredWorkers.value.length))
 
 const workerCountOf = (item: OtherDispatchItemRow) =>
   detailWorkers.value.filter((w) => isWorkerOfItem(item, w)).length
@@ -340,16 +408,6 @@ const formatNum = (v: number | undefined) => {
   if (v == null || Number.isNaN(v)) return '0'
   return Number(v).toLocaleString('zh-CN', { maximumFractionDigits: 6 })
 }
-
-/** 行数少时表体收缩，多时到上限后内部滚动 */
-const calcTableMaxHeight = (rowCount: number, rowH: number, headerH: number, minRows: number, cap: number) => {
-  const n = Math.max(rowCount, minRows)
-  return Math.min(headerH + n * rowH, cap)
-}
-
-const masterMaxHeight = computed(() => calcTableMaxHeight(list.value.length, 42, 44, 2, 480))
-const itemMaxHeight = computed(() => calcTableMaxHeight(detailItems.value.length, 36, 40, 1, 360))
-const workerMaxHeight = computed(() => calcTableMaxHeight(filteredWorkers.value.length, 36, 40, 1, 360))
 
 const dateFrom = () => dateRange.value?.[0]
 const dateTo = () => dateRange.value?.[1]
@@ -588,7 +646,23 @@ const onFormSaved = async (owtNo: string) => {
 }
 
 onMounted(async () => {
+  await nextTick()
+  syncTableHeights()
+  if (typeof ResizeObserver !== 'undefined') {
+    layoutRo = new ResizeObserver(() => syncTableHeights())
+    if (listPaneRef.value) layoutRo.observe(listPaneRef.value)
+    if (masterWrapRef.value) layoutRo.observe(masterWrapRef.value)
+  }
+  window.addEventListener('resize', syncTableHeights)
   await Promise.all([fetchDepts(), refreshAll()])
+  await nextTick()
+  syncTableHeights()
+})
+
+onBeforeUnmount(() => {
+  layoutRo?.disconnect()
+  layoutRo = null
+  window.removeEventListener('resize', syncTableHeights)
 })
 </script>
 
@@ -598,6 +672,8 @@ onMounted(async () => {
   flex-direction: column;
   gap: 12px;
   padding: 12px;
+  min-height: 0;
+  height: 100%;
   background: linear-gradient(180deg, #f0f4ff 0%, var(--el-bg-color-page) 120px);
 }
 
@@ -605,6 +681,7 @@ onMounted(async () => {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 12px;
+  flex-shrink: 0;
 }
 
 .od-stat {
@@ -677,6 +754,7 @@ onMounted(async () => {
     justify-content: space-between;
     padding: 12px 16px;
     border-bottom: 1px solid var(--el-border-color-lighter);
+    flex-shrink: 0;
   }
 
   &__title {
@@ -692,8 +770,7 @@ onMounted(async () => {
   flex-direction: column;
   min-height: 0;
   padding: 12px 16px 0;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 .od-filter {
@@ -702,8 +779,10 @@ onMounted(async () => {
 }
 
 .od-table-wrap {
-  flex: none;
+  flex: 1 1 0;
+  min-height: 160px;
   width: 100%;
+  overflow: hidden;
 }
 
 .od-link-panels {
@@ -737,6 +816,10 @@ onMounted(async () => {
 }
 
 .od-link-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: auto;
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 10px;
   padding: 12px;
@@ -753,12 +836,18 @@ onMounted(async () => {
     justify-content: space-between;
     gap: 12px;
     margin-bottom: 10px;
+    flex-shrink: 0;
 
     h3 {
       margin: 0;
       font-size: 14px;
       font-weight: 600;
     }
+  }
+
+  &__body {
+    flex: none;
+    width: 100%;
   }
 
   &__hint {
@@ -789,9 +878,11 @@ onMounted(async () => {
   .od-hero {
     grid-template-columns: repeat(2, 1fr);
   }
+}
 
+@media (max-width: 900px) {
   .od-link-panels {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
   }
 }
 </style>
