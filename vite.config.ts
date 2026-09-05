@@ -1,5 +1,6 @@
 import autoprefixer from 'autoprefixer'
 import dayjs from 'dayjs'
+import http from 'node:http'
 import { resolve } from 'node:path'
 import type { ConfigEnv, UserConfig } from 'vite'
 import { defineConfig, loadEnv } from 'vite'
@@ -21,6 +22,8 @@ import {
 import { createVitePlugin, createWatch } from '/@vab/build'
 
 const lastBuildTime = dayjs().format('YYYY-MM-DD HH:mm:ss')
+/** 复用到后端的 TCP，降低开发态代理冷连接耗时 */
+const proxyKeepAliveAgent = new http.Agent({ keepAlive: true, maxSockets: 64 })
 
 export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
   process.env['VITE_APP_UPDATE_TIME'] = lastBuildTime
@@ -47,41 +50,49 @@ export default defineConfig(({ mode }: ConfigEnv): UserConfig => {
         '/oss-minio': {
           target: 'http://127.0.0.1:9000',
           changeOrigin: true,
+          agent: proxyKeepAliveAgent,
           rewrite: (path) => path.replace(/^\/oss-minio/, ''),
         },
         '/api/blade-system': {
           target: 'http://127.0.0.1:8106',
           changeOrigin: true,
+          agent: proxyKeepAliveAgent,
           rewrite: (path) => path.replace(/^\/api\/blade-system/, ''),
         },
         '/api/blade-desk': {
           target: 'http://127.0.0.1:8105',
           changeOrigin: true,
+          agent: proxyKeepAliveAgent,
           rewrite: (path) => path.replace(/^\/api\/blade-desk/, ''),
         },
         '/api/blade-log': {
           target: 'http://127.0.0.1:8103',
           changeOrigin: true,
+          agent: proxyKeepAliveAgent,
           rewrite: (path) => path.replace(/^\/api\/blade-log/, ''),
         },
         '/api/blade-resource': {
           target: 'http://127.0.0.1:8010',
           changeOrigin: true,
+          agent: proxyKeepAliveAgent,
           rewrite: (path) => path.replace(/^\/api\/blade-resource/, ''),
         },
         '/api/blade-auth': {
           target: 'http://127.0.0.1:8100',
           changeOrigin: true,
+          agent: proxyKeepAliveAgent,
           rewrite: (path) => path.replace(/^\/api\/blade-auth/, ''),
         },
         '/api/blade-shop': {
           target: 'http://127.0.0.1:8106',
           changeOrigin: true,
+          agent: proxyKeepAliveAgent,
           rewrite: (path) => path.replace(/^\/api\/blade-shop/, '/shop'),
         },
         '/api': {
           target: 'http://127.0.0.1:80',
           changeOrigin: true,
+          agent: proxyKeepAliveAgent,
           rewrite: (path) => path.replace(/^\/api/, ''),
         },
       },

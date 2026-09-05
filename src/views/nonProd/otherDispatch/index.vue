@@ -163,14 +163,14 @@
                 <template v-else>请选择上方派工单</template>
               </span>
             </div>
-            <div class="od-link-panel__body">
+            <div ref="itemBodyRef" class="od-link-panel__body">
               <el-table
                 ref="itemTableRef"
                 v-loading="detailLoading"
                 border
                 :data="detailItems"
                 highlight-current-row
-                :max-height="itemMaxHeight"
+                :height="itemTableHeight"
                 row-key="sNo"
                 size="small"
                 stripe
@@ -233,12 +233,12 @@
                 <span v-else class="od-link-panel__hint">请先选择左侧一条派工明细</span>
               </div>
             </div>
-            <div class="od-link-panel__body">
+            <div ref="workerBodyRef" class="od-link-panel__body">
               <el-table
                 border
                 :data="filteredWorkers"
                 empty-text="该派工行暂无人员明细"
-                :max-height="workerMaxHeight"
+                :height="workerTableHeight"
                 size="small"
                 stripe
               >
@@ -319,22 +319,24 @@ const listPaneRef = ref<HTMLElement | null>(null)
 const filterRef = ref<HTMLElement | null>(null)
 const pagerRef = ref<HTMLElement | null>(null)
 const masterWrapRef = ref<HTMLElement | null>(null)
+const itemBodyRef = ref<HTMLElement | null>(null)
+const workerBodyRef = ref<HTMLElement | null>(null)
 const deptOptions = ref<DeptOption[]>([])
 const stats = ref<OtherDispatchStats>({ totalCount: 0, auditedCount: 0, pendingCount: 0, recentCount: 0 })
 
-/** 主表随窗口填满剩余区域；明细按行数伸缩，窗口变小时同步压低上限 */
+/** 主表 / 明细表随窗口铺满，不按内容收缩留白 */
 const masterTableHeight = ref(280)
-const detailHeightCap = ref(360)
+const itemTableHeight = ref(200)
+const workerTableHeight = ref(200)
 let layoutRo: ResizeObserver | null = null
 
 const syncTableHeights = () => {
-  const paneH = listPaneRef.value?.clientHeight || 0
-  if (paneH > 0) {
-    // 明细区固定预留，避免主表把下方派工/人员明细挤出可视区
-    detailHeightCap.value = Math.max(160, Math.floor(paneH * 0.38))
-  }
   const masterH = masterWrapRef.value?.clientHeight || 0
   if (masterH > 0) masterTableHeight.value = Math.max(120, masterH)
+  const itemH = itemBodyRef.value?.clientHeight || 0
+  if (itemH > 0) itemTableHeight.value = Math.max(120, itemH)
+  const workerH = workerBodyRef.value?.clientHeight || 0
+  if (workerH > 0) workerTableHeight.value = Math.max(120, workerH)
 }
 
 /** 默认不限日期 */
@@ -362,17 +364,6 @@ const filteredWorkers = computed(() => {
   if (!selectedItem.value) return []
   return detailWorkers.value.filter((w) => isWorkerOfItem(selectedItem.value!, w))
 })
-
-const calcDetailMaxHeight = (rowCount: number) => {
-  const header = 40
-  const rowH = 36
-  const rows = Math.max(rowCount, 0)
-  const content = header + Math.max(rows, 1) * rowH + (rows === 0 ? 8 : 0)
-  return Math.min(content, detailHeightCap.value)
-}
-
-const itemMaxHeight = computed(() => calcDetailMaxHeight(detailItems.value.length))
-const workerMaxHeight = computed(() => calcDetailMaxHeight(filteredWorkers.value.length))
 
 const workerCountOf = (item: OtherDispatchItemRow) =>
   detailWorkers.value.filter((w) => isWorkerOfItem(item, w)).length
@@ -658,6 +649,8 @@ onMounted(async () => {
     layoutRo = new ResizeObserver(() => syncTableHeights())
     if (listPaneRef.value) layoutRo.observe(listPaneRef.value)
     if (masterWrapRef.value) layoutRo.observe(masterWrapRef.value)
+    if (itemBodyRef.value) layoutRo.observe(itemBodyRef.value)
+    if (workerBodyRef.value) layoutRo.observe(workerBodyRef.value)
   }
   window.addEventListener('resize', syncTableHeights)
   await Promise.all([fetchDepts(), refreshAll()])
@@ -676,17 +669,18 @@ onBeforeUnmount(() => {
 .od-page {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 12px;
+  gap: 10px;
+  padding: 10px 12px;
   min-height: 0;
   height: 100%;
+  overflow: hidden;
   background: linear-gradient(180deg, #f0f4ff 0%, var(--el-bg-color-page) 120px);
 }
 
 .od-hero {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
+  gap: 10px;
   flex-shrink: 0;
 }
 
@@ -694,7 +688,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 16px 18px;
+  padding: 12px 16px;
   border-radius: 12px;
   background: #fff;
   box-shadow: 0 2px 12px rgb(64 158 255 / 8%);
@@ -708,10 +702,10 @@ onBeforeUnmount(() => {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 44px;
-    height: 44px;
+    width: 40px;
+    height: 40px;
     border-radius: 10px;
-    font-size: 22px;
+    font-size: 20px;
     color: #fff;
   }
 
@@ -738,7 +732,7 @@ onBeforeUnmount(() => {
   }
 
   &__value {
-    font-size: 24px;
+    font-size: 22px;
     font-weight: 700;
     color: var(--el-text-color-primary);
   }
@@ -758,7 +752,7 @@ onBeforeUnmount(() => {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 16px;
+    padding: 10px 16px;
     border-bottom: 1px solid var(--el-border-color-lighter);
     flex-shrink: 0;
   }
@@ -775,19 +769,18 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  padding: 12px 16px 0;
+  padding: 10px 16px 0;
   overflow: hidden;
 }
 
 .od-filter {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   flex-shrink: 0;
 }
 
 .od-table-wrap {
   flex: 1 1 0;
-  min-height: 120px;
-  max-height: 55%;
+  min-height: 160px;
   width: 100%;
   overflow: hidden;
 }
@@ -795,11 +788,13 @@ onBeforeUnmount(() => {
 .od-link-panels {
   display: grid;
   grid-template-columns: 1.2fr 1fr;
-  gap: 12px;
-  margin-top: 12px;
-  flex: 0 0 auto;
+  gap: 10px;
+  margin-top: 10px;
+  flex: 0 0 220px;
+  height: 220px;
+  max-height: 220px;
   min-height: 180px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .od-row-ops {
@@ -827,10 +822,12 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  height: auto;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 10px;
-  padding: 12px;
+  padding: 10px 12px;
   background: #fafcff;
 
   &--workers {
@@ -843,7 +840,7 @@ onBeforeUnmount(() => {
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
     flex-shrink: 0;
 
     h3 {
@@ -854,8 +851,10 @@ onBeforeUnmount(() => {
   }
 
   &__body {
-    flex: none;
+    flex: 1 1 0;
+    min-height: 0;
     width: 100%;
+    overflow: hidden;
   }
 
   &__hint {
@@ -873,7 +872,7 @@ onBeforeUnmount(() => {
 }
 
 .od-pager {
-  padding: 10px 0 12px;
+  padding: 8px 0 10px;
   flex-shrink: 0;
 }
 

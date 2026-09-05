@@ -82,8 +82,13 @@
         <el-button :disabled="!selectedItem" :icon="Delete" @click="removeSelectedItem">删除明细</el-button>
         <el-button :disabled="!selectedItem" :icon="Plus" @click="addWorker">添加人员</el-button>
         <el-button :disabled="!selectedWorker" :icon="Delete" @click="removeSelectedWorker">删除人员</el-button>
+        <el-button :icon="MagicStick" type="warning" plain @click="oneClickFillWorkers">一键派工</el-button>
         <span class="od-create__tip">
-          {{ isEdit ? '可修改明细与人员后保存（仅未审核）' : '添加派工明细，并为每行配置参与人员' }}
+          {{
+            isEdit
+              ? '可修改明细与人员后保存（仅未审核）'
+              : '先选明细并选人员，再点一键派工：未选人员的其他明细将自动加入该人'
+          }}
         </span>
       </div>
 
@@ -379,7 +384,7 @@
 </template>
 
 <script lang="ts" setup>
-import { Delete, Plus } from '@element-plus/icons-vue'
+import { Delete, MagicStick, Plus } from '@element-plus/icons-vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import {
   getNextOwtNo,
@@ -709,6 +714,74 @@ const removeSelectedWorker = () => {
   selectedWorker.value = null
 }
 
+/**
+ * 一键派工：
+ * 以当前明细已选人员为模板，给「尚未选择人员」的其他明细自动写入该人员（无人员行则新增一行）。
+ */
+const oneClickFillWorkers = () => {
+  const item = selectedItem.value
+  if (!item) {
+    ElMessage.warning('请先选择一条派工明细')
+    return
+  }
+  const src =
+    (selectedWorker.value &&
+    Number(selectedWorker.value.sNo) === Number(item.sNo) &&
+    String(selectedWorker.value.empNo || '').trim()
+      ? selectedWorker.value
+      : null) ||
+    form.workers.find(
+      (w) => isWorkerOfItem(item, w) && String(w.empNo || '').trim()
+    ) ||
+    null
+  if (!src || !String(src.empNo || '').trim()) {
+    ElMessage.warning('请先为当前明细选择人员工号，再点一键派工')
+    return
+  }
+
+  const empNo = String(src.empNo).trim()
+  const applyEmp = (w: OtherDispatchWorkerRow) => {
+    w.empNo = empNo
+    w.empName = src.empName || ''
+    w.deptId = src.deptId || 0
+    w.deptCode = src.deptCode || ''
+    w.deptName = src.deptName || ''
+  }
+
+  let filledItems = 0
+  for (const other of form.items) {
+    if (Number(other.sNo) === Number(item.sNo)) continue
+    const workers = form.workers.filter((w) => isWorkerOfItem(other, w))
+    const hasEmp = workers.some((w) => String(w.empNo || '').trim())
+    // 已选过人员的明细跳过
+    if (hasEmp) continue
+
+    if (!workers.length) {
+      const row = createEmptyWorker(other)
+      applyEmp(row)
+      form.workers.push(row)
+      filledItems += 1
+      continue
+    }
+    // 有空人员行：全部填上该人
+    for (const w of workers) {
+      if (String(w.empNo || '').trim()) continue
+      applyEmp(w)
+    }
+    filledItems += 1
+  }
+
+  if (filledItems === 0) {
+    ElMessage.info('没有「未选人员」的其他明细需要填充')
+    return
+  }
+  selectedWorker.value = src
+  nextTick(() => workerTableRef.value?.setCurrentRow?.(src))
+  ElMessage.success(
+    `一键派工完成：已将「${src.empName || empNo}」写入 ${filledItems} 条未选人员的明细`
+  )
+}
+
 const isHourType = (row: OtherDispatchItemRow) =>
   row.pwSortCode === HOUR_TYPE_CODE || row.pwSortName === HOUR_TYPE_NAME
 
@@ -785,6 +858,8 @@ const ensureEmpOptions = async (deptId?: number) => {
 }
 
 const onEmpChange = (row: OtherDispatchWorkerRow, empNo: string) => {
+  selectedWorker.value = row
+  nextTick(() => workerTableRef.value?.setCurrentRow?.(row))
   if (!empNo) {
     row.empNo = ''
     row.empName = ''
