@@ -11,15 +11,31 @@
     <section class="ds-filter">
       <el-form inline :model="queryForm" @submit.prevent>
         <el-form-item label="统计时间">
-          <el-date-picker
-            v-model="dateRange"
-            end-placeholder="结束"
-            range-separator="至"
-            start-placeholder="开始"
-            style="width: 260px"
-            type="daterange"
-            value-format="YYYY-MM-DD"
-          />
+          <div class="ds-date">
+            <el-date-picker
+              v-model="dateRange"
+              end-placeholder="结束"
+              range-separator="至"
+              :shortcuts="dateShortcuts"
+              start-placeholder="开始"
+              style="width: 260px"
+              type="daterange"
+              value-format="YYYY-MM-DD"
+              @change="onDateRangeChange"
+            />
+            <div class="ds-date__presets">
+              <button
+                v-for="p in datePresets"
+                :key="p.key"
+                class="ds-date__chip"
+                :class="{ 'is-active': activeDatePreset === p.key }"
+                type="button"
+                @click="applyDatePreset(p.key)"
+              >
+                {{ p.label }}
+              </button>
+            </div>
+          </div>
         </el-form-item>
         <el-form-item label="车间">
           <el-select v-model="queryForm.wsName" clearable placeholder="全部" style="width: 120px">
@@ -34,7 +50,25 @@
           </el-select>
         </el-form-item>
         <el-form-item label="人员">
-          <el-input v-model.trim="queryForm.empKeyword" clearable placeholder="姓名" style="width: 110px" @keyup.enter="reload" />
+          <el-autocomplete
+            v-model.trim="queryForm.empKeyword"
+            clearable
+            :debounce="280"
+            :fetch-suggestions="fetchEmpSuggestions"
+            placeholder="姓名 / 工号 / 拼音"
+            style="width: 180px"
+            value-key="value"
+            @clear="onEmpSuggestClear"
+            @keyup.enter="reload"
+            @select="onEmpSuggestSelect"
+          >
+            <template #default="{ item }">
+              <div class="ds-emp-suggest">
+                <strong>{{ item.value }}</strong>
+                <em>{{ item.sub }}</em>
+              </div>
+            </template>
+          </el-autocomplete>
         </el-form-item>
         <el-form-item label="工序">
           <el-select v-model="queryForm.prcName" clearable placeholder="全部" style="width: 120px">
@@ -72,37 +106,44 @@
       </article>
     </section>
 
-    <section class="ds-charts">
-      <article class="ds-panel ds-panel--trend">
-        <header class="ds-panel__head">
-          <strong>派工 / 报工趋势</strong>
-          <em>工时 & 完成率</em>
-        </header>
-        <vab-chart class="ds-chart" :option="trendOption" />
-      </article>
-      <article class="ds-panel ds-panel--pie">
-        <header class="ds-panel__head">
-          <strong>工序报工工时分布</strong>
-          <em>占比</em>
-        </header>
-        <vab-chart class="ds-chart" :option="pieOption" />
-      </article>
-      <article class="ds-panel ds-panel--wage">
-        <header class="ds-panel__head">
-          <strong>计件工资趋势</strong>
-          <em>日汇总</em>
-        </header>
-        <vab-chart class="ds-chart" :option="wageOption" />
-      </article>
-    </section>
+    <div class="ds-main">
+      <section class="ds-charts">
+        <article class="ds-panel ds-panel--trend">
+          <header class="ds-panel__head">
+            <strong>派工 / 报工趋势</strong>
+            <em>工时 & 完成率</em>
+          </header>
+          <div class="ds-chart-box">
+            <vab-chart class="ds-chart" :option="trendOption" />
+          </div>
+        </article>
+        <article class="ds-panel ds-panel--pie">
+          <header class="ds-panel__head">
+            <strong>工序报工工时分布</strong>
+            <em>占比</em>
+          </header>
+          <div class="ds-chart-box">
+            <vab-chart class="ds-chart" :option="pieOption" />
+          </div>
+        </article>
+        <article class="ds-panel ds-panel--wage">
+          <header class="ds-panel__head">
+            <strong>计件工资趋势</strong>
+            <em>日汇总（单价×报工量）</em>
+          </header>
+          <div class="ds-chart-box">
+            <vab-chart class="ds-chart" :option="wageOption" />
+          </div>
+        </article>
+      </section>
 
-    <section class="ds-tables">
+      <section class="ds-tables">
       <article class="ds-panel">
         <header class="ds-panel__head">
           <strong>人员效率 TOP5</strong>
           <el-button link type="primary" @click="openMore('emp')">查看全部</el-button>
         </header>
-        <el-table :data="payload?.empTop || []" height="260" size="small" stripe>
+        <el-table :data="payload?.empTop || []" class="ds-table" max-height="200" size="small" stripe>
           <el-table-column align="center" label="排名" width="56">
             <template #default="{ row }">
               <span class="ds-rank" :class="`is-${row.rank}`">{{ row.rank }}</span>
@@ -114,7 +155,7 @@
           <el-table-column label="完成率" min-width="120">
             <template #default="{ row }">
               <div class="ds-rate">
-                <el-progress :percentage="row.rate" :stroke-width="8" :show-text="false" />
+                <el-progress :percentage="Math.min(100, Number(row.rate) || 0)" :stroke-width="8" :show-text="false" />
                 <em>{{ row.rate }}%</em>
               </div>
             </template>
@@ -122,6 +163,9 @@
           <el-table-column align="right" label="工资" min-width="80">
             <template #default="{ row }">¥{{ row.wage }}</template>
           </el-table-column>
+          <template #empty>
+            <el-empty :image-size="48" description="暂无人员数据" />
+          </template>
         </el-table>
       </article>
 
@@ -130,7 +174,7 @@
           <strong>工序完成率排行</strong>
           <el-button link type="primary" @click="openMore('prc')">查看全部</el-button>
         </header>
-        <el-table :data="payload?.prcTop || []" height="260" size="small" stripe>
+        <el-table :data="payload?.prcTop || []" class="ds-table" max-height="200" size="small" stripe>
           <el-table-column align="center" label="排名" width="56">
             <template #default="{ row }">
               <span class="ds-rank" :class="`is-${row.rank}`">{{ row.rank }}</span>
@@ -141,20 +185,28 @@
           <el-table-column label="完成率" min-width="140">
             <template #default="{ row }">
               <div class="ds-rate">
-                <el-progress :percentage="row.rate" :stroke-width="8" :show-text="false" status="success" />
+                <el-progress
+                  :percentage="Math.min(100, Number(row.rate) || 0)"
+                  :stroke-width="8"
+                  :show-text="false"
+                  status="success"
+                />
                 <em>{{ row.rate }}%</em>
               </div>
             </template>
           </el-table-column>
+          <template #empty>
+            <el-empty :image-size="48" description="暂无工序数据" />
+          </template>
         </el-table>
       </article>
 
-      <article class="ds-panel">
+      <article class="ds-panel ds-panel--alert">
         <header class="ds-panel__head">
           <strong>未报工明细 TOP5</strong>
           <el-button link type="primary" @click="openMore('unreported')">查看全部</el-button>
         </header>
-        <el-table :data="payload?.unreportedTop || []" height="260" size="small" stripe>
+        <el-table :data="payload?.unreportedTop || []" class="ds-table" max-height="200" size="small" stripe>
           <el-table-column label="工单号" min-width="130" prop="woNo" show-overflow-tooltip />
           <el-table-column label="工序" min-width="64" prop="prcName" />
           <el-table-column label="人员" min-width="64" prop="empName" />
@@ -162,9 +214,13 @@
           <el-table-column align="right" label="未报工资" min-width="80">
             <template #default="{ row }">¥{{ row.unreportedWage }}</template>
           </el-table-column>
+          <template #empty>
+            <el-empty :image-size="48" description="区间内无未报工" />
+          </template>
         </el-table>
       </article>
     </section>
+    </div>
 
     <footer class="ds-foot">
       <span>{{ payload?.formulaHint }}</span>
@@ -175,7 +231,7 @@
     </footer>
 
     <el-drawer v-model="moreVisible" destroy-on-close size="520px" :title="moreTitle">
-      <el-table v-if="moreType === 'emp'" :data="payload?.empTop || []" height="100%">
+      <el-table v-if="moreType === 'emp'" :data="payload?.empAll || payload?.empTop || []" height="100%">
         <el-table-column label="排名" prop="rank" width="60" />
         <el-table-column label="人员" prop="empName" />
         <el-table-column align="right" label="派工" prop="dispatchHours" />
@@ -187,7 +243,7 @@
           <template #default="{ row }">¥{{ row.wage }}</template>
         </el-table-column>
       </el-table>
-      <el-table v-else-if="moreType === 'prc'" :data="payload?.prcTop || []" height="100%">
+      <el-table v-else-if="moreType === 'prc'" :data="payload?.prcAll || payload?.prcTop || []" height="100%">
         <el-table-column label="排名" prop="rank" width="60" />
         <el-table-column label="工序" prop="prcName" />
         <el-table-column align="right" label="报工工时" prop="reportHours" />
@@ -195,7 +251,7 @@
           <template #default="{ row }">{{ row.rate }}</template>
         </el-table-column>
       </el-table>
-      <el-table v-else :data="payload?.unreportedTop || []" height="100%">
+      <el-table v-else :data="payload?.unreportedAll || payload?.unreportedTop || []" height="100%">
         <el-table-column label="工单号" prop="woNo" min-width="130" />
         <el-table-column label="工序" prop="prcName" />
         <el-table-column label="人员" prop="empName" />
@@ -214,31 +270,145 @@ import {
   Coin,
   Download,
   Histogram,
+  Money,
+  PriceTag,
   Refresh,
   Timer,
   TrendCharts,
   User,
   Warning,
 } from '@element-plus/icons-vue'
+import { getQuickDispatchEmployees } from '/@/api/procurement/quickDispatch'
 import type { DispatchStatsKpi, DispatchStatsPayload } from '/@/api/procurement/dispatchStats'
 import { getDispatchStats } from '/@/api/procurement/dispatchStats'
 import { $baseMessage } from '/@/hooks'
+import { filterEmpsByKeyword, isPinyinLikeKeyword } from '/@/utils/empMatch'
 
 defineOptions({ name: 'DispatchStats' })
 
-const workshopOptions = ['木工车间', '海绵车间', '缝纫车间', '包装车间']
-const groupOptions = ['一组', '二组', '三组']
-const processOptions = ['缝纫', '裁剪', '组装', '包装', '检验']
+const pad2 = (n: number) => String(n).padStart(2, '0')
+const formatYmd = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+
+type DatePresetKey = 'today' | 'yesterday' | 'last7' | 'last30' | 'thisMonth' | 'lastMonth'
+
+const rangeByPreset = (key: DatePresetKey): [string, string] => {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const end = new Date(today)
+  const start = new Date(today)
+  if (key === 'today') {
+    // start = end = today
+  } else if (key === 'yesterday') {
+    start.setDate(today.getDate() - 1)
+    end.setDate(today.getDate() - 1)
+  } else if (key === 'last7') {
+    start.setDate(today.getDate() - 6)
+  } else if (key === 'last30') {
+    start.setDate(today.getDate() - 29)
+  } else if (key === 'thisMonth') {
+    start.setDate(1)
+  } else if (key === 'lastMonth') {
+    start.setMonth(today.getMonth() - 1, 1)
+    end.setDate(0)
+  }
+  return [formatYmd(start), formatYmd(end)]
+}
+
+const defaultDateRange = (): [string, string] => rangeByPreset('last30')
+
+const datePresets: { key: DatePresetKey; label: string }[] = [
+  { key: 'today', label: '今天' },
+  { key: 'yesterday', label: '昨天' },
+  { key: 'last7', label: '近7天' },
+  { key: 'last30', label: '近30天' },
+  { key: 'thisMonth', label: '本月' },
+  { key: 'lastMonth', label: '上月' },
+]
+
+const toShortcutRange = (key: DatePresetKey) => {
+  const [s, e] = rangeByPreset(key)
+  return [new Date(`${s}T00:00:00`), new Date(`${e}T00:00:00`)] as [Date, Date]
+}
+
+const dateShortcuts = datePresets.map((p) => ({
+  text: p.label,
+  value: () => toShortcutRange(p.key),
+}))
+
+const matchDatePreset = (range?: [string, string] | null): DatePresetKey | '' => {
+  if (!range?.[0] || !range?.[1]) return ''
+  const hit = datePresets.find((p) => {
+    const [s, e] = rangeByPreset(p.key)
+    return s === range[0] && e === range[1]
+  })
+  return hit?.key || ''
+}
+
+const workshopOptions = ref<string[]>([])
+const groupOptions = ref<string[]>([])
+const processOptions = ref<string[]>([])
 
 const loading = ref(false)
 const payload = ref<DispatchStatsPayload | null>(null)
-const dateRange = ref<[string, string]>(['2025-05-20', '2025-05-26'])
+const dateRange = ref<[string, string]>(defaultDateRange())
+const activeDatePreset = ref<DatePresetKey | ''>('last30')
 const queryForm = reactive({
   wsName: '',
   workGpName: '',
   empKeyword: '',
   prcName: '',
 })
+
+const applyDatePreset = (key: DatePresetKey) => {
+  dateRange.value = rangeByPreset(key)
+  activeDatePreset.value = key
+  reload()
+}
+
+const onDateRangeChange = () => {
+  activeDatePreset.value = matchDatePreset(dateRange.value)
+}
+
+type EmpSuggestItem = {
+  value: string
+  sub: string
+  empNo?: string
+  empName?: string
+}
+
+const fetchEmpSuggestions = async (query: string, cb: (results: EmpSuggestItem[]) => void) => {
+  const kw = String(query || '').trim()
+  if (!kw) {
+    cb([])
+    return
+  }
+  try {
+    const pinyinKw = isPinyinLikeKeyword(kw)
+    const rows = await getQuickDispatchEmployees({
+      keyword: pinyinKw ? undefined : kw,
+    })
+    const matched = filterEmpsByKeyword(rows || [], kw).slice(0, 12)
+    cb(
+      matched.map((r: any) => ({
+        value: r.empName || r.empNo || '',
+        sub: `${r.empNo || '-'} · ${r.deptName || '-'}`,
+        empNo: r.empNo,
+        empName: r.empName,
+      }))
+    )
+  } catch {
+    cb([])
+  }
+}
+
+const onEmpSuggestSelect = (item: EmpSuggestItem) => {
+  queryForm.empKeyword = item?.empName || item?.empNo || queryForm.empKeyword
+  reload()
+}
+
+const onEmpSuggestClear = () => {
+  queryForm.empKeyword = ''
+}
 
 const moreVisible = ref(false)
 const moreType = ref<'emp' | 'prc' | 'unreported'>('emp')
@@ -255,6 +425,8 @@ const kpiIcon = (key: string) => {
     reportH: Histogram,
     rate: TrendCharts,
     wage: Coin,
+    avgWage: Money,
+    avgPrice: PriceTag,
     pendingH: Warning,
   }
   return map[key] || TrendCharts
@@ -275,7 +447,7 @@ const trendOption = computed(() => {
     color: ['#3b82f6', '#22c55e', '#f59e0b'],
     tooltip: { trigger: 'axis' },
     legend: { top: 0, right: 0, textStyle: { color: '#64748b', fontSize: 11 } },
-    grid: { top: 36, right: 48, bottom: 28, left: 44 },
+    grid: { top: 36, right: 48, bottom: 36, left: 44 },
     xAxis: {
       type: 'category',
       data: list.map((d) => d.date),
@@ -293,7 +465,7 @@ const trendOption = computed(() => {
       {
         type: 'value',
         name: '%',
-        min: 70,
+        min: 0,
         max: 100,
         nameTextStyle: { color: '#94a3b8', fontSize: 11 },
         splitLine: { show: false },
@@ -403,7 +575,7 @@ const wageOption = computed(() => {
         return `${p?.axisValue}<br/>工资：¥${Number(p?.value || 0).toLocaleString()}`
       },
     },
-    grid: { top: 24, right: 16, bottom: 28, left: 52 },
+    grid: { top: 24, right: 16, bottom: 36, left: 52 },
     xAxis: {
       type: 'category',
       boundaryGap: false,
@@ -444,14 +616,35 @@ const wageOption = computed(() => {
 const reload = async () => {
   loading.value = true
   try {
-    payload.value = await getDispatchStats({
+    let empKeyword = String(queryForm.empKeyword || '').trim()
+    // 纯拼音回车查询：先解析为姓名/工号再请求后端
+    if (empKeyword && isPinyinLikeKeyword(empKeyword)) {
+      try {
+        const rows = await getQuickDispatchEmployees({})
+        const matched = filterEmpsByKeyword(rows || [], empKeyword)
+        if (matched.length) {
+          empKeyword = matched[0].empName || matched[0].empNo || empKeyword
+          queryForm.empKeyword = empKeyword
+        }
+      } catch {
+        /* 解析失败仍用原关键词 */
+      }
+    }
+    const data = await getDispatchStats({
       startDate: dateRange.value?.[0],
       endDate: dateRange.value?.[1],
       wsName: queryForm.wsName || undefined,
       workGpName: queryForm.workGpName || undefined,
-      empKeyword: queryForm.empKeyword || undefined,
+      empKeyword: empKeyword || undefined,
       prcName: queryForm.prcName || undefined,
     })
+    payload.value = data
+    const opts = data.filterOptions
+    if (opts) {
+      workshopOptions.value = opts.workshops || []
+      groupOptions.value = opts.groups || []
+      processOptions.value = opts.processes || []
+    }
   } catch (e: any) {
     payload.value = null
     $baseMessage(e?.message || '加载统计失败', 'error', 'hey')
@@ -461,7 +654,8 @@ const reload = async () => {
 }
 
 const resetQuery = () => {
-  dateRange.value = ['2025-05-20', '2025-05-26']
+  dateRange.value = defaultDateRange()
+  activeDatePreset.value = 'last30'
   queryForm.wsName = ''
   queryForm.workGpName = ''
   queryForm.empKeyword = ''
@@ -474,8 +668,47 @@ const openMore = (type: 'emp' | 'prc' | 'unreported') => {
   moreVisible.value = true
 }
 
+const csvEscape = (v: unknown) => {
+  const s = String(v ?? '')
+  if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`
+  return s
+}
+
 const onExport = () => {
-  $baseMessage('导出功能预留：后端就绪后对接 Excel 下载', 'info', 'hey')
+  const data = payload.value
+  if (!data) {
+    $baseMessage('暂无数据可导出', 'warning', 'hey')
+    return
+  }
+  const lines: string[] = []
+  lines.push('指标,数值,环比%')
+  ;(data.kpis || []).forEach((k) => {
+    lines.push([csvEscape(k.label), csvEscape(k.value), csvEscape(k.trend)].join(','))
+  })
+  lines.push('')
+  lines.push('人员排名,姓名,派工工时,报工工时,完成率%,工资')
+  ;(data.empAll || data.empTop || []).forEach((r) => {
+    lines.push([r.rank, csvEscape(r.empName), r.dispatchHours, r.reportHours, r.rate, r.wage].join(','))
+  })
+  lines.push('')
+  lines.push('工序排名,工序,报工工时,完成率%')
+  ;(data.prcAll || data.prcTop || []).forEach((r) => {
+    lines.push([r.rank, csvEscape(r.prcName), r.reportHours, r.rate].join(','))
+  })
+  lines.push('')
+  lines.push('工单号,工序,人员,未报工时,未报工资')
+  ;(data.unreportedAll || data.unreportedTop || []).forEach((r) => {
+    lines.push([csvEscape(r.woNo), csvEscape(r.prcName), csvEscape(r.empName), r.unreportedHours, r.unreportedWage].join(','))
+  })
+  const blob = new Blob([`\uFEFF${lines.join('\n')}`], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  const range = `${dateRange.value?.[0] || ''}_${dateRange.value?.[1] || ''}`
+  a.href = url
+  a.download = `派工报工统计_${range}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+  $baseMessage('已导出 CSV', 'success', 'hey')
 }
 
 onMounted(() => reload())
@@ -485,10 +718,12 @@ onMounted(() => reload())
 .ds-page {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
   min-height: 0;
-  padding-bottom: 10px;
-  background: linear-gradient(180deg, #f0f4f8 0%, #f5f7fa 140px, #f5f7fa 100%);
+  height: 100%;
+  overflow: hidden;
+  padding-bottom: 4px;
+  background: linear-gradient(180deg, #f0f4f8 0%, #f5f7fa 120px, #f5f7fa 100%);
 }
 
 .ds-hero {
@@ -496,11 +731,12 @@ onMounted(() => reload())
   align-items: flex-end;
   justify-content: space-between;
   gap: 12px;
+  flex-shrink: 0;
   animation: ds-fade-up 0.45s ease both;
 
   h1 {
-    margin: 0 0 4px;
-    font-size: 22px;
+    margin: 0 0 2px;
+    font-size: 20px;
     font-weight: 700;
     color: #1a3a52;
     letter-spacing: 0.02em;
@@ -508,36 +744,95 @@ onMounted(() => reload())
 
   p {
     margin: 0;
-    font-size: 13px;
+    font-size: 12px;
     color: #7a8b9a;
   }
 }
 
 .ds-filter {
-  padding: 12px 14px 2px;
-  border-radius: 12px;
+  flex-shrink: 0;
+  padding: 8px 12px 0;
+  border-radius: 10px;
   background: #fff;
   border: 1px solid #e8eef4;
   box-shadow: 0 2px 10px rgb(26 58 82 / 4%);
   animation: ds-fade-up 0.5s ease 0.04s both;
 
   :deep(.el-form-item) {
-    margin-bottom: 10px;
+    margin-bottom: 8px;
+  }
+}
+
+.ds-date {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.ds-date__presets {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ds-date__chip {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid #d9e4ee;
+  border-radius: 999px;
+  background: #f7fafc;
+  color: #5b6b7a;
+  font-size: 12px;
+  line-height: 26px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+
+  &:hover {
+    border-color: #9ec5e8;
+    color: #1f6fb5;
+    background: #eef6fc;
+  }
+
+  &.is-active {
+    border-color: #3b82f6;
+    background: #eff6ff;
+    color: #1d4ed8;
+    font-weight: 600;
+  }
+}
+
+.ds-emp-suggest {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  line-height: 1.4;
+
+  strong {
+    font-weight: 600;
+    color: #1f2937;
+  }
+
+  em {
+    font-style: normal;
+    font-size: 12px;
+    color: #94a3b8;
   }
 }
 
 .ds-kpis {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  flex-shrink: 0;
 }
 
 .ds-kpi {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 14px 14px;
-  border-radius: 12px;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
   background: #fff;
   border: 1px solid #e8eef4;
   box-shadow: 0 2px 10px rgb(26 58 82 / 4%);
@@ -546,19 +841,19 @@ onMounted(() => reload())
   animation-delay: var(--delay, 0ms);
 
   &:hover {
-    transform: translateY(-3px);
+    transform: translateY(-2px);
     box-shadow: 0 10px 24px rgb(26 111 181 / 10%);
     border-color: #cfe0f0;
   }
 
   &__icon {
-    width: 44px;
-    height: 44px;
+    width: 38px;
+    height: 38px;
     flex-shrink: 0;
     display: grid;
     place-items: center;
-    border-radius: 12px;
-    font-size: 20px;
+    border-radius: 10px;
+    font-size: 18px;
     color: #fff;
   }
 
@@ -577,6 +872,12 @@ onMounted(() => reload())
   &--wage .ds-kpi__icon {
     background: linear-gradient(135deg, #ec4899, #f472b6);
   }
+  &--avgWage .ds-kpi__icon {
+    background: linear-gradient(135deg, #0ea5e9, #38bdf8);
+  }
+  &--avgPrice .ds-kpi__icon {
+    background: linear-gradient(135deg, #14b8a6, #2dd4bf);
+  }
   &--pendingH .ds-kpi__icon {
     background: linear-gradient(135deg, #ef4444, #f87171);
   }
@@ -594,7 +895,7 @@ onMounted(() => reload())
 
     strong {
       display: block;
-      font-size: 20px;
+      font-size: 18px;
       font-weight: 700;
       color: #1a3a52;
       font-variant-numeric: tabular-nums;
@@ -605,7 +906,7 @@ onMounted(() => reload())
       display: inline-flex;
       align-items: baseline;
       gap: 4px;
-      margin-top: 6px;
+      margin-top: 4px;
       font-size: 12px;
       font-weight: 600;
 
@@ -626,19 +927,36 @@ onMounted(() => reload())
   }
 }
 
-.ds-charts,
+.ds-main {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ds-charts {
+  flex: 1 1 auto;
+  min-height: 220px;
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: stretch;
+}
+
 .ds-tables {
+  flex: 0 0 auto;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  gap: 10px;
 }
 
 .ds-panel {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  padding: 12px 14px 10px;
-  border-radius: 12px;
+  padding: 10px 12px 10px;
+  border-radius: 10px;
   background: #fff;
   border: 1px solid #e8eef4;
   box-shadow: 0 2px 10px rgb(26 58 82 / 4%);
@@ -649,27 +967,60 @@ onMounted(() => reload())
     box-shadow: 0 8px 22px rgb(26 111 181 / 8%);
   }
 
+  &--trend,
+  &--pie,
+  &--wage {
+    height: 100%;
+    overflow: hidden;
+  }
+
+  &--alert {
+    border-color: #fde68a;
+    background: linear-gradient(180deg, #fffbeb 0%, #fff 48px);
+  }
+
   &__head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
+    flex-shrink: 0;
 
     strong {
-      font-size: 14px;
+      font-size: 13px;
       color: #1a3a52;
     }
 
     em {
       font-style: normal;
-      font-size: 12px;
+      font-size: 11px;
       color: #94a3b8;
     }
   }
 }
 
+.ds-chart-box {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+}
+
 .ds-chart {
-  height: 260px;
+  position: absolute !important;
+  inset: 0;
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+
+  :deep(> div),
+  :deep(canvas) {
+    width: 100% !important;
+    height: 100% !important;
+  }
+}
+
+.ds-table {
   width: 100%;
 }
 
@@ -723,7 +1074,8 @@ onMounted(() => reload())
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  padding: 8px 4px 0;
+  flex-shrink: 0;
+  padding: 4px 4px 0;
   font-size: 12px;
   color: #94a3b8;
   animation: ds-fade-up 0.5s ease 0.18s both;
@@ -755,16 +1107,55 @@ onMounted(() => reload())
 
 @media (max-width: 1400px) {
   .ds-kpis {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .ds-charts {
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr);
   }
 }
 
 @media (max-width: 1100px) {
+  .ds-page {
+    height: auto;
+    overflow: visible;
+  }
+
+  .ds-main {
+    flex: none;
+  }
+
+  .ds-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .ds-charts,
   .ds-tables {
     grid-template-columns: 1fr;
   }
 
+  .ds-charts {
+    flex: none;
+    min-height: 0;
+  }
+
+  .ds-panel--trend,
+  .ds-panel--pie,
+  .ds-panel--wage {
+    height: auto;
+  }
+
+  .ds-chart-box {
+    height: 260px;
+    flex: none;
+  }
+
+  .ds-chart {
+    position: absolute !important;
+  }
+}
+
+@media (max-width: 768px) {
   .ds-kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
