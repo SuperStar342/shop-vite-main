@@ -8,11 +8,10 @@
     destroy-on-close
     class="hiprint-report-dialog"
     :close-on-click-modal="false"
-    @update:model-value="$emit('update:modelValue', $event)"
+    :before-close="beforeClose"
     @opened="handleOpened"
-    @close="handleClose"
   >
-    <div class="hiprint-report-body">
+    <div v-loading="loading" class="hiprint-report-body">
       <el-tabs v-model="activeTab" class="hiprint-report-tabs" @tab-change="onTabChange">
         <el-tab-pane label="设计" name="design" />
         <el-tab-pane label="预览" name="preview" />
@@ -33,7 +32,7 @@
       <el-button type="primary" :loading="saving" @click="handleSave">保存模板</el-button>
       <el-button :loading="restoring" @click="handleRestore">恢复默认</el-button>
       <el-button :loading="printing" @click="handlePrint">打印</el-button>
-      <el-button @click="emitClose">关闭</el-button>
+      <el-button @click="requestClose">关闭</el-button>
     </template>
   </el-dialog>
 </template>
@@ -220,9 +219,10 @@ const emitClose = () => {
   emit('update:modelValue', false)
 }
 
-const handleClose = async () => {
+const requestClose = async (done?: () => void) => {
   if (!isDirty()) {
-    emitClose()
+    if (done) done()
+    else emitClose()
     return
   }
   try {
@@ -231,10 +231,15 @@ const handleClose = async () => {
       cancelButtonText: '取消',
       type: 'warning',
     })
-    emitClose()
+    if (done) done()
+    else emitClose()
   } catch {
     // user cancelled, keep open
   }
+}
+
+const beforeClose = (done: () => void) => {
+  requestClose(done)
 }
 </script>
 
