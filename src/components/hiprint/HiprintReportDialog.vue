@@ -215,14 +215,14 @@ const handlePrint = () => {
   }
 }
 
-const emitClose = () => {
+const allowClose = (done?: (cancel?: boolean) => void) => {
   emit('update:modelValue', false)
+  done?.()
 }
 
-const requestClose = async (done?: () => void) => {
+const requestClose = async (done?: (cancel?: boolean) => void) => {
   if (!isDirty()) {
-    if (done) done()
-    else emitClose()
+    allowClose(done)
     return
   }
   try {
@@ -231,8 +231,7 @@ const requestClose = async (done?: () => void) => {
       cancelButtonText: '取消',
       type: 'warning',
     })
-    if (done) done()
-    else emitClose()
+    allowClose(done)
   } catch {
     // user cancelled, keep open
   }
