@@ -33,6 +33,9 @@
           <el-form-item>
             <el-button :icon="Refresh" @click="resetQuery">重置</el-button>
           </el-form-item>
+          <el-form-item>
+            <el-button :icon="Printer" :loading="printLoading" type="success" @click="openPrint">打印</el-button>
+          </el-form-item>
         </el-form>
       </vab-query-form-left-panel>
     </vab-query-form>
@@ -121,11 +124,21 @@
       :subtitle="attachSubtitle"
       @change="onAttachChange"
     />
+
+    <HiprintReportDialog
+      v-model="printVisible"
+      title="生产指令单"
+      :report-key="INSTRUCTION_REPORT_KEY"
+      :providers="printProviders"
+      :provider-modules="[COMMON_MODULE, INSTRUCTION_MODULE]"
+      :default-template="instructionDefaultTemplate"
+      :print-data="printData"
+    />
   </div>
 </template>
 
 <script lang="ts" setup>
-import { Refresh, Search } from '@element-plus/icons-vue'
+import { Printer, Refresh, Search } from '@element-plus/icons-vue'
 import { ListTable } from '@visactor/vue-vtable'
 import { getAttachmentCounts } from '/@/api/procurement/attachment'
 import {
@@ -140,6 +153,21 @@ import {
 } from '/@/api/procurement/instruction'
 import { useVTableLayout } from '/@/hooks/useVTableLayout'
 import { sortNewestFirst } from '/@/utils/bladeAdapter'
+import HiprintReportDialog from '/@/components/hiprint/HiprintReportDialog.vue'
+import {
+  buildInstructionPrintData,
+  mapItemsToPrintRows,
+  type InstructionPrintRow,
+} from '/@/utils/hiprint/instructionSheet'
+import { COMMON_MODULE, createCommonProvider } from '/@/utils/hiprint/providers/common'
+import {
+  INSTRUCTION_MODULE,
+  createInstructionSheetProvider,
+} from '/@/utils/hiprint/providers/instructionSheet'
+import {
+  buildInstructionSheetDefaultTemplate,
+  INSTRUCTION_REPORT_KEY,
+} from '/@/utils/hiprint/templates/instructionSheet'
 import { getVTableInstance, handleVTableContextMenuCell, trackVTableCellForCopy } from '/@/utils/tableCopy'
 import AttachmentDrawer from '/@/views/procurement/shared/attachment/AttachmentDrawer.vue'
 
@@ -562,6 +590,56 @@ const onAttachChange = (count: number) => {
   row.attachCount = count
   // 触发表格刷新显示
   masterList.value = [...masterList.value]
+}
+
+const printVisible = ref(false)
+const printLoading = ref(false)
+const printData = ref<Record<string, unknown>>({ table: [] })
+const printProviders = ref<any[]>([])
+const instructionDefaultTemplate = ref<unknown>(null)
+
+const ensurePrintSetup = async () => {
+  if (instructionDefaultTemplate.value && printProviders.value.length) return
+  const { hiprint } = await import('vue-plugin-hiprint')
+  printProviders.value = [
+    createCommonProvider(hiprint),
+    createInstructionSheetProvider(hiprint),
+  ]
+  instructionDefaultTemplate.value = await buildInstructionSheetDefaultTemplate()
+}
+
+const loadPrintRows = async (): Promise<InstructionPrintRow[]> => {
+  const mo = selectedMo.value
+  if (!mo?.moNo) {
+    $baseMessage('请先选择上方制令', 'warning', 'hey')
+    return []
+  }
+  let items: any[] = []
+  if (activeTab.value === 'content' && midList.value.length && selectedMo.value?.moNo === mo.moNo) {
+    items = midList.value
+  } else {
+    items = await getMoItems(mo.moNo)
+  }
+  if (!items.length) {
+    $baseMessage('该制令暂无生产内容，无法打印', 'warning', 'hey')
+    return []
+  }
+  return mapItemsToPrintRows(items, mo)
+}
+
+const openPrint = async () => {
+  printLoading.value = true
+  try {
+    const rows = await loadPrintRows()
+    if (!rows.length) return
+    await ensurePrintSetup()
+    printData.value = buildInstructionPrintData(rows)
+    printVisible.value = true
+  } catch (e: any) {
+    $baseMessage(e?.message || '准备打印数据失败', 'error', 'hey')
+  } finally {
+    printLoading.value = false
+  }
 }
 
 const fetchMaster = async () => {
