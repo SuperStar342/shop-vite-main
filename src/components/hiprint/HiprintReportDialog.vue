@@ -32,7 +32,7 @@
       <el-button type="primary" :loading="saving" @click="handleSave">保存模板</el-button>
       <el-button :loading="restoring" @click="handleRestore">恢复默认</el-button>
       <el-button :loading="printing" @click="handlePrint">打印</el-button>
-      <el-button @click="requestClose">关闭</el-button>
+      <el-button @click="() => requestClose()">关闭</el-button>
     </template>
   </el-dialog>
 </template>
