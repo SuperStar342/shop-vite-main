@@ -3,8 +3,6 @@
  * 纸张：A4 竖版（mm）；元素坐标/宽高：pt（1mm ≈ 2.8346pt）
  */
 import dayjs from 'dayjs'
-import { ensureJquery, fitPreviewToContainer as coreFitPreviewToContainer } from './core'
-import { buildInstructionSheetDefaultTemplate } from './templates/instructionSheet'
 
 export type InstructionPrintRow = {
   ordNo: string
@@ -73,44 +71,3 @@ export const buildInstructionPrintData = (rows: InstructionPrintRow[]) => ({
   pageInfo: '1 / 1',
   table: withTotalRow(rows),
 })
-
-const createInstructionTemplate = async () => {
-  await ensureJquery()
-  const { hiprint } = await import('vue-plugin-hiprint')
-  const template = await buildInstructionSheetDefaultTemplate()
-  return new hiprint.PrintTemplate({ template })
-}
-
-/** 预览区：把纸张缩放到铺满容器宽度 */
-export const fitPreviewToContainer = (container: HTMLElement) => {
-  coreFitPreviewToContainer(container)
-}
-
-/** 浏览器预览并调起打印 */
-export const printInstructionSheet = async (rows: InstructionPrintRow[]) => {
-  if (!rows.length) throw new Error('没有可打印的明细数据')
-  const tpl = await createInstructionTemplate()
-  tpl.print(buildInstructionPrintData(rows))
-}
-
-/** 生成预览 HTML（挂到容器） */
-export const renderInstructionSheetPreview = async (
-  container: HTMLElement,
-  rows: InstructionPrintRow[]
-) => {
-  const $ = await ensureJquery()
-  if (!rows.length) {
-    container.innerHTML = '<p style="padding:24px;color:#909399;text-align:center">暂无数据</p>'
-    return null
-  }
-  const tpl = await createInstructionTemplate()
-  const html = tpl.getHtml(buildInstructionPrintData(rows)) as any
-  const $wrap = $('<div class="hiprint-printPagination instruction-print-fit"/>')
-  if (html) $wrap.append(html)
-  $(container).empty().append($wrap)
-  requestAnimationFrame(() => {
-    fitPreviewToContainer(container)
-    requestAnimationFrame(() => fitPreviewToContainer(container))
-  })
-  return tpl
-}
