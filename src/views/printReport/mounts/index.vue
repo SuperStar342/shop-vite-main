@@ -67,7 +67,7 @@
           v-for="r in roleOptions"
           :key="r.id"
           :label="`${r.roleName}${r.roleAlias ? ` (${r.roleAlias})` : ''}`"
-          :value="Number(r.id)"
+          :value="String(r.id)"
         />
       </el-select>
       <el-input
@@ -145,7 +145,7 @@ const flattenRoles = (nodes: any[], acc: any[] = []) => {
 }
 
 const roleOptions = ref<any[]>([])
-const selectedRoleIds = ref<number[]>([])
+const selectedRoleIds = ref<string[]>([])
 const roleIdsText = ref('')
 const authSaving = ref(false)
 
@@ -183,7 +183,7 @@ const loadAuths = async (docTypeCode: string) => {
   roleIdsText.value = ''
   try {
     const auths: any[] = await listDocTypeAuths(docTypeCode)
-    const ids = auths.map((a) => Number(a.roleId ?? a.role_id)).filter((id) => !Number.isNaN(id))
+    const ids = auths.map((a) => String(a.roleId ?? a.role_id)).filter((id) => id && id !== 'null' && id !== 'undefined')
     if (roleOptions.value.length) {
       selectedRoleIds.value = ids
     } else {
@@ -199,12 +199,12 @@ const onMountSelect = (row: PrintMount | null) => {
   if (row?.docTypeCode) loadAuths(row.docTypeCode)
 }
 
-const parseRoleIds = (): number[] => {
+const parseRoleIds = (): string[] => {
   if (roleOptions.value.length) return selectedRoleIds.value
   return roleIdsText.value
     .split(/[,，\s]+/)
-    .map((s) => Number(s.trim()))
-    .filter((id) => !Number.isNaN(id) && id > 0)
+    .map((s) => s.trim())
+    .filter((id) => id && /^\d+$/.test(id))
 }
 
 const saveAuths = async () => {

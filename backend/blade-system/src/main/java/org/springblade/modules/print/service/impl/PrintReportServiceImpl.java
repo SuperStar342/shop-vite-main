@@ -174,6 +174,9 @@ public class PrintReportServiceImpl implements IPrintReportService {
 	@Transactional(rollbackFor = Exception.class)
 	public boolean setDefault(Long templateId) {
 		PrintTemplate tpl = getRequiredTemplate(templateId);
+		if (!canDesign(tpl.getDocTypeCode())) {
+			throw new ServiceException("当前用户无该单据类型的模板设计权限");
+		}
 		if (tpl.getStatus() != null && tpl.getStatus() == 0) {
 			throw new ServiceException("停用模板不能设为默认");
 		}
@@ -186,6 +189,9 @@ public class PrintReportServiceImpl implements IPrintReportService {
 	@Transactional(rollbackFor = Exception.class)
 	public boolean changeStatus(Long id, int status) {
 		PrintTemplate tpl = getRequiredTemplate(id);
+		if (!canDesign(tpl.getDocTypeCode())) {
+			throw new ServiceException("当前用户无该单据类型的模板设计权限");
+		}
 		if (status == 0) {
 			PrintDocType type = getRequiredTypeByCode(tpl.getDocTypeCode());
 			if (type.getDefaultTemplateId() != null && type.getDefaultTemplateId().equals(id)) {
@@ -205,6 +211,9 @@ public class PrintReportServiceImpl implements IPrintReportService {
 			throw new ServiceException("新模板编码与名称不能为空");
 		}
 		PrintTemplate src = getRequiredTemplate(templateId);
+		if (!canDesign(src.getDocTypeCode())) {
+			throw new ServiceException("当前用户无该单据类型的模板设计权限");
+		}
 		String tenantId = currentTenantId();
 
 		LambdaQueryWrapper<PrintTemplate> dup = Wrappers.<PrintTemplate>lambdaQuery()
@@ -242,6 +251,9 @@ public class PrintReportServiceImpl implements IPrintReportService {
 	@Transactional(rollbackFor = Exception.class)
 	public boolean restoreFactory(Long templateId) {
 		PrintTemplate tpl = getRequiredTemplate(templateId);
+		if (!canDesign(tpl.getDocTypeCode())) {
+			throw new ServiceException("当前用户无该单据类型的模板设计权限");
+		}
 		if (StringUtil.isBlank(tpl.getFactoryJson())) {
 			throw new ServiceException("无出厂布局");
 		}
@@ -336,7 +348,7 @@ public class PrintReportServiceImpl implements IPrintReportService {
 
 	@Override
 	@Transactional(rollbackFor = Exception.class)
-	public boolean replaceAuths(String docTypeCode, List<Long> roleIds) {
+	public boolean replaceAuths(String docTypeCode, List<String> roleIds) {
 		if (StringUtil.isBlank(docTypeCode)) {
 			throw new ServiceException("单据类型编码不能为空");
 		}
@@ -345,18 +357,23 @@ public class PrintReportServiceImpl implements IPrintReportService {
 		Date now = new Date();
 		Long userId = currentUserId();
 
-		authMapper.update(null, Wrappers.<PrintDocTypeAuth>lambdaUpdate()
+		authMapper.delete(Wrappers.<PrintDocTypeAuth>lambdaQuery()
 			.eq(PrintDocTypeAuth::getTenantId, tenantId)
-			.eq(PrintDocTypeAuth::getDocTypeCode, docTypeCode)
-			.set(PrintDocTypeAuth::getIsDeleted, 1));
+			.eq(PrintDocTypeAuth::getDocTypeCode, docTypeCode));
 
 		if (roleIds == null || roleIds.isEmpty()) {
 			return true;
 		}
 
-		for (Long roleId : roleIds) {
-			if (roleId == null) {
+		for (String roleIdStr : roleIds) {
+			if (StringUtil.isBlank(roleIdStr)) {
 				continue;
+			}
+			Long roleId;
+			try {
+				roleId = Long.parseLong(roleIdStr.trim());
+			} catch (NumberFormatException e) {
+				throw new ServiceException("角色ID格式错误: " + roleIdStr);
 			}
 			PrintDocTypeAuth auth = new PrintDocTypeAuth();
 			auth.setId(IdWorker.getId());
@@ -408,6 +425,37 @@ public class PrintReportServiceImpl implements IPrintReportService {
 			result.add(vo);
 		}
 		return result;
+	}
+
+	@Override
+	public String getJsonForPage(String pageCode, Long id) {
+		if (StringUtil.isBlank(pageCode)) {
+			throw new ServiceException("业务页编码不能为空");
+		}
+		if (id == null) {
+			throw new ServiceException("模板ID不能为空");
+		}
+		String tenantId = currentTenantId();
+		PrintMount mount = mountMapper.selectOne(Wrappers.<PrintMount>lambdaQuery()
+			.eq(PrintMount::getTenantId, tenantId)
+			.eq(PrintMount::getPageCode, pageCode)
+			.eq(PrintMount::getEnabled, 1)
+			.eq(PrintMount::getIsDeleted, 0)
+			.last("LIMIT 1"));
+		if (mount == null) {
+			throw new ServiceException("业务页未挂载单据类型");
+		}
+		PrintTemplate tpl = templateMapper.selectById(id);
+		if (tpl == null || !Objects.equals(tpl.getTenantId(), tenantId) || Func.toInt(tpl.getIsDeleted(), 0) == 1) {
+			throw new ServiceException("模板不存在");
+		}
+		if (!Objects.equals(tpl.getDocTypeCode(), mount.getDocTypeCode())) {
+			throw new ServiceException("模板不属于该业务页挂载的单据类型");
+		}
+		if (tpl.getStatus() == null || tpl.getStatus() == 0) {
+			throw new ServiceException("模板已停用");
+		}
+		return tpl.getTemplateJson();
 	}
 
 	@Override

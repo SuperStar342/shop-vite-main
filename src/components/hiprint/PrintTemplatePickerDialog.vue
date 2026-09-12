@@ -61,7 +61,7 @@
 import { ElMessage } from 'element-plus'
 import { computed, nextTick, ref, watch } from 'vue'
 import HiprintReportDialog from './HiprintReportDialog.vue'
-import { getTemplateJson, listPageTemplates, type PagePrintTemplate } from '/@/api/print/reportCenter'
+import { getPageTemplateJson, listPageTemplates, type PagePrintTemplate } from '/@/api/print/reportCenter'
 import { createPrintTemplate, initHiprint, printWithTemplate } from '/@/utils/hiprint/core'
 import { getHiprintBundle } from '/@/utils/hiprint/registry'
 
@@ -139,7 +139,7 @@ const validateSelected = () => {
 
 const loadSelectedJson = async () => {
   if (!previewId.value) return null
-  const raw = await getTemplateJson(previewId.value)
+  const raw = await getPageTemplateJson(props.pageCode, previewId.value)
   if (!raw) return null
   return typeof raw === 'string' ? JSON.parse(raw) : raw
 }
@@ -162,7 +162,7 @@ const handlePrint = async () => {
   printLoading.value = true
   try {
     await loadBundle()
-    const raw = await getTemplateJson(selected.value!.id)
+    const raw = await getPageTemplateJson(props.pageCode, selected.value!.id)
     if (!raw) {
       ElMessage.warning('模板未配置')
       return

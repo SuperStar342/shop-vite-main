@@ -48,6 +48,11 @@ export async function getTemplateJson(id: string | number) {
   return unwrap(res) as string | null
 }
 
+export async function getPageTemplateJson(pageCode: string, id: string | number) {
+  const res: any = await request({ url: `${BASE}/pages/${pageCode}/templates/${id}/json`, method: 'get' })
+  return unwrap(res) as string | null
+}
+
 export async function saveTemplateJson(id: string | number, templateJson: unknown) {
   const res: any = await request({
     url: `${BASE}/templates/${id}/json`,
@@ -104,7 +109,7 @@ export async function listDocTypeAuths(docTypeCode: string) {
   return unwrap(res) || []
 }
 
-export async function replaceDocTypeAuths(docTypeCode: string, roleIds: number[]) {
+export async function replaceDocTypeAuths(docTypeCode: string, roleIds: string[]) {
   const res: any = await request({
     url: `${BASE}/doc-type-auths/replace`,
     method: 'post',

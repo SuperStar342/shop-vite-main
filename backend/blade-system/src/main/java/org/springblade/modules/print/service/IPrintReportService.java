@@ -83,12 +83,17 @@ public interface IPrintReportService {
 	/**
 	 * 替换某单据类型的设计授权角色
 	 */
-	boolean replaceAuths(String docTypeCode, List<Long> roleIds);
+	boolean replaceAuths(String docTypeCode, List<String> roleIds);
 
 	/**
 	 * 业务页可用模板
 	 */
 	List<PagePrintTemplateVO> listTemplatesForPage(String pageCode);
+
+	/**
+	 * 业务页读取模板 Hiprint JSON
+	 */
+	String getJsonForPage(String pageCode, Long id);
 
 	/**
 	 * 当前用户是否可设计某单据类型

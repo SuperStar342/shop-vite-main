@@ -140,7 +140,7 @@ public class PrintReportController extends BladeController {
 	@PreAuth(menu = "printMount")
 	@ApiOperationSupport(order = 13)
 	@Operation(summary = "替换某单据类型的设计授权角色")
-	public R<Boolean> replaceAuths(@RequestParam String docTypeCode, @RequestBody List<Long> roleIds) {
+	public R<Boolean> replaceAuths(@RequestParam String docTypeCode, @RequestBody List<String> roleIds) {
 		return R.status(printReportService.replaceAuths(docTypeCode, roleIds));
 	}
 
@@ -155,5 +155,15 @@ public class PrintReportController extends BladeController {
 	@Operation(summary = "业务页可用打印模板")
 	public R<List<PagePrintTemplateVO>> pageTemplates(@PathVariable String pageCode) {
 		return R.data(printReportService.listTemplatesForPage(pageCode));
+	}
+
+	/**
+	 * 业务页读取模板 Hiprint JSON；login-only，用于制令等业务页打印。
+	 */
+	@GetMapping("/pages/{pageCode}/templates/{id}/json")
+	@ApiOperationSupport(order = 15)
+	@Operation(summary = "业务页读取模板 Hiprint JSON")
+	public R<String> getJsonForPage(@PathVariable String pageCode, @PathVariable Long id) {
+		return R.data(printReportService.getJsonForPage(pageCode, id));
 	}
 }

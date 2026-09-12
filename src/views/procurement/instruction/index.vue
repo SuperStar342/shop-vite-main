@@ -184,7 +184,7 @@ import { useVTableLayout } from '/@/hooks/useVTableLayout'
 import { sortNewestFirst } from '/@/utils/bladeAdapter'
 import HiprintReportDialog from '/@/components/hiprint/HiprintReportDialog.vue'
 import PrintTemplatePickerDialog from '/@/components/hiprint/PrintTemplatePickerDialog.vue'
-import { getTemplateJson, listPageTemplates } from '/@/api/print/reportCenter'
+import { getPageTemplateJson, listPageTemplates } from '/@/api/print/reportCenter'
 import { buildInstructionPrintData, mapItemsToPrintRows, type InstructionPrintRow } from '/@/utils/hiprint/instructionSheet'
 import { getHiprintBundle } from '/@/utils/hiprint/registry'
 import { getVTableInstance, handleVTableContextMenuCell, trackVTableCellForCopy } from '/@/utils/tableCopy'
@@ -630,7 +630,7 @@ const ensureBundle = async () => {
 }
 
 const loadTemplateJson = async (key: string) => {
-  const raw = await getTemplateJson(key)
+  const raw = await getPageTemplateJson(PAGE_CODE, key)
   if (!raw) return null
   return typeof raw === 'string' ? JSON.parse(raw) : raw
 }
