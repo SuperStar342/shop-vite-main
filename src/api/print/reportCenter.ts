@@ -3,9 +3,30 @@ import request from '/@/utils/request'
 
 const BASE = '/api/blade-system/print'
 
-export async function listDocTypes() {
+export type PrintDocType = {
+  code: string
+  name: string
+  defaultTemplateId?: number
+  status?: number
+  remark?: string
+}
+
+export type PrintTemplate = {
+  id: number
+  code: string
+  name: string
+  docTypeCode: string
+  docTypeName: string
+  status: number
+  isDefault?: boolean
+  hasJson?: boolean
+  createTime?: string
+  updateTime?: string
+}
+
+export async function listDocTypes(): Promise<PrintDocType[]> {
   const res: any = await request({ url: `${BASE}/doc-types`, method: 'get' })
-  return unwrap(res) || []
+  return (unwrap(res) || []) as PrintDocType[]
 }
 
 export async function listTemplates(docTypeCode?: string, params?: { current?: number; size?: number }) {
