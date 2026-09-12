@@ -99,6 +99,9 @@ public class PrintReportServiceImpl implements IPrintReportService {
 		if (StringUtil.isBlank(template.getName())) {
 			throw new ServiceException("模板名称不能为空");
 		}
+		if (!canDesign(template.getDocTypeCode())) {
+			throw new ServiceException("当前用户无该单据类型的模板设计权限");
+		}
 
 		PrintDocType type = getRequiredTypeByCode(template.getDocTypeCode());
 		String tenantId = currentTenantId();
@@ -155,6 +158,9 @@ public class PrintReportServiceImpl implements IPrintReportService {
 	@Transactional(rollbackFor = Exception.class)
 	public boolean saveJson(Long id, String json) {
 		PrintTemplate tpl = getRequiredTemplate(id);
+		if (!canDesign(tpl.getDocTypeCode())) {
+			throw new ServiceException("当前用户无该单据类型的模板设计权限");
+		}
 		tpl.setTemplateJson(json);
 		tpl.setUpdateTime(new Date());
 		tpl.setUpdateUser(currentUserId());
