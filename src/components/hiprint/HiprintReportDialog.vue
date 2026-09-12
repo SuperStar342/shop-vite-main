@@ -13,11 +13,11 @@
   >
     <div v-loading="loading" class="hiprint-report-body">
       <el-tabs v-model="activeTab" class="hiprint-report-tabs" @tab-change="onTabChange">
-        <el-tab-pane label="设计" name="design" />
+        <el-tab-pane v-if="designable" label="设计" name="design" />
         <el-tab-pane label="预览" name="preview" />
       </el-tabs>
 
-      <div v-show="activeTab === 'design'" class="hiprint-report-design">
+      <div v-if="designable" v-show="activeTab === 'design'" class="hiprint-report-design">
         <div :id="`${uid}-providers`" class="hiprint-report-providers">
           <div v-for="module in providerModules" :key="module" :id="`${uid}-provider-${module}`" class="hiprint-report-provider-panel" />
         </div>
@@ -29,8 +29,10 @@
     </div>
 
     <template #footer>
-      <el-button type="primary" :loading="saving" @click="handleSave">保存模板</el-button>
-      <el-button :loading="restoring" @click="handleRestore">恢复默认</el-button>
+      <template v-if="designable">
+        <el-button type="primary" :loading="saving" @click="handleSave">保存模板</el-button>
+        <el-button :loading="restoring" @click="handleRestore">恢复默认</el-button>
+      </template>
       <el-button :loading="printing" @click="handlePrint">打印</el-button>
       <el-button @click="() => requestClose()">关闭</el-button>
     </template>
@@ -59,17 +61,20 @@ interface Props {
   providerModules: string[]
   defaultTemplate: unknown
   printData: Record<string, unknown>
+  designable?: boolean
   onLoadTemplate?: (key: string) => Promise<unknown | null>
   onSaveTemplate?: (key: string, json: unknown) => Promise<void>
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  designable: true,
+})
 const emit = defineEmits<{ (e: 'update:modelValue', v: boolean): void }>()
 
 defineOptions({ name: 'HiprintReportDialog' })
 
 const uid = `hp-${Date.now()}`
-const activeTab = ref<'design' | 'preview'>('design')
+const activeTab = ref<'design' | 'preview'>(props.designable ? 'design' : 'preview')
 const previewRef = ref<HTMLElement | null>(null)
 
 let tpl: any = null
@@ -86,7 +91,7 @@ watch(
   () => props.modelValue,
   (v) => {
     if (!v) {
-      activeTab.value = 'design'
+      activeTab.value = props.designable ? 'design' : 'preview'
       tpl = null
       inited = false
     }
@@ -105,13 +110,23 @@ const handleOpened = async () => {
 
     await initHiprint(props.providers)
     await nextTick()
-    await buildProviders()
 
-    tpl = await createPrintTemplate({
-      template: resolvedTemplate,
-      settingContainer: `#${uid}-settings`,
-    })
-    designTemplate(tpl, `#${uid}-paper`)
+    if (props.designable) {
+      await buildProviders()
+      tpl = await createPrintTemplate({
+        template: resolvedTemplate,
+        settingContainer: `#${uid}-settings`,
+      })
+      designTemplate(tpl, `#${uid}-paper`)
+    } else {
+      tpl = await createPrintTemplate({
+        template: resolvedTemplate,
+      })
+      activeTab.value = 'preview'
+      await nextTick()
+      await onTabChange('preview')
+    }
+
     savedSnapshot = JSON.stringify(tpl.getJson() ?? {})
     inited = true
   } catch (err: any) {
@@ -155,7 +170,7 @@ const currentJson = () => {
   }
 }
 
-const isDirty = () => currentJson() !== savedSnapshot
+const isDirty = () => props.designable && currentJson() !== savedSnapshot
 
 const handleSave = async () => {
   if (!tpl) return

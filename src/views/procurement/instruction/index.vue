@@ -34,7 +34,10 @@
             <el-button :icon="Refresh" @click="resetQuery">重置</el-button>
           </el-form-item>
           <el-form-item>
-            <el-button :icon="Printer" :loading="printLoading" type="success" @click="openPrint">打印</el-button>
+            <el-button-group>
+              <el-button :icon="Printer" :loading="printLoading" type="primary" @click="printDefault">打印</el-button>
+              <el-button type="primary" @click="openPicker">选模板</el-button>
+            </el-button-group>
           </el-form-item>
         </el-form>
       </vab-query-form-left-panel>
@@ -49,7 +52,12 @@
             :height="masterHeight"
             :options="masterOptions"
             :records="masterList"
-            @on-click-cell="(args: any) => { onCopyTrack(args, masterTableRef); handleMasterClick(args) }"
+            @on-click-cell="
+              (args: any) => {
+                onCopyTrack(args, masterTableRef)
+                handleMasterClick(args)
+              }
+            "
             @on-context-menu-cell="(args: any) => onCopyContextMenu(args, masterTableRef)"
             @on-initialized="() => masterLayout.handleTableReady()"
             @on-selected-cell="(args: any) => onCopyTrack(args, masterTableRef)"
@@ -60,8 +68,19 @@
           :page-size="queryForm.pageSize"
           :page-sizes="[100, 200, 500, 1000]"
           :total="total"
-          @current-change="(p: number) => { queryForm.pageNo = p; fetchMaster() }"
-          @size-change="(s: number) => { queryForm.pageSize = s; queryForm.pageNo = 1; fetchMaster() }"
+          @current-change="
+            (p: number) => {
+              queryForm.pageNo = p
+              fetchMaster()
+            }
+          "
+          @size-change="
+            (s: number) => {
+              queryForm.pageSize = s
+              queryForm.pageNo = 1
+              fetchMaster()
+            }
+          "
         />
       </div>
 
@@ -88,7 +107,12 @@
             :height="midHeight"
             :options="midOptions"
             :records="midList"
-            @on-click-cell="(args: any) => { onCopyTrack(args, midTableRef); handleMidClick(args) }"
+            @on-click-cell="
+              (args: any) => {
+                onCopyTrack(args, midTableRef)
+                handleMidClick(args)
+              }
+            "
             @on-context-menu-cell="(args: any) => onCopyContextMenu(args, midTableRef)"
             @on-initialized="() => midLayout.handleTableReady()"
             @on-selected-cell="(args: any) => onCopyTrack(args, midTableRef)"
@@ -126,19 +150,24 @@
     />
 
     <HiprintReportDialog
-      v-model="printVisible"
+      v-model="previewVisible"
+      :designable="false"
       title="生产指令单"
-      :report-key="INSTRUCTION_REPORT_KEY"
-      :providers="printProviders"
-      :provider-modules="[COMMON_MODULE, INSTRUCTION_MODULE]"
-      :default-template="instructionDefaultTemplate"
+      :report-key="String(activeTemplateId)"
+      :providers="bundle.providers"
+      :provider-modules="bundle.providerModules"
+      :default-template="bundle.defaultTemplate"
       :print-data="printData"
+      :on-load-template="loadTemplateJson"
     />
+
+    <PrintTemplatePickerDialog v-model="pickerVisible" :page-code="PAGE_CODE" :print-data="printData" />
   </div>
 </template>
 
 <script lang="ts" setup>
 import { Printer, Refresh, Search } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { ListTable } from '@visactor/vue-vtable'
 import { getAttachmentCounts } from '/@/api/procurement/attachment'
 import {
@@ -154,20 +183,10 @@ import {
 import { useVTableLayout } from '/@/hooks/useVTableLayout'
 import { sortNewestFirst } from '/@/utils/bladeAdapter'
 import HiprintReportDialog from '/@/components/hiprint/HiprintReportDialog.vue'
-import {
-  buildInstructionPrintData,
-  mapItemsToPrintRows,
-  type InstructionPrintRow,
-} from '/@/utils/hiprint/instructionSheet'
-import { COMMON_MODULE, createCommonProvider } from '/@/utils/hiprint/providers/common'
-import {
-  INSTRUCTION_MODULE,
-  createInstructionSheetProvider,
-} from '/@/utils/hiprint/providers/instructionSheet'
-import {
-  buildInstructionSheetDefaultTemplate,
-  INSTRUCTION_REPORT_KEY,
-} from '/@/utils/hiprint/templates/instructionSheet'
+import PrintTemplatePickerDialog from '/@/components/hiprint/PrintTemplatePickerDialog.vue'
+import { getTemplateJson, listPageTemplates } from '/@/api/print/reportCenter'
+import { buildInstructionPrintData, mapItemsToPrintRows, type InstructionPrintRow } from '/@/utils/hiprint/instructionSheet'
+import { getHiprintBundle } from '/@/utils/hiprint/registry'
 import { getVTableInstance, handleVTableContextMenuCell, trackVTableCellForCopy } from '/@/utils/tableCopy'
 import AttachmentDrawer from '/@/views/procurement/shared/attachment/AttachmentDrawer.vue'
 
@@ -592,20 +611,28 @@ const onAttachChange = (count: number) => {
   masterList.value = [...masterList.value]
 }
 
-const printVisible = ref(false)
+const PAGE_CODE = 'procurement.instruction'
+
+const previewVisible = ref(false)
+const pickerVisible = ref(false)
+const activeTemplateId = ref<number | string>('')
 const printLoading = ref(false)
 const printData = ref<Record<string, unknown>>({ table: [] })
-const printProviders = ref<any[]>([])
-const instructionDefaultTemplate = ref<unknown>(null)
+const bundle = ref<{ providers: any[]; providerModules: string[]; defaultTemplate: unknown }>({
+  providers: [],
+  providerModules: [],
+  defaultTemplate: null,
+})
 
-const ensurePrintSetup = async () => {
-  if (instructionDefaultTemplate.value && printProviders.value.length) return
-  const { hiprint } = await import('vue-plugin-hiprint')
-  printProviders.value = [
-    createCommonProvider(hiprint),
-    createInstructionSheetProvider(hiprint),
-  ]
-  instructionDefaultTemplate.value = await buildInstructionSheetDefaultTemplate()
+const ensureBundle = async () => {
+  if (bundle.value.providers.length) return
+  bundle.value = await getHiprintBundle('instruction')
+}
+
+const loadTemplateJson = async (key: string) => {
+  const raw = await getTemplateJson(key)
+  if (!raw) return null
+  return typeof raw === 'string' ? JSON.parse(raw) : raw
 }
 
 const loadPrintRows = async (): Promise<InstructionPrintRow[]> => {
@@ -627,19 +654,40 @@ const loadPrintRows = async (): Promise<InstructionPrintRow[]> => {
   return mapItemsToPrintRows(items, mo)
 }
 
-const openPrint = async () => {
+const preparePrintData = async () => {
+  const rows = await loadPrintRows()
+  if (!rows.length) return false
+  await ensureBundle()
+  printData.value = buildInstructionPrintData(rows)
+  return true
+}
+
+const openPreview = async (templateId: number | string) => {
+  activeTemplateId.value = String(templateId)
+  previewVisible.value = true
+}
+
+const printDefault = async () => {
   printLoading.value = true
   try {
-    const rows = await loadPrintRows()
-    if (!rows.length) return
-    await ensurePrintSetup()
-    printData.value = buildInstructionPrintData(rows)
-    printVisible.value = true
+    if (!(await preparePrintData())) return
+    const list = await listPageTemplates(PAGE_CODE)
+    const def = list.find((t) => t.isDefault) || list[0]
+    if (!def?.hasJson) {
+      ElMessage.warning('模板未配置')
+      return
+    }
+    await openPreview(def.id)
   } catch (e: any) {
-    $baseMessage(e?.message || '准备打印数据失败', 'error', 'hey')
+    $baseMessage(e?.message || '加载默认模板失败', 'error', 'hey')
   } finally {
     printLoading.value = false
   }
+}
+
+const openPicker = async () => {
+  if (!(await preparePrintData())) return
+  pickerVisible.value = true
 }
 
 const fetchMaster = async () => {
@@ -722,10 +770,7 @@ const handleMasterClick = (args: any) => {
   const record = getRecord(masterTableRef, args, masterList.value)
   if (!record?.moNo) return
   const vtable = masterTableRef.value?.vTableInstance
-  const colDef =
-    vtable?.getBodyColumnDefine?.(args.col) ||
-    vtable?.getColumnDefine?.(args.col) ||
-    masterOptions.value.columns?.[args.col]
+  const colDef = vtable?.getBodyColumnDefine?.(args.col) || vtable?.getColumnDefine?.(args.col) || masterOptions.value.columns?.[args.col]
   if (colDef?.field === 'attachLabel') {
     openAttachment(record)
   }
@@ -810,7 +855,9 @@ onBeforeMount(() => fetchMaster())
     height: 3px;
     border-radius: 2px;
     background: #dcdfe6;
-    transition: background 0.15s, width 0.15s;
+    transition:
+      background 0.15s,
+      width 0.15s;
   }
 
   &:hover {
