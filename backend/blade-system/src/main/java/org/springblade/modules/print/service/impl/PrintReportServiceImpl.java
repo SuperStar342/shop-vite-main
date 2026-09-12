@@ -161,6 +161,9 @@ public class PrintReportServiceImpl implements IPrintReportService {
 		if (!canDesign(tpl.getDocTypeCode())) {
 			throw new ServiceException("当前用户无该单据类型的模板设计权限");
 		}
+		if (StringUtil.isBlank(tpl.getFactoryJson())) {
+			tpl.setFactoryJson(json);
+		}
 		tpl.setTemplateJson(json);
 		tpl.setUpdateTime(new Date());
 		tpl.setUpdateUser(currentUserId());
