@@ -143,6 +143,56 @@ export const handleActivePath = (route: VabRoute, isTab = false) => {
 }
 
 /**
+ * 报表模板设计页：即使未执行菜单 SQL，也注入隐藏路由，保证可从列表打开标签页
+ */
+export const ensurePrintTemplateDesignRoute = (routes: VabRouteRecord[]): VabRouteRecord[] => {
+  const designChild: VabRouteRecord = {
+    path: '/printReport/templates/design',
+    name: 'printTemplateDesign',
+    component: () => import('/@/views/printReport/templates/design.vue'),
+    meta: {
+      title: '模板设计',
+      hidden: true,
+      dynamicNewTab: true,
+      activeMenu: '/printReport/templates/index',
+      noKeepAlive: true,
+    },
+  }
+
+  const walk = (list: VabRouteRecord[]): boolean => {
+    for (const route of list) {
+      const name = String(route.name || '')
+      const path = String(route.path || '')
+      if (name === 'printReport' || path === '/printReport' || path.endsWith('/printReport')) {
+        route.children = route.children || []
+        const exists = route.children.some(
+          (c) =>
+            String(c.name) === 'printTemplateDesign' ||
+            String(c.path || '').includes('/printReport/templates/design') ||
+            String(c.path || '').endsWith('templates/design')
+        )
+        if (!exists) route.children.push(designChild)
+        return true
+      }
+      if (route.children?.length && walk(route.children)) return true
+    }
+    return false
+  }
+
+  const next = [...routes]
+  if (!walk(next)) {
+    next.unshift({
+      path: '/printReport',
+      name: 'printReportFallback',
+      component: () => import('/@vab/layouts/index.vue'),
+      meta: { title: '报表中心', hidden: true },
+      children: [designChild],
+    } as VabRouteRecord)
+  }
+  return next
+}
+
+/**
  * 获取当前跳转登录页的Route
  * @param currentPath 当前页面地址
  */

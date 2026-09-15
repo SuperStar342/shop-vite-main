@@ -278,6 +278,12 @@ export const formatPath = (ele: any, first: boolean): void => {
     noKeepAlive: ele.isOpen !== 2,
     ...(isDictBiz || isDictSystem ? { dictBiz: isDictBiz } : {}),
   }
+  // 模板设计页：隐藏侧栏，支持按 id 多开标签
+  if (code === 'printTemplateDesign' || /printReport\/templates\/design/i.test(pathStr)) {
+    ele.meta.hidden = true
+    ele.meta.dynamicNewTab = true
+    ele.meta.activeMenu = '/printReport/templates/index'
+  }
   ele.name = ele.code
 
   const iframeComponent = 'components/iframe/main'

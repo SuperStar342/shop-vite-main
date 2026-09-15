@@ -33,6 +33,14 @@
           <el-form-item>
             <el-button :icon="Refresh" @click="resetQuery">重置</el-button>
           </el-form-item>
+          <el-form-item>
+            <el-button-group>
+              <el-button :icon="Printer" :loading="printLoading" type="primary" @click="printDefault">
+                {{ printButtonLabel }}
+              </el-button>
+              <el-button type="primary" @click="openPicker">选模板</el-button>
+            </el-button-group>
+          </el-form-item>
         </el-form>
       </vab-query-form-left-panel>
     </vab-query-form>
@@ -46,7 +54,13 @@
             :height="masterHeight"
             :options="masterOptions"
             :records="masterList"
-            @on-click-cell="(args: any) => { onCopyTrack(args, masterTableRef); handleMasterClick(args) }"
+            @on-checkbox-state-change="handleMasterCheckboxChange"
+            @on-click-cell="
+              (args: any) => {
+                onCopyTrack(args, masterTableRef)
+                handleMasterClick(args)
+              }
+            "
             @on-context-menu-cell="(args: any) => onCopyContextMenu(args, masterTableRef)"
             @on-initialized="() => masterLayout.handleTableReady()"
             @on-selected-cell="(args: any) => onCopyTrack(args, masterTableRef)"
@@ -57,8 +71,19 @@
           :page-size="queryForm.pageSize"
           :page-sizes="[100, 200, 500, 1000]"
           :total="total"
-          @current-change="(p: number) => { queryForm.pageNo = p; fetchMaster() }"
-          @size-change="(s: number) => { queryForm.pageSize = s; queryForm.pageNo = 1; fetchMaster() }"
+          @current-change="
+            (p: number) => {
+              queryForm.pageNo = p
+              fetchMaster()
+            }
+          "
+          @size-change="
+            (s: number) => {
+              queryForm.pageSize = s
+              queryForm.pageNo = 1
+              fetchMaster()
+            }
+          "
         />
       </div>
 
@@ -85,7 +110,12 @@
             :height="midHeight"
             :options="midOptions"
             :records="midList"
-            @on-click-cell="(args: any) => { onCopyTrack(args, midTableRef); handleMidClick(args) }"
+            @on-click-cell="
+              (args: any) => {
+                onCopyTrack(args, midTableRef)
+                handleMidClick(args)
+              }
+            "
             @on-context-menu-cell="(args: any) => onCopyContextMenu(args, midTableRef)"
             @on-initialized="() => midLayout.handleTableReady()"
             @on-selected-cell="(args: any) => onCopyTrack(args, midTableRef)"
@@ -121,11 +151,26 @@
       :subtitle="attachSubtitle"
       @change="onAttachChange"
     />
+
+    <HiprintReportDialog
+      v-model="previewVisible"
+      :designable="false"
+      title="生产指令单"
+      :report-key="String(activeTemplateId)"
+      :providers="bundle.providers"
+      :provider-modules="bundle.providerModules"
+      :default-template="bundle.defaultTemplate"
+      :print-data="printData"
+      :on-load-template="loadTemplateJson"
+    />
+
+    <PrintTemplatePickerDialog v-model="pickerVisible" :page-code="PAGE_CODE" :print-data="printData" />
   </div>
 </template>
 
 <script lang="ts" setup>
-import { Refresh, Search } from '@element-plus/icons-vue'
+import { Printer, Refresh, Search } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { ListTable } from '@visactor/vue-vtable'
 import { getAttachmentCounts } from '/@/api/procurement/attachment'
 import {
@@ -140,6 +185,17 @@ import {
 } from '/@/api/procurement/instruction'
 import { useVTableLayout } from '/@/hooks/useVTableLayout'
 import { sortNewestFirst } from '/@/utils/bladeAdapter'
+import HiprintReportDialog from '/@/components/hiprint/HiprintReportDialog.vue'
+import PrintTemplatePickerDialog from '/@/components/hiprint/PrintTemplatePickerDialog.vue'
+import { getPageTemplateJson, listPageTemplates } from '/@/api/print/reportCenter'
+import {
+  buildInstructionPrintData,
+  buildMultiInstructionPrintData,
+  mapItemsToPrintRows,
+  type InstructionPrintData,
+  type InstructionPrintRow,
+} from '/@/utils/hiprint/instructionSheet'
+import { getHiprintBundle } from '/@/utils/hiprint/registry'
 import { getVTableInstance, handleVTableContextMenuCell, trackVTableCellForCopy } from '/@/utils/tableCopy'
 import AttachmentDrawer from '/@/views/procurement/shared/attachment/AttachmentDrawer.vue'
 
@@ -167,6 +223,7 @@ const detailList = ref<any[]>([])
 const total = ref(0)
 const activeTab = ref('content')
 const selectedMo = ref<any>(null)
+const selectedMos = ref<any[]>([])
 const selectedItem = ref<any>(null)
 const midLoading = ref(false)
 
@@ -300,9 +357,16 @@ const attachCol = {
 
 const masterOptions = computed(() => ({
   ...baseTableOpts,
-  frozenColCount: 2,
+  frozenColCount: 3,
   rightFrozenColCount: 1,
   columns: [
+    {
+      field: '__checkbox__',
+      cellType: 'checkbox',
+      headerType: 'checkbox',
+      width: 46,
+      style: { textAlign: 'center' },
+    },
     col('ifSuspend', '是否暂停', 80),
     col('moNo', '制令号', 140),
     col('ordNo', '订单号', 120),
@@ -564,6 +628,141 @@ const onAttachChange = (count: number) => {
   masterList.value = [...masterList.value]
 }
 
+const PAGE_CODE = 'procurement.instruction'
+
+const previewVisible = ref(false)
+const pickerVisible = ref(false)
+const activeTemplateId = ref<number | string>('')
+const printLoading = ref(false)
+const printData = ref<InstructionPrintData | InstructionPrintData[]>({ table: [] } as InstructionPrintData)
+const bundle = ref<{ providers: any[]; providerModules: string[]; defaultTemplate: unknown }>({
+  providers: [],
+  providerModules: [],
+  defaultTemplate: null,
+})
+
+const printButtonLabel = computed(() =>
+  selectedMos.value.length > 1 ? `打印(${selectedMos.value.length})` : '打印'
+)
+
+const syncSelectedMos = () => {
+  const vtable = masterTableRef.value?.vTableInstance
+  if (!vtable) {
+    selectedMos.value = []
+    return
+  }
+  const headerCount = vtable.columnHeaderLevelCount ?? 1
+  const selected: any[] = []
+  masterList.value.forEach((_item, index) => {
+    const row = headerCount + index
+    const state = vtable.getCellCheckboxState(0, row)
+    if (state === true) selected.push(masterList.value[index])
+  })
+  selectedMos.value = selected
+}
+
+const handleMasterCheckboxChange = () => {
+  nextTick(() => syncSelectedMos())
+}
+
+const ensureBundle = async () => {
+  if (bundle.value.providers.length) return
+  bundle.value = await getHiprintBundle('instruction')
+}
+
+const loadTemplateJson = async (key: string) => {
+  const raw = await getPageTemplateJson(PAGE_CODE, key)
+  if (!raw) return null
+  return typeof raw === 'string' ? JSON.parse(raw) : raw
+}
+
+/** 打印目标：有勾选用勾选；否则用当前点击行 */
+const resolvePrintTargets = (): any[] => {
+  if (selectedMos.value.length) return selectedMos.value
+  if (selectedMo.value?.moNo) return [selectedMo.value]
+  return []
+}
+
+const loadItemsForMo = async (mo: any): Promise<any[]> => {
+  if (
+    activeTab.value === 'content' &&
+    midList.value.length &&
+    selectedMo.value?.moNo === mo.moNo &&
+    selectedMos.value.length <= 1
+  ) {
+    return midList.value
+  }
+  return getMoItems(mo.moNo)
+}
+
+const preparePrintData = async () => {
+  const targets = resolvePrintTargets()
+  if (!targets.length) {
+    $baseMessage('请先选择上方制令（可勾选多条）', 'warning', 'hey')
+    return false
+  }
+
+  const bundles: Array<{ moNo?: string; rows: InstructionPrintRow[] }> = []
+  let skipped = 0
+  for (const mo of targets) {
+    if (!mo?.moNo) continue
+    const items = await loadItemsForMo(mo)
+    if (!items.length) {
+      skipped += 1
+      continue
+    }
+    bundles.push({ moNo: mo.moNo, rows: mapItemsToPrintRows(items, mo) })
+  }
+
+  if (!bundles.length) {
+    $baseMessage(
+      targets.length > 1 ? '所选制令均无生产内容，无法打印' : '该制令暂无生产内容，无法打印',
+      'warning',
+      'hey'
+    )
+    return false
+  }
+
+  if (skipped > 0) {
+    $baseMessage(`已跳过 ${skipped} 条无生产内容的制令`, 'warning', 'hey')
+  }
+
+  await ensureBundle()
+  printData.value =
+    bundles.length === 1
+      ? buildInstructionPrintData(bundles[0].rows, { moNo: bundles[0].moNo })
+      : buildMultiInstructionPrintData(bundles)
+  return true
+}
+
+const openPreview = async (templateId: number | string) => {
+  activeTemplateId.value = String(templateId)
+  previewVisible.value = true
+}
+
+const printDefault = async () => {
+  printLoading.value = true
+  try {
+    if (!(await preparePrintData())) return
+    const list = await listPageTemplates(PAGE_CODE)
+    const def = list.find((t) => t.isDefault) || list[0]
+    if (!def?.hasJson) {
+      ElMessage.warning('模板未配置')
+      return
+    }
+    await openPreview(def.id)
+  } catch (e: any) {
+    $baseMessage(e?.message || '加载默认模板失败', 'error', 'hey')
+  } finally {
+    printLoading.value = false
+  }
+}
+
+const openPicker = async () => {
+  if (!(await preparePrintData())) return
+  pickerVisible.value = true
+}
+
 const fetchMaster = async () => {
   listLoading.value = true
   try {
@@ -572,6 +771,7 @@ const fetchMaster = async () => {
     masterList.value = await mergeAttachCounts(rows)
     total.value = data.total || 0
     selectedMo.value = null
+    selectedMos.value = []
     selectedItem.value = null
     midList.value = []
     detailList.value = []
@@ -641,13 +841,12 @@ const loadDetail = async () => {
 }
 
 const handleMasterClick = (args: any) => {
+  const vtable = masterTableRef.value?.vTableInstance
+  const colDef = vtable?.getBodyColumnDefine?.(args.col) || vtable?.getColumnDefine?.(args.col) || masterOptions.value.columns?.[args.col]
+  if (colDef?.field === '__checkbox__') return
+
   const record = getRecord(masterTableRef, args, masterList.value)
   if (!record?.moNo) return
-  const vtable = masterTableRef.value?.vTableInstance
-  const colDef =
-    vtable?.getBodyColumnDefine?.(args.col) ||
-    vtable?.getColumnDefine?.(args.col) ||
-    masterOptions.value.columns?.[args.col]
   if (colDef?.field === 'attachLabel') {
     openAttachment(record)
   }
@@ -732,8 +931,10 @@ onBeforeMount(() => fetchMaster())
     height: 3px;
     border-radius: 2px;
     background: #dcdfe6;
-    transition: background 0.15s, width 0.15s;
-  }
+    transition:
+      background 0.15s,
+      width 0.15s;
+   }
 
   &:hover {
     background: rgba(64, 158, 255, 0.08);
