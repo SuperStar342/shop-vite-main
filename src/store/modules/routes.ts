@@ -5,7 +5,7 @@ import { getList } from '/@/api/router'
 import { authentication, rolesControl } from '/@/config'
 import { asyncRoutes, constantRoutes, resetRouter } from '/@/router'
 import { expandMenuCodesForRoutes } from '/@/utils/bladeMenuCodes'
-import { convertRouter, filterRoutes } from '/@/utils/routes'
+import { convertRouter, filterRoutes, ensurePrintTemplateDesignRoute } from '/@/utils/routes'
 import { isArray } from '/@/utils/validate'
 import { gp } from '/@vab/plugins/vab'
 import { useAclStore } from '/@/store/modules/acl'
@@ -171,9 +171,13 @@ export const useRoutesStore = defineStore('routes', {
           })
         }
         routes = convertRouter(list)
+        routes = ensurePrintTemplateDesignRoute(routes)
       }
       // 根据权限和rolesControl过滤路由
       let accessRoutes = filterRoutes([...constantRoutes, ...routes], control)
+      if (authentication !== 'all') {
+        accessRoutes = ensurePrintTemplateDesignRoute(accessRoutes)
+      }
       // 非超管：按 acl.menuCodes 兜底过滤动态菜单（constantRoutes 一并走 walk，hidden/404 会保留）
       accessRoutes = filterRoutesByMenuAcl(accessRoutes)
       // 设置菜单所需路由

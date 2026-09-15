@@ -37,9 +37,54 @@ export const buildProviderPanel = async ($container: any, moduleName: string) =>
   const { hiprint } = await import('vue-plugin-hiprint')
   $container.empty()
   hiprint.PrintElementTypeManager.build($container, moduleName)
+  const el = $container?.[0] as HTMLElement | undefined
+  if (el) decorateProviderIcons(el)
 }
 
-export const renderPreview = async (container: HTMLElement, tpl: any, printData: unknown) => {
+/** 为左侧拖拽组件补图标，不影响 hiprint tid 拖拽行为 */
+export const decorateProviderIcons = (root: HTMLElement) => {
+  root.querySelectorAll('a.ep-draggable-item[tid]').forEach((node) => {
+    const a = node as HTMLAnchorElement
+    if (a.querySelector('.hp-el-icon')) return
+    const tid = a.getAttribute('tid') || ''
+    const title = (a.textContent || '').trim()
+    a.classList.add('hp-el-item')
+    a.innerHTML = ''
+    const icon = document.createElement('span')
+    icon.className = `hp-el-icon ${iconClassForTid(tid)}`
+    icon.setAttribute('aria-hidden', 'true')
+    const label = document.createElement('span')
+    label.className = 'hp-el-title'
+    label.textContent = title
+    a.append(icon, label)
+  })
+
+  root.querySelectorAll('.title').forEach((node) => {
+    const title = node as HTMLElement
+    if (title.classList.contains('hp-group-title')) return
+    title.classList.add('hp-group-title')
+  })
+}
+
+const iconClassForTid = (tid: string) => {
+  const t = tid.toLowerCase()
+  if (t.includes('.table') || t.endsWith('table')) return 'is-table'
+  if (t.includes('longtext')) return 'is-longtext'
+  if (t.includes('hline')) return 'is-hline'
+  if (t.includes('vline')) return 'is-vline'
+  if (t.includes('rect') || t.includes('oval')) return 'is-rect'
+  if (t.includes('qrcode')) return 'is-qrcode'
+  if (t.includes('barcode')) return 'is-barcode'
+  if (t.includes('image') || t.includes('img')) return 'is-image'
+  if (t.startsWith('instructionmodule.')) return 'is-field'
+  return 'is-text'
+}
+
+export const renderPreview = async (
+  container: HTMLElement,
+  tpl: any,
+  printData: unknown
+) => {
   const $ = await ensureJquery()
   const html = tpl.getHtml(printData) as any
   const $wrap = $('<div class="hiprint-printPagination hiprint-report-preview-fit"/>')
@@ -51,6 +96,7 @@ export const renderPreview = async (container: HTMLElement, tpl: any, printData:
   })
 }
 
+/** printData 可为单对象或数组（多份连续打印） */
 export const printWithTemplate = (tpl: any, printData: unknown) => {
   tpl.print(printData)
 }

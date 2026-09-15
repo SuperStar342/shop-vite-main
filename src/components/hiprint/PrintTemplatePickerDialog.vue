@@ -68,7 +68,7 @@ import { getHiprintBundle } from '/@/utils/hiprint/registry'
 interface Props {
   modelValue: boolean
   pageCode: string
-  printData: Record<string, unknown>
+  printData: Record<string, unknown> | Record<string, unknown>[]
 }
 
 const props = defineProps<Props>()

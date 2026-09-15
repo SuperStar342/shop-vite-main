@@ -101,17 +101,16 @@ export const createInstructionSheetProvider = (hiprint: any) => {
           tid: 'instructionModule.table',
           title: '明细表格',
           type: 'table',
-          options: {
-            field: 'table',
-            columns: [
-              TABLE_COLUMNS.map((c) => ({
-                title: c.title,
-                field: c.field,
-                width: c.width,
-                align: 'center',
-              })),
-            ],
-          },
+          field: 'table',
+          // columns 必须在顶层，否则左侧拖拽表格会失败
+          columns: [
+            TABLE_COLUMNS.map((c) => ({
+              title: c.title,
+              field: c.field,
+              width: c.width,
+              align: 'center',
+            })),
+          ],
         },
       ]),
     ])

@@ -35,7 +35,9 @@
           </el-form-item>
           <el-form-item>
             <el-button-group>
-              <el-button :icon="Printer" :loading="printLoading" type="primary" @click="printDefault">打印</el-button>
+              <el-button :icon="Printer" :loading="printLoading" type="primary" @click="printDefault">
+                {{ printButtonLabel }}
+              </el-button>
               <el-button type="primary" @click="openPicker">选模板</el-button>
             </el-button-group>
           </el-form-item>
@@ -52,6 +54,7 @@
             :height="masterHeight"
             :options="masterOptions"
             :records="masterList"
+            @on-checkbox-state-change="handleMasterCheckboxChange"
             @on-click-cell="
               (args: any) => {
                 onCopyTrack(args, masterTableRef)
@@ -185,7 +188,13 @@ import { sortNewestFirst } from '/@/utils/bladeAdapter'
 import HiprintReportDialog from '/@/components/hiprint/HiprintReportDialog.vue'
 import PrintTemplatePickerDialog from '/@/components/hiprint/PrintTemplatePickerDialog.vue'
 import { getPageTemplateJson, listPageTemplates } from '/@/api/print/reportCenter'
-import { buildInstructionPrintData, mapItemsToPrintRows, type InstructionPrintRow } from '/@/utils/hiprint/instructionSheet'
+import {
+  buildInstructionPrintData,
+  buildMultiInstructionPrintData,
+  mapItemsToPrintRows,
+  type InstructionPrintData,
+  type InstructionPrintRow,
+} from '/@/utils/hiprint/instructionSheet'
 import { getHiprintBundle } from '/@/utils/hiprint/registry'
 import { getVTableInstance, handleVTableContextMenuCell, trackVTableCellForCopy } from '/@/utils/tableCopy'
 import AttachmentDrawer from '/@/views/procurement/shared/attachment/AttachmentDrawer.vue'
@@ -214,6 +223,7 @@ const detailList = ref<any[]>([])
 const total = ref(0)
 const activeTab = ref('content')
 const selectedMo = ref<any>(null)
+const selectedMos = ref<any[]>([])
 const selectedItem = ref<any>(null)
 const midLoading = ref(false)
 
@@ -347,9 +357,16 @@ const attachCol = {
 
 const masterOptions = computed(() => ({
   ...baseTableOpts,
-  frozenColCount: 2,
+  frozenColCount: 3,
   rightFrozenColCount: 1,
   columns: [
+    {
+      field: '__checkbox__',
+      cellType: 'checkbox',
+      headerType: 'checkbox',
+      width: 46,
+      style: { textAlign: 'center' },
+    },
     col('ifSuspend', '是否暂停', 80),
     col('moNo', '制令号', 140),
     col('ordNo', '订单号', 120),
@@ -617,12 +634,36 @@ const previewVisible = ref(false)
 const pickerVisible = ref(false)
 const activeTemplateId = ref<number | string>('')
 const printLoading = ref(false)
-const printData = ref<Record<string, unknown>>({ table: [] })
+const printData = ref<InstructionPrintData | InstructionPrintData[]>({ table: [] } as InstructionPrintData)
 const bundle = ref<{ providers: any[]; providerModules: string[]; defaultTemplate: unknown }>({
   providers: [],
   providerModules: [],
   defaultTemplate: null,
 })
+
+const printButtonLabel = computed(() =>
+  selectedMos.value.length > 1 ? `打印(${selectedMos.value.length})` : '打印'
+)
+
+const syncSelectedMos = () => {
+  const vtable = masterTableRef.value?.vTableInstance
+  if (!vtable) {
+    selectedMos.value = []
+    return
+  }
+  const headerCount = vtable.columnHeaderLevelCount ?? 1
+  const selected: any[] = []
+  masterList.value.forEach((_item, index) => {
+    const row = headerCount + index
+    const state = vtable.getCellCheckboxState(0, row)
+    if (state === true) selected.push(masterList.value[index])
+  })
+  selectedMos.value = selected
+}
+
+const handleMasterCheckboxChange = () => {
+  nextTick(() => syncSelectedMos())
+}
 
 const ensureBundle = async () => {
   if (bundle.value.providers.length) return
@@ -635,30 +676,62 @@ const loadTemplateJson = async (key: string) => {
   return typeof raw === 'string' ? JSON.parse(raw) : raw
 }
 
-const loadPrintRows = async (): Promise<InstructionPrintRow[]> => {
-  const mo = selectedMo.value
-  if (!mo?.moNo) {
-    $baseMessage('请先选择上方制令', 'warning', 'hey')
-    return []
+/** 打印目标：有勾选用勾选；否则用当前点击行 */
+const resolvePrintTargets = (): any[] => {
+  if (selectedMos.value.length) return selectedMos.value
+  if (selectedMo.value?.moNo) return [selectedMo.value]
+  return []
+}
+
+const loadItemsForMo = async (mo: any): Promise<any[]> => {
+  if (
+    activeTab.value === 'content' &&
+    midList.value.length &&
+    selectedMo.value?.moNo === mo.moNo &&
+    selectedMos.value.length <= 1
+  ) {
+    return midList.value
   }
-  let items: any[] = []
-  if (activeTab.value === 'content' && midList.value.length && selectedMo.value?.moNo === mo.moNo) {
-    items = midList.value
-  } else {
-    items = await getMoItems(mo.moNo)
-  }
-  if (!items.length) {
-    $baseMessage('该制令暂无生产内容，无法打印', 'warning', 'hey')
-    return []
-  }
-  return mapItemsToPrintRows(items, mo)
+  return getMoItems(mo.moNo)
 }
 
 const preparePrintData = async () => {
-  const rows = await loadPrintRows()
-  if (!rows.length) return false
+  const targets = resolvePrintTargets()
+  if (!targets.length) {
+    $baseMessage('请先选择上方制令（可勾选多条）', 'warning', 'hey')
+    return false
+  }
+
+  const bundles: Array<{ moNo?: string; rows: InstructionPrintRow[] }> = []
+  let skipped = 0
+  for (const mo of targets) {
+    if (!mo?.moNo) continue
+    const items = await loadItemsForMo(mo)
+    if (!items.length) {
+      skipped += 1
+      continue
+    }
+    bundles.push({ moNo: mo.moNo, rows: mapItemsToPrintRows(items, mo) })
+  }
+
+  if (!bundles.length) {
+    $baseMessage(
+      targets.length > 1 ? '所选制令均无生产内容，无法打印' : '该制令暂无生产内容，无法打印',
+      'warning',
+      'hey'
+    )
+    return false
+  }
+
+  if (skipped > 0) {
+    $baseMessage(`已跳过 ${skipped} 条无生产内容的制令`, 'warning', 'hey')
+  }
+
   await ensureBundle()
-  printData.value = buildInstructionPrintData(rows)
+  printData.value =
+    bundles.length === 1
+      ? buildInstructionPrintData(bundles[0].rows, { moNo: bundles[0].moNo })
+      : buildMultiInstructionPrintData(bundles)
   return true
 }
 
@@ -698,6 +771,7 @@ const fetchMaster = async () => {
     masterList.value = await mergeAttachCounts(rows)
     total.value = data.total || 0
     selectedMo.value = null
+    selectedMos.value = []
     selectedItem.value = null
     midList.value = []
     detailList.value = []
@@ -767,10 +841,12 @@ const loadDetail = async () => {
 }
 
 const handleMasterClick = (args: any) => {
-  const record = getRecord(masterTableRef, args, masterList.value)
-  if (!record?.moNo) return
   const vtable = masterTableRef.value?.vTableInstance
   const colDef = vtable?.getBodyColumnDefine?.(args.col) || vtable?.getColumnDefine?.(args.col) || masterOptions.value.columns?.[args.col]
+  if (colDef?.field === '__checkbox__') return
+
+  const record = getRecord(masterTableRef, args, masterList.value)
+  if (!record?.moNo) return
   if (colDef?.field === 'attachLabel') {
     openAttachment(record)
   }
@@ -858,7 +934,7 @@ onBeforeMount(() => fetchMaster())
     transition:
       background 0.15s,
       width 0.15s;
-  }
+   }
 
   &:hover {
     background: rgba(64, 158, 255, 0.08);

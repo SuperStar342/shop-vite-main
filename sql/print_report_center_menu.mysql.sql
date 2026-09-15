@@ -46,6 +46,18 @@ INSERT INTO blade_role_menu (id, menu_id, role_id)
 SELECT 2083134009698754941, 2083134009698754931, 1123598816738675201 FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM blade_role_menu WHERE menu_id = 2083134009698754931 AND role_id = 1123598816738675201);
 
+INSERT INTO blade_menu (
+  id, parent_id, code, name, alias, path, source, sort, category, action, is_open, component, remark, is_deleted
+)
+SELECT
+  2083134009698754933, 2083134009698754930, 'printTemplateDesign', '模板设计', 'menu',
+  '/printReport/templates/design', 'edit-box-line', 3, 1, 0, 1,
+  'views/printReport/templates/design', '打印模板设计（隐藏菜单，标签页打开）', 0
+FROM DUAL
+WHERE NOT EXISTS (
+  SELECT 1 FROM blade_menu WHERE is_deleted = 0 AND (id = 2083134009698754933 OR code = 'printTemplateDesign')
+);
+
 INSERT INTO blade_role_menu (id, menu_id, role_id)
-SELECT 2083134009698754942, 2083134009698754932, 1123598816738675201 FROM DUAL
-WHERE NOT EXISTS (SELECT 1 FROM blade_role_menu WHERE menu_id = 2083134009698754932 AND role_id = 1123598816738675201);
+SELECT 2083134009698754943, 2083134009698754933, 1123598816738675201 FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM blade_role_menu WHERE menu_id = 2083134009698754933 AND role_id = 1123598816738675201);

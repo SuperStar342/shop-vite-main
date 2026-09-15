@@ -18,6 +18,13 @@ export type InstructionPrintRow = {
   remark: string
 }
 
+export type InstructionPrintData = Record<string, unknown> & {
+  printDate: string
+  pageInfo: string
+  moNo?: string
+  table: InstructionPrintRow[]
+}
+
 const dateOnly = (v: unknown) => {
   const s = String(v ?? '').trim()
   if (!s) return ''
@@ -66,8 +73,45 @@ const withTotalRow = (rows: InstructionPrintRow[]): InstructionPrintRow[] => {
   ]
 }
 
-export const buildInstructionPrintData = (rows: InstructionPrintRow[]) => ({
-  printDate: dayjs().format('YYYY-MM-DD HH:mm'),
-  pageInfo: '1 / 1',
-  table: withTotalRow(rows),
-})
+/** 单份打印数据：table + 首行常用字段摊到顶层，便于表头文本绑定 */
+export const buildInstructionPrintData = (
+  rows: InstructionPrintRow[],
+  options?: { moNo?: string; pageInfo?: string; printDate?: string }
+): InstructionPrintData => {
+  const first = rows[0]
+  return {
+    printDate: options?.printDate || dayjs().format('YYYY-MM-DD HH:mm'),
+    pageInfo: options?.pageInfo || '1 / 1',
+    moNo: options?.moNo || '',
+    ordNo: first?.ordNo || '',
+    custOrdNo: first?.custOrdNo || '',
+    custName: first?.custName || '',
+    styleCode: first?.styleCode || '',
+    goodsName: first?.goodsName || '',
+    fabricCode: first?.fabricCode || '',
+    clrCode: first?.clrCode || '',
+    moQty: first?.moQty ?? '',
+    reqDate: first?.reqDate || '',
+    deliveryDate: first?.deliveryDate || '',
+    remark: first?.remark || '',
+    table: withTotalRow(rows),
+  }
+}
+
+/**
+ * 多制令批量打印：每条制令一份数据，hiprint 接收数组时连续出多页
+ */
+export const buildMultiInstructionPrintData = (
+  bundles: Array<{ moNo?: string; rows: InstructionPrintRow[] }>
+): InstructionPrintData[] => {
+  const valid = bundles.filter((b) => (b.rows || []).length > 0)
+  const total = valid.length
+  const printDate = dayjs().format('YYYY-MM-DD HH:mm')
+  return valid.map((b, i) =>
+    buildInstructionPrintData(b.rows, {
+      moNo: b.moNo,
+      printDate,
+      pageInfo: `${i + 1} / ${total}`,
+    })
+  )
+}
