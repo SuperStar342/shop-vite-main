@@ -284,6 +284,23 @@ export const formatPath = (ele: any, first: boolean): void => {
     ele.meta.dynamicNewTab = true
     ele.meta.activeMenu = '/printReport/templates/index'
   }
+  // 商品编辑页：隐藏侧栏，高亮商品列表
+  if (code === 'productEdit' || /product\/edit/i.test(pathStr)) {
+    ele.meta.hidden = true
+    ele.meta.activeMenu = '/product/index'
+  }
+  // 商品工作台 / 驾驶舱 / 独立新增：隐藏，统一落到商品列表
+  if (
+    code === 'productWorkbench' ||
+    /product\/workbench/i.test(pathStr) ||
+    code === 'productCockpit' ||
+    /product\/cockpit/i.test(pathStr) ||
+    code === 'productCreate' ||
+    /product\/create/i.test(pathStr)
+  ) {
+    ele.meta.hidden = true
+    ele.meta.activeMenu = '/product/index'
+  }
   ele.name = ele.code
 
   const iframeComponent = 'components/iframe/main'

@@ -1,0 +1,109 @@
+/* 沙发家具商品中心 · 统一设计语言 */
+.pg {
+  --pg-ink: #1c1917;
+  --pg-muted: #78716c;
+  --pg-line: #e7e5e4;
+  --pg-bg: #f7f5f2;
+  --pg-card: #ffffff;
+  --pg-sand: #f3efe8;
+  --pg-teal: #0f766e;
+  --pg-teal-soft: #ccfbf1;
+  --pg-warm: #b45309;
+  --pg-danger: #b91c1c;
+  --pg-ok: #047857;
+  --pg-radius: 16px;
+  --pg-shadow: 0 10px 30px rgba(28, 25, 23, 0.05);
+  color: var(--pg-ink);
+  background:
+    radial-gradient(900px 280px at 8% -8%, rgba(15, 118, 110, 0.06), transparent 55%),
+    radial-gradient(700px 240px at 96% 0%, rgba(180, 83, 9, 0.05), transparent 50%),
+    var(--pg-bg);
+  min-height: calc(100vh - 110px);
+  padding: 16px 18px 28px;
+}
+
+.pg-card {
+  background: var(--pg-card);
+  border: 1px solid var(--pg-line);
+  border-radius: var(--pg-radius);
+  box-shadow: var(--pg-shadow);
+}
+
+.pg-title {
+  font-size: 22px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  color: var(--pg-ink);
+}
+
+.pg-sub {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--pg-muted);
+}
+
+.pg-eyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--pg-teal);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.pg-btn-primary {
+  --el-button-bg-color: var(--pg-teal);
+  --el-button-border-color: var(--pg-teal);
+  --el-button-hover-bg-color: #0d9488;
+  --el-button-hover-border-color: #0d9488;
+}
+
+.pg-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--pg-sand);
+  color: var(--pg-muted);
+
+  &::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  &.ok {
+    background: #ecfdf5;
+    color: var(--pg-ok);
+  }
+  &.warn {
+    background: #fffbeb;
+    color: var(--pg-warm);
+  }
+  &.danger {
+    background: #fef2f2;
+    color: var(--pg-danger);
+  }
+  &.info {
+    background: #f5f5f4;
+    color: #57534e;
+  }
+}
+
+.pg-score {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  font-weight: 800;
+  color: var(--pg-teal);
+
+  small {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--pg-muted);
+  }
+}
