@@ -1,0 +1,2 @@
+﻿消息 207，级别 16，状态 1，服务器 WIN-MLI7B4LEM9E，第 1 行
+列名 'Sp_Sys_GetNewID' 无效。

@@ -85,7 +85,7 @@ const total = ref(0)
 const selectRows = ref<any[]>([])
 const selectedId = ref('')
 const tableKey = ref(0)
-const expandAll = ref(true)
+const expandAll = ref(false)
 
 const queryForm = reactive({
   pageNo: 1,
@@ -93,6 +93,7 @@ const queryForm = reactive({
   categoryName: '',
   categoryCode: '',
 })
+
 
 const yesNo = (v: any) => (v === '是' || v === 1 || v === '1' || v === true ? '是' : '否')
 const qcLabel = (v: any) => {
@@ -414,6 +415,7 @@ const runDelete = async (ids: string) => {
   }
   await fetchData()
 }
+
 
 const handleAdd = (parentRow?: any) => {
   if (parentRow?.id) editRef.value?.showEdit({ parentId: parentRow.id })

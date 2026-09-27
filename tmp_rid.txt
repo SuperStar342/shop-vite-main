@@ -1,0 +1,6 @@
+﻿COLUMN_NAME
+-----------
+fReceiptCode
+fNextID
+fTimeStamp
+fReceiptGroup

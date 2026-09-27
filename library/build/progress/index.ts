@@ -1,12 +1,6 @@
 import progress from 'vite-plugin-vitebar'
 
-import { title } from '/@/config'
-
+/** 勿从 /@/config 聚合导入：会把 setting.config 挂进 Vite 配置依赖，改业务配置就整服重启 */
 export const createProgress = (env: Record<string, string>) => {
-  let projectName = 'Vue Shop Vite'
-  if (title !== 'Vue Shop Vite') {
-    projectName = `${projectName} - ${title}`
-  }
-
-  return progress({ env, projectName })
+  return progress({ env, projectName: 'Vue Shop Vite - Jpai Home' })
 }

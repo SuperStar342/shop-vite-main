@@ -1,51 +1,5 @@
 <template>
   <div class="up-page auto-height-container">
-    <header class="up-hero">
-      <div class="up-hero__text">
-        <p class="up-hero__eyebrow">非生产派工</p>
-        <h1>单价设置</h1>
-        <p class="up-hero__desc">维护零星、返修、样品等非生产派工的计件单价与改价权限，字段与现场单据对齐。</p>
-      </div>
-      <div class="up-hero__stats">
-        <div class="up-stat">
-          <span class="up-stat__label">条目</span>
-          <strong>{{ total }}</strong>
-        </div>
-        <div class="up-stat">
-          <span class="up-stat__label">可改价</span>
-          <strong>{{ editableCount }}</strong>
-        </div>
-        <div class="up-stat">
-          <span class="up-stat__label">类型</span>
-          <strong>{{ typeStats.length }}</strong>
-        </div>
-      </div>
-    </header>
-
-    <section class="up-types">
-      <button
-        class="up-type"
-        :class="{ active: !queryForm.dispatchTypeCode }"
-        type="button"
-        @click="selectType('')"
-      >
-        <span class="up-type__name">全部类型</span>
-        <span class="up-type__meta">{{ totalAll }} 条</span>
-      </button>
-      <button
-        v-for="t in typeStats"
-        :key="t.code"
-        class="up-type"
-        :class="{ active: queryForm.dispatchTypeCode === t.code }"
-        type="button"
-        @click="selectType(t.code)"
-      >
-        <span class="up-type__code">{{ t.code }}</span>
-        <span class="up-type__name">{{ t.name }}</span>
-        <span class="up-type__meta">{{ t.count }} 条 · 均价 {{ t.avgPrice }}</span>
-      </button>
-    </section>
-
     <section class="up-toolbar">
       <el-form inline :model="queryForm" @submit.prevent>
         <el-form-item>
@@ -321,11 +275,6 @@ const resetQuery = () => {
   queryForm.allowEditPrice = ''
   queryForm.pageNo = 1
   fetchList()
-}
-
-const selectType = (code: string) => {
-  queryForm.dispatchTypeCode = code
-  queryData()
 }
 
 const blankForm = (): Partial<UnitPriceRow> => ({

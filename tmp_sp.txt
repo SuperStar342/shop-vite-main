@@ -1,0 +1,144 @@
+﻿--exec sp_Sys_LockSQLObj @SqlObj='Sp_PLS020_Save',@LockTaskNo='任务单',@LockRemark='备注' 
+
+CREATE proc [dbo].[Sp_PLS020_Save]
+	@fOWTFnNo varchar(50)
+	,@UserCode varchar(8)
+	,@UserName nvarchar(32)
+	,@OnLineID varchar(32)
+	,@Success bit=0 output  --返回执行成功与否    
+	,@Msg nvarchar(max)='' output--返回消息
+	,@RtnTblResult char(1)='1'--是否返回结果集合
+	,@NeedTran bit = 0 -- 是否需要启动事务
+	,@debug char(1) = '0' --调试状态
+as
+/*
+功能: 非生产派工单完工确认保存
+作者: LiuXX
+日期: 2011-12-01
+
+修改历史
+-------------------------------------
+修改人       修改日期    描述
+
+antsing      20120216    加返回值的参数
+zgy			 20190319	 A065000923 添加行号保存
+-----------  ----------  ----------
+*/
+set nocount on
+
+declare @DtlOneLvlTb varchar(64), @DtlTwoLvlTb varchar(64)
+select @DtlOneLvlTb = 'tmpPLS020Dtl' + @OnLineID
+     , @DtlTwoLvlTb = 'tmpPLS020DeptEmp' + @OnLineID
+declare @sql nvarchar(max), @newLine char(1)
+select @sql = '', @msg = '', @newLine = char(10)
+
+--IF OBJECT_ID('dbo.[' + @DtlOneLvlTb+']') IS NOT NULL
+--BEGIN
+
+	
+	--update A set a.fFnQty = b.fFnQty
+	--from " + @DtlOneLvlTb + " A inner join 
+	--	(select fOwtNo, fSNo, fFnQty = sum(fFnQty) from " + @DtlTwoLvlTb + " group by fOwtNo,fSNo) B
+	--	on b.fOwtNo = a.fOwtNo and b.fSNo = a.fSNo
+
+	--update A set a.fFnQty = b.fFnQty
+	--from t_PLSD_OWTFinishItem A inner join 
+	--	(select t1.fOwtNo, t1.fSNo, fFnQty = sum(t1.fFnQty) 
+	--	 from " + @DtlTwoLvlTb + " t1 inner join t_PLSD_OWTFinishItem t2 with(nolock) /*ggw 20160313 batch modi*/
+	--		  on t2.fowtFnNo='" + @fOWTFnNo + "' and t2.fowtNo=t1.fowtNo and t2.fSNo=t1.fSNo
+	--		 and not (t2.fPWageType='1' and t2.fAssignType='1')
+	--	 group by t1.fOwtNo, t1.fSNo) B
+	--	on b.fOwtNo = a.fOwtNo and b.fSNo = a.fSNo
+	--where a.fOwtFnNo = '" + @fOWTFnNo + "'
+	
+    select @sql = "	
+	-- 先删除本次完工数量为零的一级和二级数据
+	delete from " + @DtlOneLvlTb + " where fFnQty = 0 " + "
+	delete from " + @DtlTwoLvlTb + " where fFnQty = 0 " + "
+	delete from t_PLSD_OWTFinishItem where fOWTFnNo='" + @fOWTFnNo + "' and fFnQty = 0 " + "
+	delete from t_PLSD_OWTFinishWorker where fOWTFnNo='" + @fOWTFnNo + "' and fFnQty = 0 " + "
+
+	update " + @DtlOneLvlTb + " set fOWTFnNo='" + @fOWTFnNo + "'
+	update " + @DtlTwoLvlTb + " set fOWTFnNo='" + @fOWTFnNo + "'
+
+	if not exists(select 1 from t_PLSD_OWTFinishWorker where fOWTFnNo='" + @fOWTFnNo + "')" + "
+		insert t_PLSD_OWTFinishWorker
+			(fOWTFnNo,fOWTNo,fSNo,fDeptID,fEmpNo,fFnQty,fWageQty,fAllotmentRate,fUpRate
+			,fWorkTime,fWageAmt,fIfWage,fWagePeriod,fCreatorID,fCreator,fCDate,fOWTFnSNo)
+		select '" + @fOWTFnNo + "', fOWTNo,fSNo,fDeptID,IsNull(fEmpNo,''),fFnQty,fWageQty,fAllotmentRate,fUpRate
+			,fWorkTime,fWageAmt,fIfWage,fWagePeriod,'" + @userCode + 
+			"',N'" + replace(@userName,"'", "''") + "', getdate(),fOWTFnSNo  --zgy  20190319 add fOWTFnSNo
+		from " + @DtlTwoLvlTb + " where fFnQty > 0 and fRowState != 'Deleted'
+
+
+	-- 插入　非生产派工单细细表中不存在的数量
+	insert t_PLSD_OWorkTicketWorker
+	(fOWTNo,fSNo,fDeptID,fEmpNo,fPlanQty,fFnQty,fWageQty,fCreatorID,fCreator,fCDate)" + "
+	select a.fOWTNo, a.fSNo, a.fDeptID, IsNull(a.fEmpNo,''), a.fFnQty, 0, a.fWageQty
+		 , '" + @userCode + "', N'" + replace(@userName,"'","''") + "', getdate()
+	from " + @DtlTwoLvlTb + " A left join t_PLSD_OWorkTicketWorker B on b.fOwtNo=a.fOwtNo and b.fSNo=a.fSNo
+		  and b.fDeptID=a.fDeptID and b.fEmpNo=IsNull(a.fEmpNo,'')
+	where a.fFnQty > 0 and a.fRowState != 'Deleted' and  b.fOwtNo is null
+	"
+--END
+--BEGIN
+--	--更新非生产派工细表的完工数量
+--	UPDATE  a
+--		SET a.fFnQty = a.fFnQty + a.fFnQty
+--	FROM t_PLSD_OWorkTicketItem a
+--	INNER JOIN t_PLSD_OWTFinishItem b with(nolock) /*ggw 20160313 batch modi*/
+--		ON a.fOWTNo=b.fOWTNo and a.fSNo=b.fSNo 
+--	WHERE b.fOWTFnNo=@fOWTFnNo
+--	--AND a.fDeptID=b.fDeptID and a.fEmpNo=b.fEmpNo
+--	 
+--	--更新非生产派工细细表的完工数量
+--	UPDATE a 
+--		SET a.fFnQty= a.fFnQty + a.fFnQty
+--	FROM t_PLSD_OWorkTicketWorker a
+--	INNER JOIN t_PLSD_OWTFinishWorker b with(nolock) /*ggw 20160313 batch modi*/
+--		ON a.fOWTNo=b.fOWTNo and a.fSNo=b.fSNo 
+--		AND a.fDeptID=b.fDeptID and a.fEmpNo=b.fEmpNo
+--	WHERE b.fOWTFnNo=@fOWTFnNo
+--	
+--	--更新非生产派工细细表的完工数量
+--	INSERT INTO t_PLSD_OWorkTicketWorker(
+--		fOWTNo,fSNo,fDeptID,fEmpNo,fPlanQty,
+--		fFnQty,fWageQty,fCreatorID,fCreator,fCDate)
+--	SELECT a.fOWTNo,a.fSNo,a.fDeptID,a.fEmpNo,0,
+--		a.fFnQty,a.fWageQty, @UserCode,@UserName,GETDATE()
+--	FROM t_PLSD_OWTFinishWorker a with(nolock) /*ggw 20160313 batch modi*/
+--	LEFT JOIN t_PLSD_OWorkTicketWorker b with(nolock) /*ggw 20160313 batch modi*/
+--	ON  a.fOWTNo=b.fOWTNo and a.fSNo=b.fSNo 
+--	AND a.fDeptID=b.fDeptID and a.fEmpNo=b.fEmpNo
+--	WHERE b.fDeptID IS NULL
+--END
+--	
+
+begin try
+    exec (@sql)
+end try
+begin catch
+    select @msg = error_message()
+end catch
+
+if @RtnTblResult='1'
+begin
+	if @msg = ''
+	begin
+		select fok=convert(bit,1), fmsg=''
+	end    
+	else
+	begin
+		select fok=convert(bit,0), fmsg=@msg
+	end
+end
+
+
+
+
+
+
+
+
+
+

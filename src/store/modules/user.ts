@@ -3,7 +3,7 @@
  */
 import { useTabsStore } from './tabs'
 import { useAclStore } from './acl'
-import { setToken, setRefreshToken, removeToken, removeRefreshToken, getToken, getRefreshToken, setTokenExpireAt } from '/@/utils/auth'
+import { setToken, setRefreshToken, removeToken, removeRefreshToken, getToken, getRefreshToken, setTokenExpireAt, DEFAULT_ACCESS_EXPIRES_IN } from '/@/utils/auth'
 import { setStore, getStore } from '/@/utils/store'
 import { deepClone } from '/@/utils/util'
 import { loginByUsername, getUserInfo, logout, refreshToken, getButtons } from '/@/api/user'
@@ -127,7 +127,7 @@ export const useUserStore = defineStore('user', {
           }
           this.SET_TOKEN(data.access_token)
           this.SET_REFRESH_TOKEN(data.refresh_token)
-          setTokenExpireAt(data.expires_in ?? 3600)
+          setTokenExpireAt(data.expires_in ?? DEFAULT_ACCESS_EXPIRES_IN)
           this.SET_TENANT_ID(data.tenant_id)
           this.SET_USER_INFO(data)
           try {
@@ -213,7 +213,7 @@ export const useUserStore = defineStore('user', {
       }
       this.SET_TOKEN(data.access_token)
       this.SET_REFRESH_TOKEN(data.refresh_token || getRefreshToken())
-      setTokenExpireAt(data.expires_in ?? 3600)
+      setTokenExpireAt(data.expires_in ?? DEFAULT_ACCESS_EXPIRES_IN)
       this.SET_USER_INFO(data)
       const roles = splitRoles(data.role_name || data.roleName)
       if (roles.length) {

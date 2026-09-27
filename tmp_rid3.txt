@@ -1,0 +1,7 @@
+﻿code|name|prefixSC|fFctyLen|fDeptLen|fStkLen|fCstLen|fPrvLen|fLineLen|prefixLS|noFld|tbl
+----|----|--------|--------|--------|-------|-------|-------|--------|--------|-----|---
+PLS105|非生产派工单||0|0|0|0|0|0|0|fOWTNo|t_PLSD_OWorkTicketMst
+c|fNextID|g
+-|-------|-
+c|fNextID|g
+-|-------|-

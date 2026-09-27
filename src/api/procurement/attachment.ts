@@ -41,8 +41,18 @@ export const ATTACHMENT_ACCEPT =
 const MAX_FILE_SIZE = 50 * 1024 * 1024
 const QUOTA_BYTES = 5 * 1024 * 1024 * 1024
 
-const SAMPLE_PDF = 'https://mozilla.github.io/pdf.js/web/compressed.tracemonkey-pldi-09.pdf'
-const SAMPLE_IMG = 'https://picsum.photos/seed/jpai-attach/1200/800'
+/** 同源样例（public/attachment-samples），避免外链 CORS / 空地址导致无法预览 */
+const sampleUrl = (name: string) => {
+  const base = (import.meta.env.BASE_URL || '/').replace(/\/?$/, '/')
+  return `${base}attachment-samples/${name}`
+}
+
+const SAMPLE = {
+  pdf: sampleUrl('process-flow.pdf'),
+  xlsx: sampleUrl('product-size.xlsx'),
+  docx: sampleUrl('customer-confirm.docx'),
+  img: sampleUrl('product-photo.jpg'),
+}
 
 const delay = (ms = 180) => new Promise((r) => setTimeout(r, ms))
 
@@ -82,49 +92,48 @@ const ensureSeed = (bizType: string, bizId: string) => {
       bizType,
       bizId,
       name: '工艺流程图.pdf',
-      size: Math.round(2.8 * 1024 * 1024),
+      size: 1016315,
       ext: 'pdf',
       category: 'process',
       uploader: '张三',
       uploadTime: '2026-03-20 14:32',
-      url: SAMPLE_PDF,
+      url: SAMPLE.pdf,
     },
     {
       id: `${bizId}-a2`,
       bizType,
       bizId,
       name: '产品尺寸表.xlsx',
-      size: Math.round(1.2 * 1024 * 1024),
+      size: 17254,
       ext: 'xlsx',
       category: 'production',
       uploader: '李四',
       uploadTime: '2026-03-19 10:15',
-      // mock：无公开可预览源，请上传本地 Excel 体验预览
-      url: '',
+      url: SAMPLE.xlsx,
     },
     {
       id: `${bizId}-a3`,
       bizType,
       bizId,
       name: '客户确认单.docx',
-      size: Math.round(856 * 1024),
+      size: 1311881,
       ext: 'docx',
       category: 'customer',
       uploader: '王五',
       uploadTime: '2026-03-18 16:48',
-      url: '',
+      url: SAMPLE.docx,
     },
     {
       id: `${bizId}-a4`,
       bizType,
       bizId,
-      name: '外观效果图.png',
-      size: Math.round(3.4 * 1024 * 1024),
-      ext: 'png',
+      name: '外观效果图.jpg',
+      size: 112105,
+      ext: 'jpg',
       category: 'drawing',
       uploader: '赵六',
       uploadTime: '2026-03-17 09:20',
-      url: SAMPLE_IMG,
+      url: SAMPLE.img,
     },
   ]
   store.set(key, seed)

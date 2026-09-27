@@ -1,0 +1,90 @@
+﻿no|fDeptID|dc| 
+--|-------|--|-
+1020120250326001|3|10201|5
+1020120250326002|3|10201|5
+1020120250326003|3|10201|5
+1020120260226001|3|10201|5
+1020120260226002|3|10201|5
+1020120260226003|3|10201|5
+1020120260226004|3|10201|5
+1020120260226005|3|10201|5
+1020120260226006|3|10201|5
+1020120260228001|3|10201|5
+1020120260326001|3|10201|5
+1020120260326002|3|10201|5
+1020120260326003|3|10201|5
+1020120260326004|3|10201|5
+1020120260326005|3|10201|5
+name|def
+----|---
+Sp_PLS020_UpdateOwt|create proc dbo.Sp_PLS020_UpdateOwt
+   @where nvarchar(max)
+ , @UserCode varchar(8)
+ , @UserName nvarchar(32)
+ , @IsUnApprove bit = 0 
+ , @Success  BIT=1 OUTPUT 
+ , @msg varchar(max)='' OUTPUT 
+ , @HasOutputed INT=1     --是否返回检查结果 0:不返回 1:返回 3:PDA调用
+Sp_PLS020_UpdateOwt_Del|create proc dbo.Sp_PLS020_UpdateOwt_Del
+   @Where nvarchar(1000)
+ , @UserCode varchar(8)
+ , @UserName nvarchar(32)
+as
+/*
+功能: 非生产派工单完工确认审核时，更新非生产派工单细表完工数量
+作者: LiuXX
+日期: 2011-12-01
+备注: 该SP是在删除之前调用
+begin tran
+ exec Sp_PLS020_UpdateOwt_Del ' where ((fowtfnno=N
+Sp_PLS020_UpdateOwtEditSave|create proc dbo.Sp_PLS020_UpdateOwtEditSave
+   @where nvarchar(max)
+ , @UserCode varchar(8)
+ , @UserName nvarchar(32)
+ , @EditMode VARCHAR(50)='Edit' 
+as
+/*
+功能: 非生产派工单完工确认修改保存时，先还原非生产派工单的完工数量和完工日期
+	  因可能删除的非生产派工单不在保存后的非生产派工单完工申报中，导致删除掉的派工单更新不了数量和完工
+Sp_PLS020_UpdateOwtFnQty|CREATE proc dbo.Sp_PLS020_UpdateOwtFnQty
+   @msg nvarchar(512) = '' output
+ , @HasOutputed INT = 0 output
+ , @userCode varchar(8), @userName nvarchar(32)
+as
+/*
+功能: 非生产派工单完工确认审核时，更新非生产派工单细表完工数量
+作者: LiuXX Sp_PLS020_UpdateOwtFnQty ,'A026001466'
+日期: 20
+Sp_RMID_Check_GetBillList|
+ 
+/*
+存储过程名：dbo.Sp_RMID_Check_GetBillList  
+存储过程描述： 材料仓（非条码仓库）盘点单数据加载列表接口
+创建人：   ZhangXB  
+创建日期： 2022-02-21
+note: DC01027610   
+  
+Date         Modifier      Remark                                  
+-----------------------------------------------
+name
+----
+PK_t_CUTD_FabricOptimizedBillNo
+sp_INVD_StkInHaveBillNo_WMS
+sp_INVD_StkInNotBillNo_WMS
+sp_INVD_StkInNotBillNo_WMS_PUR
+Sp_RMID_Check_GetBillList
+Sp_RWSD_GetBillFilterList
+Sp_RWSD_GetBillFilterValueList
+Sp_RWSD_InRegistGetBillInfo
+Sp_RWSD_PurQCGetBillList
+Sp_RWSD_PurRec_GetBillList
+Sp_RWSD_QryDelvGetBillList
+Sp_RWSD_RecListGetBillInfo
+Sp_RWSD_StkInOnShelves_GetBillList
+Sp_TrayPDACommon_GetBillLogData
+Sp_TrayPDADlvBatchStkOut_GetBillList
+Sp_TrayPDASaleStkOut_GetBillList
+Sp_TrayPDAStkInOutRtnNotunique_GetBillList
+Sp_TrayPDAStkInQry_GetBillFilterList
+Sp_TrayPDAStkInQry_GetBillList
+Sp_TrayPDAStkOutQry_GetBillFilterList

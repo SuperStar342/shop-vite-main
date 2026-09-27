@@ -1,0 +1,16 @@
+﻿name
+----
+Sp_Sys_GetNewID
+Sp_Sys_GetNewID_BySeq
+Sp_Sys_GetNewID_BySeq_V2
+Sp_Sys_GetNewID_Sub
+fseqName
+--------
+iden_so_t_CRMD_WFFunction
+seq_BMSD_SerialNum_t_ACPD_PayMst_202602
+seq_BMSD_SerialNum_t_ACPD_PayMst_202603
+seq_BMSD_SerialNum_t_ACPD_PayMst_202604
+seq_BMSD_SerialNum_t_ACPD_PayMst_202605
+COLUMN_NAME
+-----------
+fseqName

@@ -296,6 +296,7 @@ import {
   type OtherDispatchWorkerRow,
 } from '/@/api/nonProd/otherDispatch'
 import OtherDispatchFormDrawer from './OtherDispatchFormDrawer.vue'
+import { Row } from '@opentiny/vue'
 
 defineOptions({
   name: 'OtherDispatch',
@@ -877,8 +878,11 @@ onBeforeUnmount(() => {
 }
 
 .od-owtno {
-  font-family: ui-monospace, monospace;
-  color: var(--el-color-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-weight: 700;
+  font-size: 13px;
+  color: #1d4ed8;
+  letter-spacing: 0.02em;
 }
 
 @media (max-width: 1200px) {

@@ -40,13 +40,46 @@ export type DispatchStatsWagePoint = {
   wage: number
 }
 
+export type DispatchStatsNonProdWageSlice = {
+  name: string
+  wage: number
+  count: number
+  percent: number
+}
+
+export type DispatchStatsNonProdDaily = {
+  date: string
+  day?: string
+  hourWage: number
+  pieceWage: number
+  totalWage: number
+  hourPercent: number
+  piecePercent: number
+}
+
+export type DispatchStatsNonProdEmpWage = {
+  rank: number
+  empName: string
+  hourWage: number
+  pieceWage: number
+  totalWage: number
+  hourPercent: number
+  piecePercent: number
+}
+
 export type DispatchStatsEmpRank = {
   rank: number
+  empNo?: string
   empName: string
   dispatchHours: number
   reportHours: number
   rate: number
   wage: number
+  hourWage?: number
+  pieceWage?: number
+  totalWage?: number
+  hourPercent?: number
+  piecePercent?: number
 }
 
 export type DispatchStatsPrcRank = {
@@ -76,6 +109,14 @@ export type DispatchStatsPayload = {
   processDist: DispatchStatsProcessSlice[]
   processTotalHours: number
   wageTrend: DispatchStatsWagePoint[]
+  nonProdWageDist?: DispatchStatsNonProdWageSlice[]
+  nonProdWageTotal?: number
+  nonProdHourWage?: number
+  nonProdPieceWage?: number
+  nonProdHourPercent?: number
+  nonProdPiecePercent?: number
+  nonProdDaily?: DispatchStatsNonProdDaily[]
+  nonProdEmpWage?: DispatchStatsNonProdEmpWage[]
   empTop: DispatchStatsEmpRank[]
   prcTop: DispatchStatsPrcRank[]
   unreportedTop: DispatchStatsUnreported[]
@@ -96,3 +137,5 @@ export async function getDispatchStats(params?: DispatchStatsQuery): Promise<Dis
   })
   return unwrap(res) as DispatchStatsPayload
 }
+
+

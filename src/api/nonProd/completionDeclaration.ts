@@ -114,6 +114,7 @@ export interface CompletionStats {
 
 export interface DeptOption {
   deptId: number
+  deptCode?: string
   deptName: string
 }
 
@@ -266,8 +267,87 @@ export async function getCompletionDeptOptions() {
   const arr = Array.isArray(data) ? data : []
   return arr.map((row: any) => ({
     deptId: Number(row.deptId) || 0,
+    deptCode: row.deptCode || '',
     deptName: row.deptName || '',
   })) as DeptOption[]
+}
+
+export async function getCompletionActiveDepts() {
+  const res: any = await request({
+    url: `${BASE}/active-depts`,
+    method: 'get',
+  })
+  const data = unwrap(res)
+  const arr = Array.isArray(data) ? data : []
+  return arr.map((row: any) => ({
+    deptId: Number(row.deptId) || 0,
+    deptCode: row.deptCode || '',
+    deptName: row.deptName || '',
+  })) as DeptOption[]
+}
+
+export async function getNextCompletionFnNo(deptId: number, fnDate: string) {
+  const res: any = await request({
+    url: `${BASE}/next-fn-no`,
+    method: 'get',
+    params: { deptId, fnDate },
+  })
+  return String(unwrap(res) || '')
+}
+
+export async function generateCompletionDetails(deptId: number, excludeFnNo?: string) {
+  const res: any = await request({
+    url: `${BASE}/generate-details`,
+    method: 'get',
+    params: { deptId, excludeFnNo: excludeFnNo || undefined },
+  })
+  const data = unwrap(res)
+  if (!data) return null
+  const master = mapMaster(data)
+  master.items = (data.items || []).map(mapItem)
+  master.workers = (data.workers || []).map(mapWorker)
+  return master
+}
+
+export async function submitCompletion(payload: Partial<CompletionRow>) {
+  const res: any = await request({
+    url: `${BASE}/submit`,
+    method: 'post',
+    data: payload,
+  })
+  const envelope = res?.data != null && (res.config != null || res.status != null) ? res.data : res
+  const fnNo = unwrap(res)
+  return {
+    code: envelope?.code ?? 200,
+    success: envelope?.success ?? true,
+    msg: envelope?.msg || '保存成功',
+    data: fnNo != null ? String(fnNo) : '',
+  }
+}
+
+export async function updateCompletion(payload: Partial<CompletionRow>) {
+  const res: any = await request({
+    url: `${BASE}/update`,
+    method: 'post',
+    data: payload,
+  })
+  const envelope = res?.data != null && (res.config != null || res.status != null) ? res.data : res
+  const fnNo = unwrap(res)
+  return {
+    code: envelope?.code ?? 200,
+    success: envelope?.success ?? true,
+    msg: envelope?.msg || '保存成功',
+    data: fnNo != null ? String(fnNo) : '',
+  }
+}
+
+export async function removeCompletion(fnNo: string) {
+  const res: any = await request({
+    url: `${BASE}/remove`,
+    method: 'post',
+    params: { fnNo },
+  })
+  return adaptMsg(res, '删除成功')
 }
 
 export async function auditCompletion(fnNo: string, approve = true) {

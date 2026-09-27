@@ -449,7 +449,6 @@ const readWidth = () => {
   }
   return Math.min(max, DRAWER_DEFAULT)
 }
-
 const drawerWidth = ref(typeof window === 'undefined' ? DRAWER_DEFAULT : readWidth())
 const drawerSize = computed(() => `${drawerWidth.value}px`)
 const resizing = ref(false)

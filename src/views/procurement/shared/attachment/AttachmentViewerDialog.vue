@@ -88,7 +88,17 @@ const indexLabel = computed(() => {
 
 const viewerKey = computed(() => current.value?.id || 'empty')
 const viewerFile = computed(() => current.value?.file || undefined)
-const viewerUrl = computed(() => current.value?.url || '')
+const viewerUrl = computed(() => {
+  const raw = current.value?.url || ''
+  if (!raw || viewerFile.value) return ''
+  // 相对路径转绝对地址，便于 File Viewer fetch
+  if (/^(https?:|blob:|data:)/i.test(raw)) return raw
+  try {
+    return new URL(raw, window.location.origin).href
+  } catch {
+    return raw
+  }
+})
 
 const viewerOptions = {
   theme: 'light' as const,

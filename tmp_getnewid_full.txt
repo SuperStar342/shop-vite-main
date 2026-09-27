@@ -1,0 +1,226 @@
+﻿
+/****** Object:  Stored Procedure dbo.Sp_Sys_GetNewID    Script Date: 2016-05-10 13:37:47 ******/
+/* 根据单据号产生新的 ID  
+  
+一般用于新增单据时,单据号还没有确定.  
+如新增一订单, 订单号还未填写或写自动产生, 用户可能先加附件, 那么这些附件就不能依赖订单号,  
+可这样处理: 用户点新增按钮后,立即获取new id , 后面加个附件依赖于这个id  
+   
+注意: 不能在事务中调用本sp  
+    不保证id连续  
+   占用多个id的话,需要自己额外处理  
+  
+Date  Modifier  Remark  
+--------------------------------------------------  
+20230314 yyj   刘杰反馈有客户是sql>=2012,但当时未启用参数，有使用序列对象产生货品id.
+               判断改为  sql>= 2012   and 有序列对象，就行了
+
+20230313 yyj   不能只根据sql是否>= 2012,启用序列对象，还要加参数 Adm_IfGetBillBySqlSeqObj 判断 
+20150108 yyj   create this  
+20150326 ggw   增加根据单据分组来取最大ID  
+20150824 ggw   支持传入表名，且单据号为空  
+20151218  tanwh  修改newid产生过程  
+20160510  yyj     @DBTable没有值,就将 @ReceiptCode 赋给它
+20210609  yyj	  参考zhib版本,	  改为调用 Sp_Sys_GetNewID_BySeq , 
+				现判断是 sql2012 就用序列对象
+20211105  liuj  F19序号种子默认为3
+
+
+exec Sp_Sys_GetNewID @ReceiptCode='CRM011', @nums=1 ,@Debug=1  
+  
+ select * from t_SysM_ReceiptNewID   
+exec Sp_Sys_GetNewID @ReceiptCode='YYJTest', @nums=100  select * from t_SysM_ReceiptNewID   
+  
+  
+ 
+exec Sp_Sys_GetNewID @ReceiptCode=@receipt, @nums=1  select * from t_SysM_ReceiptNewID  where freceiptcode=@receipt  
+  
+  
+exec sp_Sys_LockSQLObj @SqlObj='Sp_Sys_GetNewID'  
+ use hse 
+*/  
+  
+  
+CREATE proc dbo.Sp_Sys_GetNewID  
+       @ReceiptCode varchar(50) ,  --单据编码  
+       @Nums int = 1 ,      --想占用id的个数  
+       @ID int = 0 output ,     --返回的id  
+       @RtnTblResult bit = 1 ,    --以结果的形式返回 id  
+       @AutoNew bit = 1 ,      --单据不存在,自动产生记录  
+       @Debug bit = 0 ,  
+       @DBTable varchar(50) = ''  /*数据表 ggw 20150824 add*/  
+as   
+
+set nocount on 
+
+       Declare @ts TIMESTAMP ,  
+               @msg nvarchar(500) ,  
+               @Group VARCHAR(50) ,  
+               @count int  
+
+
+      declare @UseSeqObj bit      --20230313 yyj 是否启用序列对象取货品ID
+      select @UseSeqObj=0
+
+        if DATABASEPROPERTYEX( 'master','version')>=706
+        begin
+                if    dbo.fn_getsyscodevalue('Adm_IfGetBillBySqlSeqObj')=1
+                     select  @UseSeqObj=1
+
+               --20230314 yyj 改判断 
+               if  @UseSeqObj=0
+               begin
+                 IF   exists(SELECT * FROM sys.sequences a WITH(nolock) WHERE a.name='iden_so_t_BOMM_GoodsMst_F19')
+                     select  @UseSeqObj=1
+               end 
+        end 
+
+	  --20210609 yyj 加新方式返回 id 值
+	   if  @UseSeqObj=0 --20230313 YYJ  DATABASEPROPERTYEX( 'master','version')<706
+	   BEGIN
+		    IF @ReceiptCode = 't_BOMM_GoodsMst_F19' --F19序列默认初始值为3亿
+			BEGIN
+				IF NOT EXISTS(SELECT 1 FROM t_SysM_ReceiptNewID a WITH(NOLOCK) WHERE a.fReceiptCode=@ReceiptCode)
+				BEGIN
+					 insert into t_SysM_ReceiptNewID(fReceiptCode,fNextID)
+                     select @ReceiptCode,300000000
+				end
+			end
+		 --拆开表,使用 identity 字段,只是相对原来的集中在一个表有些改善
+		 exec  Sp_Sys_GetNewID_Sub  
+			@receiptcode=@ReceiptCode 
+			,@Nums=@Nums
+			,@NewID=@Id output
+			,@RtnTblResult =@RtnTblResult
+			,@Debug=@Debug
+			,@DBTable=@DBTable
+			
+	   end
+	   else 
+	   BEGIN
+			 IF @ReceiptCode = 't_BOMM_GoodsMst_F19'  --F19序列默认初始值为3亿
+			 BEGIN
+					DECLARE @SeqName VARCHAR(50), @sno int;
+					SELECT @SeqName='iden_so_t_BOMM_GoodsMst_F19'
+					IF not exists(SELECT * FROM sys.sequences a  WITH(nolock) WHERE a.name=@SeqName)
+					begin
+						 EXEC dbo.Sp_Sys_GetNewID_BySeq @ReceiptCode = @ReceiptCode,@NewID = @sno OUT,@RtnTblResult = 0;
+						 exec Sp_Seq_UpdateSeqCurValue  @SeqName,300000000; 
+					END
+			 END
+			  exec Sp_Sys_GetNewID_BySeq   --  20210412 yyj 用序列对象
+				@receiptcode=@ReceiptCode 
+				,@Nums=@Nums
+				,@NewID=@Id output
+				,@RtnTblResult =@RtnTblResult
+				,@Debug=@Debug
+				,@DBTable=@DBTable
+	   END
+ 
+	  return 
+	  
+	   
+       if @Nums <= 0   
+          select    @Nums = 1  
+  
+       select   @ReceiptCode = isnull(@ReceiptCode , '') ,  
+                @DBTable = isnull(@DBTable , '')  
+  
+  		--20160510 yyj
+  		if len(@DBTable)=0 select @DBTable=@ReceiptCode
+
+       ReDo:  
+       select   @ts = a.fTimeStamp , @id = a.fNextID ,  
+                @group = a.fReceiptGroup  
+       from     t_SysM_ReceiptNewID a with ( nolock )  
+       where    a.freceiptcode = @DBTable  
+  
+     
+  
+       if @ts is null   
+          begin  
+			
+			if @ReceiptCode = 't_BOMM_GoodsMst_SFFC'
+			begin
+
+                insert  into t_SysM_ReceiptNewID ( freceiptcode , fnextid )  
+                values  ( @DBTable , 100000000 + @nums )  
+   
+                select  @id = 1  
+
+			end
+			else
+			begin
+
+                insert  into t_SysM_ReceiptNewID ( freceiptcode , fnextid )  
+                values  ( @DBTable , 1 + @nums )  
+   
+                select  @id = 1  
+
+			end
+          end   
+       else   
+          BEGIN  
+				
+				if @@trancount = 0
+				begin
+
+					begin tran
+
+					update  a  
+					set     a.fnextid = a.fnextid + @nums  
+					from    t_SysM_ReceiptNewID a
+					where   a.freceiptcode = @DBTable 
+
+					select @id = a.fnextid - @nums
+					from t_SysM_ReceiptNewID a with(nolock)
+					where a.freceiptcode = @DBTable 
+
+					commit tran 
+				end
+				else
+				begin
+					update  a  
+					set     a.fnextid = a.fnextid + @nums  
+					from    t_SysM_ReceiptNewID a
+					where   a.freceiptcode = @DBTable 
+
+					select @id = a.fnextid - @nums
+					from t_SysM_ReceiptNewID a with(nolock)
+					where a.freceiptcode = @DBTable 
+				end
+
+				----更新下一可用 ID   
+    --            update  a  
+    --            set     a.fnextid = @id + @nums  
+    --            from    t_SysM_ReceiptNewID a with ( nolock )  
+    --            where   a.freceiptcode = @DBTable  
+    --                    and a.fTimeStamp = @ts   --考虑到多用户操作  
+    
+    --            if @@rowcount = 0   
+    --               goto ReDo    
+  
+  
+          end   
+  
+  
+       if @RtnTblResult = 1   
+          begin  
+                select  fid = @id , fid2 = @id + @nums - 1 ,  
+                        fnextid = @id + @nums , fts = @ts  
+          end                      
+  
+    
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,31 @@
+﻿TABLE_NAME
+----------
+t_ADMD_ProgNodeEfficBillLog
+t_ADMD_ProgNodeEfficBillSts
+t_CUTD_FabricOptimizedBillNo
+TABLE_NAME
+----------
+TABLE_CATALOG|TABLE_SCHEMA|TABLE_NAME|COLUMN_NAME|ORDINAL_POSITION|COLUMN_DEFAULT|IS_NULLABLE|DATA_TYPE|CHARACTER_MAXIMUM_LENGTH|CHARACTER_OCTET_LENGTH|NUMERIC_PRECISION|NUMERIC_PRECISION_RADIX|NUMERIC_SCALE|DATETIME_PRECISION|CHARACTER_SET_CATALOG|CHARACTER_SET_SCHEMA|CHARACTER_SET_NAME|COLLATION_CATALOG|COLLATION_SCHEMA|COLLATION_NAME|DOMAIN_CATALOG|DOMAIN_SCHEMA|DOMAIN_NAME
+-------------|------------|----------|-----------|----------------|--------------|-----------|---------|------------------------|----------------------|-----------------|-----------------------|-------------|------------------|---------------------|--------------------|------------------|-----------------|----------------|--------------|--------------|-------------|-----------
+F19_ERP_TEST|dbo|t_NSMD_CloudWayBill|fParentWaybillCode|4|
+
+-------combine file-----00000160_DF_Empty.sql---start--10/1600
+
+/****** 对象: 默认值 dbo.DF_Empty    脚本日期: 2010-12-11 8:54:11 ******/
+
+/****** 对象: 默认值 dbo.df_empty    脚本日期: 2008-10-23 8:27:04 ******/
+CREATE DEFAULT  dbo.DF_Empty AS '' 
+
+
+|NO|varchar|200|200|NULL|NULL|NULL|NULL|NULL|NULL|cp936|NULL|NULL|Chinese_PRC_CI_AS|NULL|NULL|NULL
+F19_ERP_TEST|dbo|t_NSMD_CloudWayBill|fWaybillCode|3|
+
+-------combine file-----00000160_DF_Empty.sql---start--10/1600
+
+/****** 对象: 默认值 dbo.DF_Empty    脚本日期: 2010-12-11 8:54:11 ******/
+
+/****** 对象: 默认值 dbo.df_empty    脚本日期: 2008-10-23 8:27:04 ******/
+CREATE DEFAULT  dbo.DF_Empty AS '' 
+
+
+|NO|varchar|200|200|NULL|NULL|NULL|NULL|NULL|NULL|cp936|NULL|NULL|Chinese_PRC_CI_AS|NULL|NULL|NULL

@@ -1,0 +1,168 @@
+﻿
+  
+   
+/* 使用 identity 字段,根据单据号产生新的 ID    
+    
+一般用于新增单据时,单据号还没有确定.    
+如新增一订单, 订单号还未填写或写自动产生, 用户可能先加附件, 那么这些附件就不能依赖订单号,    
+可这样处理: 用户点新增按钮后,立即获取new id , 后面加个附件依赖于这个id    
+     
+注意: 不能在事务中调用本sp    
+    不保证id连续    
+   占用多个id的话,需要自己额外处理    
+    
+Date  Modifier  Remark    
+-------------------------------------------------- 
+20220310  yyj   原先的间隔 800 就删除算法存在问题 ，现改为  if (@NewID % 1000) >=999    
+20211105  liuj  屏蔽此段逻辑  
+20210408  yyj   create this  ,根据 Sp_Sys_GetNewID 而来  
+   
+  
+  
+exec Sp_Sys_GetNewID  @ReceiptCode='yyjtest2'  
+  , @nums=1   
+    
+exec Sp_Sys_GetNewID  @ReceiptCode='yyjtest2'  
+  , @nums=10  
+    --11  
+drop table iden_YYJTest2   
+  
+declare @receipt varchar(50) ,@tbl varchar(100)  
+select @receipt='t_BOMM_ActFgPropertyItem_NS_ATT17' --'YYJTest2' --随机单据,模拟一新单据    
+exec Sp_Sys_GetNewID_Sub @ReceiptCode=@receipt, @nums=1  
+select @tbl='iden_'+@receipt  
+exec('select * from '+@tbl)  
+select    ident_current(@tbl)  
+--select * from t_SysM_ReceiptNewID a where a.freceiptcode=@receipt  
+    
+select * from iden_yyjtest2  
+truncate table iden_YYJTest2  
+  
+select    ident_current('iden_yyjtest')  
+select    ident_current('iden_yyjtest2')  
+select * from t_SysM_ReceiptNewID a where a.freceiptcode='YYJTest'  
+  
+exec sp_Sys_LockSQLObj @SqlObj='Sp_Sys_GetNewID_Sub'    
+    
+*/    
+    
+    
+create proc dbo.Sp_Sys_GetNewID_Sub    
+       @ReceiptCode varchar(50) ,  --单据编码    
+       @Nums int = 1 ,            --想占用id的个数    
+       @NewID int = 0 output ,     --返回的id    
+       @RtnTblResult bit = 1 ,    --以结果的形式返回 id    
+       @Debug bit = 0 ,    
+       @DBTable varchar(50) = ''      
+as     
+       Declare @ts TIMESTAMP ,    
+               @msg nvarchar(500) ,    
+      @oldid int, @startIden int  
+    
+  
+   
+       if @Nums <= 0     
+          select    @Nums = 1    
+    
+       select   @ReceiptCode = isnull(@ReceiptCode , '') ,    
+                @DBTable = isnull(@DBTable , '')    
+    
+   
+    if len(@DBTable)=0 select @DBTable=@ReceiptCode  
+  
+  
+     
+    declare @idTbl varchar(300),@sql nvarchar(max)  
+   ,@next int,@tblExisted bit  
+    select @idTbl='iden_'+@DBTable   
+  
+    select @tblExisted=1  
+       if object_id(@idTbl) is null  
+    begin  
+   select @tblExisted=0  
+   select @sql='create table dbo.'+@idTbl+'(rid  int identity(1,1),fcdate datetime,fts timestamp) '  
+   exec(@sql)   
+  
+   select @newID=1  
+    end   
+    else   
+    begin  
+    select @newID=  ident_current(@idTbl)+1  
+    end   
+   
+  
+    if @newID<1 select @newID=1 --下一个新值  
+    
+    
+      
+    select @oldid=0  
+    if @newID<2 --第一次建立表时,上面取出来的 @newID=1 ,这时需要从原来的 t_SysM_ReceiptNewID 取id比较  
+    begin   
+     select   @oldid = a.fNextID      
+     --,@group = a.fReceiptGroup    
+     from     t_SysM_ReceiptNewID a with ( nolock )    
+     where    a.freceiptcode = @DBTable    
+      
+    end   
+  
+  -- 20200421 wuwx add 增加此分支  
+  --20211105  liuj 屏蔽此段逻辑  
+  --IF @DBTable='t_POMD_OrdSubPackageMst'--t_POMD_OrdSubPackageMst  
+  --BEGIN  
+       
+  -- DECLARE @MaxOrdSubPackageMstID INT   
+  -- SELECT @MaxOrdSubPackageMstID=MAX(fID)  
+  -- FROM t_POMD_OrdSubPackageMst WITH(NOLOCK)  
+  -- SELECT @MaxOrdSubPackageMstID=ISNULL(@MaxOrdSubPackageMstID,0)  
+  
+  -- select @oldid= @MaxOrdSubPackageMstID +1  
+  --end   
+  
+  
+    if @Oldid>0  
+    begin  
+     if @newID<@oldid --自动切换  
+     begin  
+    select @newID=@oldid   
+  
+     end   
+    end   
+      
+   
+    
+    
+  select @sql='insert '+@idTbl+'(fcdate) values (getdate())'  
+  exec(@sql)  
+  
+    select @next=@newID+@Nums-1  
+  
+   if @Nums>1  
+   begin  
+     dbcc checkident (@idTbl, reseed,@next )  
+   end   
+  
+   
+   
+    select @ts=0x  
+  
+    --SELECT 100 %  1000  
+   --尽量保留一条记录,以便直观看到最大id  
+    declare @hour int 
+    select @hour=DATEPART(hour,getdate())
+    if @hour>=17 and @hour<18 
+      and (@NewID % 1000) >=999  --20220310  相当于每 999 条删除一次
+    Begin  
+		 select @sql='delete a from '+ @idtbl +' a where rid<' + convert(varchar(20),@newID)  
+		 exec(@sql)  
+    end   
+  
+  
+     if @RtnTblResult = 1     
+        begin    
+            select  fid = @newID  , fid2 =@newID+@Nums-1 ,    
+                    fnextid = @newID+@Nums, fts = @ts    
+        end    
+  
+  
+   
+  

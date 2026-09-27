@@ -4,12 +4,12 @@ const TokenKey = 'saber3-access-token'
 const RefreshTokenKey = 'saber3-refresh-token'
 const TokenExpireAtKey = 'saber3-token-expire-at'
 
-/** saber3 默认 access_token_validity = 3600s */
-export const DEFAULT_ACCESS_EXPIRES_IN = 3600
+/** saber3 默认 access_token_validity；库表可调至 86400（见 scripts/blade_extend_token_validity.sql） */
+export const DEFAULT_ACCESS_EXPIRES_IN = 86400
 
 /** access cookie：略长于常见 access 有效期，续期时会重写 */
-const ACCESS_COOKIE_DAYS = 1
-/** refresh cookie：与后端 refresh_token_validity(默认 7 天) 对齐 */
+const ACCESS_COOKIE_DAYS = 2
+/** refresh cookie：与后端 refresh_token_validity(默认 30 天) 对齐 */
 const REFRESH_COOKIE_DAYS = 30
 
 export function getToken() {
@@ -78,8 +78,8 @@ export function getTokenExpireAt(): number {
   return peekJwtExpireAt()
 }
 
-/** 是否临近过期（默认提前 10 分钟刷新；适配 saber3 1 小时 access） */
-export function isTokenNearExpiry(skewMs = 10 * 60 * 1000): boolean {
+/** 是否临近过期（默认提前 30 分钟刷新；适配加长后的 access） */
+export function isTokenNearExpiry(skewMs = 30 * 60 * 1000): boolean {
   const at = getTokenExpireAt()
   if (!at) return !!getToken()
   return Date.now() >= at - skewMs

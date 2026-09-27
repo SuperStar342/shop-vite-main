@@ -75,7 +75,14 @@
         <div v-if="!list.length" class="ad-empty">
           <el-empty description="暂无附件" :image-size="72" />
         </div>
-        <div v-for="item in list" :key="item.id" class="ad-item">
+        <div
+          v-for="item in list"
+          :key="item.id"
+          class="ad-item"
+          :class="{ 'is-hover': hoverItem?.id === item.id }"
+          @mouseenter="onItemEnter(item, $event)"
+          @mouseleave="onItemLeave"
+        >
           <div class="ad-item-icon" :class="`ext-${iconKind(item.ext)}`">
             {{ (item.ext || '?').slice(0, 4).toUpperCase() }}
           </div>
@@ -91,15 +98,15 @@
               <span>{{ item.uploadTime }}</span>
             </div>
           </div>
-          <div class="ad-item-actions">
+          <div class="ad-item-actions" @mouseenter.stop @mousedown.stop>
             <el-tooltip content="预览" placement="top">
-              <el-button circle :icon="View" size="small" text type="primary" @click="openPreview(item)" />
+              <el-button circle :icon="View" size="small" text type="primary" @click.stop="openPreview(item)" />
             </el-tooltip>
             <el-tooltip content="下载" placement="top">
-              <el-button circle :icon="Download" size="small" text @click="downloadOne(item)" />
+              <el-button circle :icon="Download" size="small" text @click.stop="downloadOne(item)" />
             </el-tooltip>
             <el-tooltip content="删除" placement="top">
-              <el-button circle :icon="Delete" size="small" text type="danger" @click="removeOne(item)" />
+              <el-button circle :icon="Delete" size="small" text type="danger" @click.stop="removeOne(item)" />
             </el-tooltip>
           </div>
         </div>
@@ -118,6 +125,44 @@
       </footer>
     </div>
 
+    <teleport to="body">
+      <div
+        v-if="hoverItem && hoverVisible"
+        class="ad-hover-preview"
+        :style="hoverPanelStyle"
+        @mouseenter="onHoverPanelEnter"
+        @mouseleave="onItemLeave"
+      >
+        <div class="ad-hover-preview__hd">
+          <span class="ad-hover-preview__name" :title="hoverItem.name">{{ hoverItem.name }}</span>
+          <el-button link size="small" type="primary" @click="openPreview(hoverItem)">完整预览</el-button>
+        </div>
+        <div class="ad-hover-preview__bd">
+          <img
+            v-if="hoverKind === 'image'"
+            class="ad-hover-preview__img"
+            :alt="hoverItem.name"
+            :src="hoverResolvedUrl"
+          />
+          <iframe
+            v-else-if="hoverKind === 'pdf'"
+            class="ad-hover-preview__frame"
+            :src="hoverResolvedUrl"
+            title="pdf-preview"
+          />
+          <file-viewer
+            v-else-if="hoverKind === 'office' && (hoverItem.file || hoverResolvedUrl)"
+            :key="hoverItem.id"
+            class="ad-hover-preview__viewer"
+            :file="hoverItem.file"
+            :options="hoverViewerOptions"
+            :url="hoverItem.file ? undefined : hoverResolvedUrl"
+          />
+          <el-empty v-else description="暂不支持悬停预览" :image-size="56" />
+        </div>
+      </div>
+    </teleport>
+
     <attachment-viewer-dialog
       v-model="viewerVisible"
       v-model:current-id="viewerId"
@@ -129,6 +174,7 @@
 
 <script lang="ts" setup>
 import { Close, Delete, Download, Search, UploadFilled, View } from '@element-plus/icons-vue'
+import { FileViewer } from '@file-viewer/vue3-full'
 import {
   ATTACHMENT_ACCEPT,
   ATTACHMENT_CATEGORIES,
@@ -187,12 +233,45 @@ const storage = reactive<AttachmentStorageInfo>({
 const viewerVisible = ref(false)
 const viewerId = ref('')
 
+const hoverItem = ref<BizAttachment | null>(null)
+const hoverVisible = ref(false)
+const hoverPanelStyle = ref<Record<string, string>>({})
+let hoverEnterTimer: ReturnType<typeof setTimeout> | null = null
+let hoverLeaveTimer: ReturnType<typeof setTimeout> | null = null
+
+const hoverViewerOptions = {
+  theme: 'light' as const,
+  toolbar: { position: 'bottom-right' as const },
+}
+
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 const typeOptions = computed(() => {
   const set = new Set<string>()
   for (const a of list.value) if (a.ext) set.add(a.ext)
   return [...set].sort()
+})
+
+const resolveUrl = (item: BizAttachment | null) => {
+  if (!item) return ''
+  const raw = item.url || ''
+  if (!raw) return ''
+  if (/^(https?:|blob:|data:)/i.test(raw)) return raw
+  try {
+    return new URL(raw, window.location.origin).href
+  } catch {
+    return raw
+  }
+}
+
+const hoverResolvedUrl = computed(() => resolveUrl(hoverItem.value))
+
+const hoverKind = computed(() => {
+  const e = (hoverItem.value?.ext || '').toLowerCase()
+  if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(e)) return 'image'
+  if (e === 'pdf') return 'pdf'
+  if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'csv', 'txt'].includes(e)) return 'office'
+  return 'other'
 })
 
 const iconKind = (ext: string) => {
@@ -203,6 +282,61 @@ const iconKind = (ext: string) => {
   if (['ppt', 'pptx'].includes(e)) return 'ppt'
   if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(e)) return 'img'
   return 'other'
+}
+
+const clearHoverTimers = () => {
+  if (hoverEnterTimer) {
+    clearTimeout(hoverEnterTimer)
+    hoverEnterTimer = null
+  }
+  if (hoverLeaveTimer) {
+    clearTimeout(hoverLeaveTimer)
+    hoverLeaveTimer = null
+  }
+}
+
+const placeHoverPanel = (el: HTMLElement) => {
+  const rect = el.getBoundingClientRect()
+  const panelW = 460
+  const panelH = Math.min(560, window.innerHeight - 32)
+  let left = rect.left - panelW - 12
+  if (left < 12) left = Math.max(12, rect.right + 12)
+  let top = rect.top - 8
+  if (top + panelH > window.innerHeight - 12) top = window.innerHeight - panelH - 12
+  if (top < 12) top = 12
+  hoverPanelStyle.value = {
+    left: `${left}px`,
+    top: `${top}px`,
+    width: `${panelW}px`,
+    height: `${panelH}px`,
+  }
+}
+
+const onItemEnter = (item: BizAttachment, e: MouseEvent) => {
+  if (viewerVisible.value) return
+  if (!item.file && !item.url) return
+  clearHoverTimers()
+  const el = e.currentTarget as HTMLElement
+  hoverEnterTimer = setTimeout(() => {
+    hoverItem.value = item
+    placeHoverPanel(el)
+    hoverVisible.value = true
+  }, 280)
+}
+
+const onHoverPanelEnter = () => {
+  clearHoverTimers()
+}
+
+const onItemLeave = () => {
+  if (hoverEnterTimer) {
+    clearTimeout(hoverEnterTimer)
+    hoverEnterTimer = null
+  }
+  hoverLeaveTimer = setTimeout(() => {
+    hoverVisible.value = false
+    hoverItem.value = null
+  }, 160)
 }
 
 const reloadMeta = async () => {
@@ -261,6 +395,14 @@ watch(activeCategory, () => {
   if (visible.value) reloadList()
 })
 
+watch(viewerVisible, (open) => {
+  if (open) {
+    clearHoverTimers()
+    hoverVisible.value = false
+    hoverItem.value = null
+  }
+})
+
 const beforeUpload = (file: File) => {
   if (!props.bizId) {
     $baseMessage('请先选择制令', 'warning', 'hey')
@@ -300,6 +442,9 @@ const openPreview = (item: BizAttachment) => {
     $baseMessage('该样例暂无预览源，请上传本地文件后预览', 'warning', 'hey')
     return
   }
+  clearHoverTimers()
+  hoverVisible.value = false
+  hoverItem.value = null
   viewerId.value = item.id
   viewerVisible.value = true
 }
@@ -333,6 +478,10 @@ const removeOne = async (item: BizAttachment) => {
     await deleteAttachment(item.id, props.bizType, props.bizId)
     $baseMessage('已删除', 'success', 'hey')
     if (viewerId.value === item.id) viewerVisible.value = false
+    if (hoverItem.value?.id === item.id) {
+      hoverVisible.value = false
+      hoverItem.value = null
+    }
     await reloadList()
   } catch (e: any) {
     $baseMessage(e?.message || '删除失败', 'error', 'hey')
@@ -340,9 +489,16 @@ const removeOne = async (item: BizAttachment) => {
 }
 
 const handleClosed = () => {
+  clearHoverTimers()
+  hoverVisible.value = false
+  hoverItem.value = null
   viewerVisible.value = false
   list.value = []
 }
+
+onBeforeUnmount(() => {
+  clearHoverTimers()
+})
 </script>
 
 <style lang="scss">
@@ -351,6 +507,61 @@ const handleClosed = () => {
     padding: 0;
     overflow: hidden;
   }
+}
+
+.ad-hover-preview {
+  position: fixed;
+  z-index: 4000;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid #e4e7ed;
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14);
+}
+
+.ad-hover-preview__hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #ebeef5;
+  background: #fafafa;
+}
+
+.ad-hover-preview__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.ad-hover-preview__bd {
+  flex: 1;
+  min-height: 0;
+  background: #f5f7fa;
+}
+
+.ad-hover-preview__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #111;
+}
+
+.ad-hover-preview__frame,
+.ad-hover-preview__viewer {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
 }
 </style>
 
@@ -458,7 +669,8 @@ const handleClosed = () => {
   padding: 10px 8px;
   border-radius: 8px;
   transition: background 0.15s;
-  &:hover {
+  &:hover,
+  &.is-hover {
     background: #f5f7fa;
   }
 }

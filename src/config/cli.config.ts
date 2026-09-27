@@ -36,7 +36,7 @@ export const cliConfig: {
   // 开启代码压缩 false | 'gzip' | 'brotli'
   compress: false,
   // 需要缓存到node_modules/.vite的模块
-  include: [],
+  include: ['jquery', 'vue-plugin-hiprint'],
   // 不需要缓存到node_modules/.vite的模块
   exclude: [],
   // 开发环境开启https

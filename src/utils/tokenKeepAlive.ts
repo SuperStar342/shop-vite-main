@@ -34,7 +34,7 @@ const resolveIntervalMs = () => {
 const resolveIdleMs = () => {
   const n = Number(idleLogoutTime)
   if (Number.isFinite(n) && n >= 60_000) return n
-  return 8 * 60 * 60 * 1000
+  return 1 * 60 * 60 * 1000
 }
 
 export const touchUserActivity = () => {
@@ -76,8 +76,12 @@ const tick = async () => {
 
   if (idleMs >= maxIdle) {
     stopTokenKeepAlive()
+    const idleLabel =
+      maxIdle % 3600000 === 0
+        ? `${Math.round(maxIdle / 3600000)} 小时`
+        : `${Math.round(maxIdle / 60000)} 分钟`
     ElMessage({
-      message: `超过 ${Math.round(maxIdle / 3600000)} 小时未操作，已自动退出登录`,
+      message: `超过 ${idleLabel}未操作，已自动退出登录`,
       type: 'warning',
       grouping: true,
     })

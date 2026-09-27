@@ -1,0 +1,10 @@
+﻿COLUMN_NAME
+-----------
+fCFlag
+fIfUse
+fPostType
+fWorkerType
+fAttendanceType
+fToxicType
+fYearType
+fifExflag

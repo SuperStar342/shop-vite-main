@@ -1,103 +1,14 @@
 <template>
   <div class="dt-page auto-height-container">
     <header class="dt-crumb">
-      <span>派工类型管理</span>
-      <el-icon><ArrowRight /></el-icon>
-      <strong>{{ formModeTitle }}</strong>
+      <template v-if="panelOpen">
+        <el-icon><ArrowRight /></el-icon>
+        <strong>{{ formModeTitle }}</strong>
+      </template>
     </header>
 
-    <div class="dt-body">
-      <!-- 左侧：添加/编辑表单（还原第 1 张） -->
-      <aside class="dt-form-card">
-        <h2 class="dt-form-card__title">{{ formModeTitle }}</h2>
-
-        <el-form ref="formRef" class="dt-form" label-position="top" :model="form" :rules="rules">
-          <section class="dt-section">
-            <h3>基本信息</h3>
-            <el-form-item label="派工类型代码" prop="code">
-              <el-input v-model.trim="form.code" :disabled="isEdit" maxlength="10" placeholder="请输入派工类型代码" />
-            </el-form-item>
-            <el-form-item label="派工类型名称" prop="name">
-              <el-input v-model.trim="form.name" maxlength="100" placeholder="请输入派工类型名称" />
-            </el-form-item>
-            <el-form-item label="是否启用">
-              <el-switch v-model="form.ifUse" active-text="启用" active-value="是" inactive-text="停用" inactive-value="否" />
-            </el-form-item>
-            <el-form-item label="计件类型" prop="pieceType">
-              <el-radio-group v-model="form.pieceType">
-                <el-radio value="团体计件">团体计件</el-radio>
-                <el-radio value="个人计件">个人计件</el-radio>
-              </el-radio-group>
-            </el-form-item>
-            <el-form-item label="控制属性" prop="controlAttr">
-              <el-radio-group v-model="form.controlAttr" class="dt-control-radios">
-                <el-radio value="无关联">无关联</el-radio>
-                <el-radio value="只关联单据">只关联单据</el-radio>
-                <el-radio value="关联货品">关联货品</el-radio>
-                <el-radio value="关联单据+货品">关联单据+货品</el-radio>
-              </el-radio-group>
-            </el-form-item>
-          </section>
-
-          <section class="dt-section">
-            <h3>派工单据选项</h3>
-            <el-form-item label="关联单据">
-              <div class="dt-inline">
-                <el-input v-model.trim="form.linkNo" clearable placeholder="关联单据代码" />
-                <el-checkbox v-model="canRepeatBool" class="dt-inline__check">单据是否可重复派工</el-checkbox>
-              </div>
-            </el-form-item>
-            <el-form-item label="关联表">
-              <el-input v-model.trim="form.linkTableName" clearable placeholder="关联表名" />
-            </el-form-item>
-            <el-form-item label="货品ID字段名">
-              <el-input v-model.trim="form.goodsField" clearable placeholder="如 fGoodsID" />
-            </el-form-item>
-            <el-form-item label="定制批号字段名">
-              <el-input v-model.trim="form.cstlotNoField" clearable placeholder="如 fCstLotNo" />
-            </el-form-item>
-            <el-form-item label="货品单位字段名">
-              <div class="dt-inline">
-                <el-input v-model.trim="form.unitField" clearable placeholder="如 fUnitName" />
-                <el-checkbox v-model="qtyLimitedBool" class="dt-inline__check">是否控制派工数量</el-checkbox>
-              </div>
-            </el-form-item>
-            <el-form-item label="计件数量字段名">
-              <el-input v-model.trim="form.qtyField" clearable placeholder="如 fWOQty" />
-            </el-form-item>
-            <el-form-item label="货品计件单位属性">
-              <el-select v-model="form.goodsUnitProp" clearable placeholder="请选择" style="width: 100%">
-                <el-option label="标准单位" value="标准单位" />
-                <el-option label="库存单位" value="库存单位" />
-                <el-option label="辅助单位" value="辅助单位" />
-              </el-select>
-            </el-form-item>
-            <el-form-item label="工号">
-              <el-input v-model.trim="form.empList" clearable placeholder="加工人员代号，逗号分隔" />
-            </el-form-item>
-            <el-form-item label="加工人员姓名">
-              <el-input v-model.trim="form.empListName" clearable placeholder="加工人员姓名" />
-            </el-form-item>
-            <el-form-item label="备注">
-              <el-input
-                v-model="form.remark"
-                :autosize="{ minRows: 2, maxRows: 4 }"
-                maxlength="200"
-                placeholder="请输入备注"
-                show-word-limit
-                type="textarea"
-              />
-            </el-form-item>
-          </section>
-
-          <div class="dt-form__footer">
-            <el-button @click="resetForm">重置</el-button>
-            <el-button :loading="saving" type="primary" @click="saveForm">保存</el-button>
-          </div>
-        </el-form>
-      </aside>
-
-      <!-- 右侧：列表 -->
+    <div class="dt-body" :class="{ 'has-panel': panelOpen }">
+      <!-- 列表（默认全宽） -->
       <section class="dt-list-card">
         <div class="dt-query">
           <el-form inline :model="queryForm" @submit.prevent>
@@ -127,7 +38,6 @@
         <div class="dt-toolbar">
           <div class="dt-toolbar__left">
             <el-button :icon="Plus" type="primary" @click="startCreate">新增</el-button>
-            <el-button :disabled="!currentRow" type="success" @click="startEdit(currentRow!)">修改</el-button>
             <el-button :disabled="!selected.length" :icon="Delete" type="danger" @click="handleBatchDelete">删除</el-button>
             <el-button :icon="Refresh" @click="fetchList">刷新</el-button>
           </div>
@@ -143,7 +53,7 @@
             highlight-current-row
             stripe
             @current-change="(row: DispatchTypeRow | undefined) => (currentRow = row || null)"
-            @row-click="(row: DispatchTypeRow) => startEdit(row)"
+            @row-dblclick="(row: DispatchTypeRow) => startView(row)"
             @selection-change="(rows: DispatchTypeRow[]) => (selected = rows)"
           >
             <el-table-column type="selection" width="44" />
@@ -187,7 +97,7 @@
               <el-table-column label="加工人员姓名" min-width="130" prop="empListName" show-overflow-tooltip />
             </template>
 
-            <el-table-column fixed="right" label="操作" width="120">
+            <el-table-column fixed="right" label="操作" width="160">
               <template #default="{ row }">
                 <el-button link type="primary" @click.stop="startEdit(row)">修改</el-button>
                 <el-button link type="danger" @click.stop="handleDelete([row.code])">删除</el-button>
@@ -207,12 +117,155 @@
           />
         </footer>
       </section>
+
+      <!-- 右侧表单面板：绝对定位，避免被父级 overflow 裁切 -->
+      <aside v-show="panelOpen" class="dt-form-card">
+        <div class="dt-form-card__head">
+          <h2 class="dt-form-card__title">{{ formModeTitle }}</h2>
+          <el-button :icon="Close" link @click="closePanel">关闭</el-button>
+        </div>
+
+        <el-scrollbar class="dt-form-scroll">
+          <el-form
+            ref="formRef"
+            class="dt-form"
+            label-position="top"
+            :model="form"
+            :rules="isView ? undefined : rules"
+          >
+          <section class="dt-section">
+            <h3>基本信息</h3>
+            <el-form-item label="派工类型代码" prop="code">
+              <el-input
+                v-model.trim="form.code"
+                :disabled="isView || formMode === 'edit'"
+                maxlength="10"
+                placeholder="请输入派工类型代码"
+              />
+            </el-form-item>
+            <el-form-item label="派工类型名称" prop="name">
+              <el-input
+                v-model.trim="form.name"
+                :disabled="isView"
+                maxlength="100"
+                placeholder="请输入派工类型名称"
+              />
+            </el-form-item>
+            <el-form-item label="是否启用">
+              <el-switch
+                v-model="form.ifUse"
+                active-text="启用"
+                active-value="是"
+                :disabled="isView"
+                inactive-text="停用"
+                inactive-value="否"
+              />
+            </el-form-item>
+            <el-form-item label="计件类型" prop="pieceType">
+              <el-radio-group v-model="form.pieceType" :disabled="isView">
+                <el-radio value="团体计件">团体计件</el-radio>
+                <el-radio value="个人计件">个人计件</el-radio>
+              </el-radio-group>
+            </el-form-item>
+            <el-form-item label="控制属性" prop="controlAttr">
+              <el-radio-group v-model="form.controlAttr" class="dt-control-radios" :disabled="isView">
+                <el-radio value="无关联">无关联</el-radio>
+                <el-radio value="只关联单据">只关联单据</el-radio>
+                <el-radio value="关联货品">关联货品</el-radio>
+                <el-radio value="关联单据+货品">关联单据+货品</el-radio>
+              </el-radio-group>
+            </el-form-item>
+          </section>
+
+          <section class="dt-section">
+            <h3>派工单据选项</h3>
+            <el-form-item label="关联单据">
+              <div class="dt-inline">
+                <el-input v-model.trim="form.linkNo" clearable :disabled="isView" placeholder="关联单据代码" />
+                <el-checkbox v-model="canRepeatBool" class="dt-inline__check" :disabled="isView">
+                  单据是否可重复派工
+                </el-checkbox>
+              </div>
+            </el-form-item>
+            <el-form-item label="关联表">
+              <el-input v-model.trim="form.linkTableName" clearable :disabled="isView" placeholder="关联表名" />
+            </el-form-item>
+            <el-form-item label="货品ID字段名">
+              <el-input v-model.trim="form.goodsField" clearable :disabled="isView" placeholder="如 fGoodsID" />
+            </el-form-item>
+            <el-form-item label="定制批号字段名">
+              <el-input v-model.trim="form.cstlotNoField" clearable :disabled="isView" placeholder="如 fCstLotNo" />
+            </el-form-item>
+            <el-form-item label="货品单位字段名">
+              <div class="dt-inline">
+                <el-input v-model.trim="form.unitField" clearable :disabled="isView" placeholder="如 fUnitName" />
+                <el-checkbox v-model="qtyLimitedBool" class="dt-inline__check" :disabled="isView">
+                  是否控制派工数量
+                </el-checkbox>
+              </div>
+            </el-form-item>
+            <el-form-item label="计件数量字段名">
+              <el-input v-model.trim="form.qtyField" clearable :disabled="isView" placeholder="如 fWOQty" />
+            </el-form-item>
+            <el-form-item label="货品计件单位属性">
+              <el-select
+                v-model="form.goodsUnitProp"
+                clearable
+                :disabled="isView"
+                placeholder="请选择"
+                style="width: 100%"
+              >
+                <el-option label="标准单位" value="标准单位" />
+                <el-option label="库存单位" value="库存单位" />
+                <el-option label="辅助单位" value="辅助单位" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="工号">
+              <el-input
+                v-model.trim="form.empList"
+                clearable
+                :disabled="isView"
+                placeholder="加工人员代号，逗号分隔"
+              />
+            </el-form-item>
+            <el-form-item label="加工人员姓名">
+              <el-input
+                v-model.trim="form.empListName"
+                clearable
+                :disabled="isView"
+                placeholder="加工人员姓名"
+              />
+            </el-form-item>
+            <el-form-item label="备注">
+              <el-input
+                v-model="form.remark"
+                :autosize="{ minRows: 2, maxRows: 4 }"
+                :disabled="isView"
+                maxlength="200"
+                placeholder="请输入备注"
+                show-word-limit
+                type="textarea"
+              />
+            </el-form-item>
+          </section>
+
+          <div class="dt-form__footer">
+            <el-button @click="closePanel">{{ isView ? '关闭' : '取消' }}</el-button>
+            <template v-if="!isView">
+              <el-button @click="resetForm">重置</el-button>
+              <el-button :loading="saving" type="primary" @click="saveForm">保存</el-button>
+            </template>
+            <el-button v-else type="primary" @click="startEdit({ ...form })">修改</el-button>
+          </div>
+          </el-form>
+        </el-scrollbar>
+      </aside>
     </div>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { ArrowDown, ArrowRight, ArrowUp, Delete, Plus, Refresh, Search } from '@element-plus/icons-vue'
+import { ArrowDown, ArrowRight, ArrowUp, Close, Delete, Plus, Refresh, Search } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import {
   deleteDispatchType,
@@ -225,15 +278,26 @@ defineOptions({
   name: 'DispatchTypeSetting',
 })
 
+type FormMode = 'create' | 'edit' | 'view' | ''
+
 const loading = ref(false)
 const saving = ref(false)
 const list = ref<DispatchTypeRow[]>([])
 const total = ref(0)
 const selected = ref<DispatchTypeRow[]>([])
 const currentRow = ref<DispatchTypeRow | null>(null)
-const isEdit = ref(false)
+const formMode = ref<FormMode>('')
 const showMoreCols = ref(true)
 const formRef = ref<FormInstance>()
+
+const panelOpen = computed(() => !!formMode.value)
+const isView = computed(() => formMode.value === 'view')
+const formModeTitle = computed(() => {
+  if (formMode.value === 'create') return '添加派工类型'
+  if (formMode.value === 'edit') return '修改派工类型'
+  if (formMode.value === 'view') return '查看派工类型'
+  return '派工类型列表'
+})
 
 const queryForm = reactive({
   code: '',
@@ -289,8 +353,6 @@ const emptyForm = (): DispatchTypeRow => ({
 
 const form = reactive<DispatchTypeRow>(emptyForm())
 
-const formModeTitle = computed(() => (isEdit.value ? '修改派工类型' : '添加派工类型'))
-
 const canRepeatBool = computed({
   get: () => form.canRepeat === '是',
   set: (v: boolean) => {
@@ -316,22 +378,34 @@ const assignForm = (row: DispatchTypeRow) => {
   Object.assign(form, emptyForm(), { ...row })
 }
 
+const closePanel = () => {
+  formMode.value = ''
+  formRef.value?.clearValidate()
+}
+
 const startCreate = () => {
-  isEdit.value = false
+  formMode.value = 'create'
   currentRow.value = null
   assignForm(emptyForm())
-  formRef.value?.clearValidate()
+  nextTick(() => formRef.value?.clearValidate())
 }
 
 const startEdit = (row: DispatchTypeRow) => {
-  isEdit.value = true
+  formMode.value = 'edit'
   currentRow.value = row
   assignForm(row)
-  formRef.value?.clearValidate()
+  nextTick(() => formRef.value?.clearValidate())
+}
+
+const startView = (row: DispatchTypeRow) => {
+  formMode.value = 'view'
+  currentRow.value = row
+  assignForm(row)
+  nextTick(() => formRef.value?.clearValidate())
 }
 
 const resetForm = () => {
-  if (isEdit.value && currentRow.value) {
+  if (formMode.value === 'edit' && currentRow.value) {
     assignForm(currentRow.value)
   } else {
     assignForm(emptyForm())
@@ -373,11 +447,11 @@ const saveForm = async () => {
     await submitDispatchType({ ...form })
     ElMessage.success('保存成功')
     await fetchList()
-    if (!isEdit.value) {
-      startCreate()
+    const latest = list.value.find((r) => r.code === form.code)
+    if (latest) {
+      startEdit(latest)
     } else {
-      const latest = list.value.find((r) => r.code === form.code)
-      if (latest) startEdit(latest)
+      closePanel()
     }
   } catch (e: any) {
     ElMessage.error(e?.message || '保存失败')
@@ -392,7 +466,7 @@ const handleDelete = async (codes: string[]) => {
   try {
     await deleteDispatchType(codes)
     ElMessage.success('删除成功')
-    if (isEdit.value && codes.includes(form.code)) startCreate()
+    if (panelOpen.value && codes.includes(form.code)) closePanel()
     fetchList()
   } catch (e: any) {
     ElMessage.error(e?.message || '删除失败')
@@ -403,16 +477,17 @@ const handleBatchDelete = () => handleDelete(selected.value.map((r) => r.code))
 
 onMounted(() => {
   fetchList()
-  startCreate()
 })
 </script>
 
 <style lang="scss" scoped>
 .dt-page {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 12px;
   min-height: 0;
+  overflow: hidden;
   padding: 12px 14px 14px;
   background: linear-gradient(180deg, #f3f6fb 0%, #eef2f7 100%);
 }
@@ -421,6 +496,7 @@ onMounted(() => {
   display: flex;
   gap: 6px;
   align-items: center;
+  min-height: 20px;
   font-size: 13px;
   color: #64748b;
 
@@ -431,10 +507,11 @@ onMounted(() => {
 }
 
 .dt-body {
-  display: grid;
+  position: relative;
+  display: flex;
   flex: 1;
-  grid-template-columns: minmax(360px, 420px) 1fr;
   gap: 12px;
+  min-width: 0;
   min-height: 0;
 }
 
@@ -449,16 +526,49 @@ onMounted(() => {
   box-shadow: 0 1px 2px rgb(15 23 42 / 4%);
 }
 
+.dt-list-card {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 12px 8px;
+}
+
 .dt-form-card {
-  padding: 16px 18px 12px;
-  overflow: auto;
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  width: min(420px, 92%);
+  padding: 16px 12px 12px 18px;
+  background: #fff;
+  border: 1px solid #e6ebf2;
+  border-right: none;
+  border-radius: 10px 0 0 10px;
+  box-shadow: -8px 0 24px rgb(15 23 42 / 12%);
+}
+
+.dt-form-card__head {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  padding-right: 6px;
 }
 
 .dt-form-card__title {
-  margin: 0 0 12px;
+  margin: 0;
   font-size: 16px;
   font-weight: 650;
   color: #0f172a;
+}
+
+.dt-form-scroll {
+  flex: 1;
+  min-height: 0;
+  padding-right: 6px;
 }
 
 .dt-section {
@@ -516,10 +626,6 @@ onMounted(() => {
   border-top: 1px solid #f1f5f9;
 }
 
-.dt-list-card {
-  padding: 12px 12px 8px;
-}
-
 .dt-query {
   margin-bottom: 8px;
 }
@@ -543,25 +649,11 @@ onMounted(() => {
 
 .dt-table {
   --el-table-header-bg-color: #f8fafc;
-
-  :deep(.el-table__row) {
-    cursor: pointer;
-  }
 }
 
 .dt-pager {
   display: flex;
   justify-content: flex-end;
   padding-top: 8px;
-}
-
-@media (width <= 1100px) {
-  .dt-body {
-    grid-template-columns: 1fr;
-  }
-
-  .dt-form-card {
-    max-height: 48vh;
-  }
 }
 </style>

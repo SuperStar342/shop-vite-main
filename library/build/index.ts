@@ -14,7 +14,27 @@ import { createPwa } from './pwa/'
 import { createSvgIcons } from './svgSprite/'
 import { createUnPlugin } from './unplugin/'
 import { createVisualizer } from './visualizer/'
-import { compress, https, localEnabled, port, prodEnabled, pwa, pwaDev, report } from '/@/config/'
+import { cliConfig } from '/@/config/cli.config'
+
+const {
+  compress,
+  https,
+  localEnabled,
+  port,
+  prodEnabled,
+  pwa,
+  pwaDev,
+  report,
+} = cliConfig as {
+  compress: boolean | 'gzip' | 'brotli' | string
+  https: boolean
+  localEnabled: boolean
+  port: number
+  prodEnabled: boolean
+  pwa: boolean
+  pwaDev: boolean
+  report: boolean
+}
 
 const viteApp = 'VITE_' + 'APP_'
 const viteUser = 'VITE_' + 'USER_'

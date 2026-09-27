@@ -1,5 +1,5 @@
 <template>
-  <div class="cd-page auto-height-container">
+  <div v-table-copy class="cd-page auto-height-container">
     <section class="cd-hero">
       <div v-for="card in statCards" :key="card.key" class="cd-stat" :class="`cd-stat--${card.key}`">
         <div class="cd-stat__icon">
@@ -14,16 +14,14 @@
 
     <section class="cd-main">
       <header class="cd-main__head">
-        <el-tabs v-model="activeTab" class="cd-tabs">
-          <el-tab-pane label="申报列表" name="list" />
-          <el-tab-pane label="申报统计" name="stats" />
-        </el-tabs>
+        <h2 class="cd-main__title">申报列表</h2>
         <div class="cd-main__actions">
+          <el-button :icon="Plus" type="primary" @click="openCreate">新增</el-button>
           <el-button :icon="Refresh" :loading="loading" @click="refreshAll">刷新</el-button>
         </div>
       </header>
 
-      <div v-show="activeTab === 'list'" class="cd-list-pane">
+      <div class="cd-list-pane">
         <div class="cd-filter">
           <el-form inline :model="queryForm" @submit.prevent>
             <el-form-item label="完工日期">
@@ -77,18 +75,9 @@
             @row-dblclick="(row: CompletionRow) => openDetail(row)"
           >
             <el-table-column label="序号" type="index" width="54" />
-            <el-table-column fixed label="完工确认单号" min-width="190" prop="fnNo">
+            <el-table-column fixed label="完工确认单号" min-width="170" prop="fnNo">
               <template #default="{ row }">
-                <span class="cd-fnno" title="双击行打开详情">
-                  <span class="cd-fnno__text">{{ row.fnNo }}</span>
-                  <el-button
-                    :icon="DocumentCopy"
-                    link
-                    title="复制单号"
-                    type="primary"
-                    @click.stop="copyFnNo(row.fnNo)"
-                  />
-                </span>
+                <span class="cd-fnno" title="双击行打开详情">{{ row.fnNo }}</span>
               </template>
             </el-table-column>
             <el-table-column label="部门名称" min-width="130" prop="deptName" show-overflow-tooltip />
@@ -118,16 +107,27 @@
             <el-table-column label="审核人" min-width="90" prop="approver" />
             <el-table-column fixed="right" label="操作" width="140">
               <template #default="{ row }">
-                <el-button link type="primary" @click.stop="openDetail(row)">查看</el-button>
-                <el-dropdown trigger="click" @command="(cmd: string) => handleRowAction(cmd, row)">
-                  <el-button link type="primary" @click.stop>更多</el-button>
-                  <template #dropdown>
-                    <el-dropdown-menu>
-                      <el-dropdown-item v-if="row.auditStatus !== '已审核'" command="audit">审核</el-dropdown-item>
-                      <el-dropdown-item v-if="row.auditStatus === '已审核'" command="unaudit">反审核</el-dropdown-item>
-                    </el-dropdown-menu>
-                  </template>
-                </el-dropdown>
+                <div class="cd-row-ops">
+                  <el-button link type="primary" @click.stop="openDetail(row)">查看</el-button>
+                  <el-dropdown trigger="click" @command="(cmd: string) => handleRowAction(cmd, row)">
+                    <el-button link type="primary" @click.stop>更多</el-button>
+                    <template #dropdown>
+                      <el-dropdown-menu>
+                        <el-dropdown-item v-if="row.auditStatus !== '已审核'" command="edit">编辑</el-dropdown-item>
+                        <el-dropdown-item v-if="row.auditStatus !== '已审核'" command="audit">审核</el-dropdown-item>
+                        <el-dropdown-item v-if="row.auditStatus === '已审核'" command="unaudit">反审核</el-dropdown-item>
+                        <el-dropdown-item
+                          v-if="row.auditStatus !== '已审核'"
+                          command="delete"
+                          divided
+                          style="color: var(--el-color-danger)"
+                        >
+                          删除
+                        </el-dropdown-item>
+                      </el-dropdown-menu>
+                    </template>
+                  </el-dropdown>
+                </div>
               </template>
             </el-table-column>
           </el-table>
@@ -143,27 +143,6 @@
             @size-change="(s: number) => { queryForm.pageSize = s; queryForm.pageNo = 1; fetchList() }"
           />
         </footer>
-      </div>
-
-      <div v-show="activeTab === 'stats'" class="cd-stats-pane">
-        <div class="cd-stats-grid">
-          <article v-for="card in statCards" :key="'s-' + card.key" class="cd-stats-card">
-            <div class="cd-stats-card__head">
-              <el-icon><component :is="card.icon" /></el-icon>
-              <span>{{ card.label }}</span>
-            </div>
-            <strong class="cd-stats-card__num">{{ card.value }}</strong>
-            <p class="cd-stats-card__hint">{{ card.hint }}</p>
-          </article>
-        </div>
-        <div class="cd-stats-bar">
-          <div class="cd-stats-bar__label">审核占比</div>
-          <el-progress :percentage="auditPercent" :stroke-width="14" :text-inside="true" striped striped-flow />
-          <div class="cd-stats-bar__meta">
-            <span>已审核 {{ stats.auditedCount }}</span>
-            <span>未审核 {{ stats.pendingCount }}</span>
-          </div>
-        </div>
       </div>
     </section>
 
@@ -186,16 +165,7 @@
         <template v-if="detail">
           <header class="cd-drawer__hero">
             <div>
-              <p class="cd-drawer__no">
-                <span>{{ detail.fnNo }}</span>
-                <el-button
-                  :icon="DocumentCopy"
-                  link
-                  title="复制单号"
-                  type="primary"
-                  @click="copyFnNo(detail.fnNo)"
-                />
-              </p>
+              <p class="cd-drawer__no">{{ detail.fnNo }}</p>
               <p class="cd-drawer__sub">{{ detail.deptName }} · {{ detail.fnDate }}</p>
             </div>
             <div class="cd-drawer__tags">
@@ -216,18 +186,7 @@
           <section class="cd-info">
             <h3>申报信息</h3>
             <el-descriptions :column="2" border size="small">
-              <el-descriptions-item label="完工确认单号">
-                <span class="cd-fnno">
-                  {{ detail.fnNo }}
-                  <el-button
-                    :icon="DocumentCopy"
-                    link
-                    title="复制单号"
-                    type="primary"
-                    @click="copyFnNo(detail.fnNo)"
-                  />
-                </span>
-              </el-descriptions-item>
+              <el-descriptions-item label="完工确认单号">{{ detail.fnNo }}</el-descriptions-item>
               <el-descriptions-item label="部门名称">{{ detail.deptName }}</el-descriptions-item>
               <el-descriptions-item label="完工日期">{{ detail.fnDate }}</el-descriptions-item>
               <el-descriptions-item label="审核状态">{{ detail.auditStatus }}</el-descriptions-item>
@@ -389,6 +348,7 @@
         <div class="cd-drawer__footer">
           <el-button @click="drawerOpen = false">关闭</el-button>
           <template v-if="detail">
+            <el-button v-if="detail.auditStatus !== '已审核'" @click="openEdit(detail.fnNo)">编辑</el-button>
             <el-button v-if="detail.auditStatus !== '已审核' && !editingRemark" @click="startEditRemark">编辑备注</el-button>
             <el-button v-if="editingRemark" :loading="saving" type="primary" @click="saveRemark">保存备注</el-button>
             <el-button v-if="detail.auditStatus !== '已审核'" :loading="auditing" type="primary" @click="doAudit(true)">
@@ -397,15 +357,20 @@
             <el-button v-if="detail.auditStatus === '已审核'" :loading="auditing" type="warning" @click="doAudit(false)">
               反审核
             </el-button>
+            <el-button v-if="detail.auditStatus !== '已审核'" :loading="removing" type="danger" @click="doRemove(detail.fnNo)">
+              删除
+            </el-button>
           </template>
         </div>
       </template>
     </el-drawer>
+
+    <completion-create-drawer v-model="formOpen" :edit-fn-no="editFnNo" @saved="onFormSaved" />
   </div>
 </template>
 
 <script lang="ts" setup>
-import { CircleCheck, Clock, Document, DocumentCopy, Refresh, Search, TrendCharts } from '@element-plus/icons-vue'
+import { CircleCheck, Clock, Document, Plus, Refresh, Search, TrendCharts } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   auditCompletion,
@@ -413,6 +378,7 @@ import {
   getCompletionDetail,
   getCompletionList,
   getCompletionStats,
+  removeCompletion,
   updateCompletionRemark,
   type CompletionItemRow,
   type CompletionRow,
@@ -420,7 +386,7 @@ import {
   type CompletionWorkerRow,
   type DeptOption,
 } from '/@/api/nonProd/completionDeclaration'
-import handleClipboard from '/@/utils/clipboard'
+import CompletionCreateDrawer from './CompletionCreateDrawer.vue'
 
 defineOptions({
   name: 'CompletionDeclaration',
@@ -430,10 +396,12 @@ const loading = ref(false)
 const detailLoading = ref(false)
 const saving = ref(false)
 const auditing = ref(false)
+const removing = ref(false)
 const list = ref<CompletionRow[]>([])
 const total = ref(0)
-const activeTab = ref('list')
 const drawerOpen = ref(false)
+const formOpen = ref(false)
+const editFnNo = ref<string | undefined>()
 const detail = ref<CompletionRow | null>(null)
 const selectedItem = ref<CompletionItemRow | null>(null)
 const itemTableRef = ref<{ setCurrentRow?: (row?: CompletionItemRow) => void } | null>(null)
@@ -467,11 +435,6 @@ const readDefaultDrawerWidth = () => {
 const drawerWidth = ref(typeof window === 'undefined' ? DRAWER_DEFAULT_W : readDefaultDrawerWidth())
 const drawerSize = computed(() => `${drawerWidth.value}px`)
 const drawerResizing = ref(false)
-
-const copyFnNo = (fnNo: string) => {
-  if (!fnNo) return
-  handleClipboard(fnNo)
-}
 
 const startDrawerResize = (e: MouseEvent) => {
   drawerResizing.value = true
@@ -508,12 +471,6 @@ const queryForm = reactive({
 })
 
 const drawerTitle = computed(() => (detail.value ? `完工申报 · ${detail.value.fnNo}` : '完工申报详情'))
-
-const auditPercent = computed(() => {
-  const t = stats.value.totalCount
-  if (!t) return 0
-  return Math.round((stats.value.auditedCount / t) * 100)
-})
 
 /** 派工行 ↔ 人员：优先完工行号 fOWTFnSNo，否则派工单号 + 序号 */
 const isWorkerOfItem = (item: CompletionItemRow, worker: CompletionWorkerRow) => {
@@ -698,9 +655,77 @@ const doAudit = async (approve: boolean) => {
 }
 
 const handleRowAction = async (cmd: string, row: CompletionRow) => {
+  if (cmd === 'edit') {
+    openEdit(row.fnNo)
+    return
+  }
+  if (cmd === 'delete') {
+    await doRemove(row.fnNo)
+    return
+  }
   if (cmd === 'audit' || cmd === 'unaudit') {
     await openDetail(row)
     await doAudit(cmd === 'audit')
+  }
+}
+
+const openCreate = () => {
+  editFnNo.value = undefined
+  formOpen.value = true
+}
+
+const openEdit = (fnNo: string) => {
+  if (!fnNo) return
+  drawerOpen.value = false
+  editFnNo.value = fnNo
+  formOpen.value = true
+}
+
+const doRemove = async (fnNo: string) => {
+  if (!fnNo) return
+  try {
+    await ElMessageBox.confirm(`确定删除未审核单据 ${fnNo} 吗？删除后不可恢复。`, '确认删除', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+    })
+  } catch {
+    return
+  }
+  removing.value = true
+  try {
+    await removeCompletion(fnNo)
+    const idx = list.value.findIndex((r) => r.fnNo === fnNo)
+    const removed = idx >= 0 ? list.value[idx] : null
+    if (idx >= 0) {
+      list.value.splice(idx, 1)
+      total.value = Math.max(0, total.value - 1)
+    }
+    if (removed) {
+      stats.value.totalCount = Math.max(0, stats.value.totalCount - 1)
+      if (removed.auditStatus !== '已审核') {
+        stats.value.pendingCount = Math.max(0, stats.value.pendingCount - 1)
+      } else {
+        stats.value.auditedCount = Math.max(0, stats.value.auditedCount - 1)
+      }
+    }
+    if (detail.value?.fnNo === fnNo) {
+      drawerOpen.value = false
+      detail.value = null
+    }
+    ElMessage.success('删除成功')
+  } catch (e: any) {
+    ElMessage.error(e?.message || '删除失败')
+  } finally {
+    removing.value = false
+  }
+}
+
+const onFormSaved = async (fnNo: string) => {
+  editFnNo.value = undefined
+  await refreshAll()
+  if (fnNo) {
+    await openDetail({ fnNo } as CompletionRow)
   }
 }
 
@@ -792,18 +817,14 @@ onMounted(async () => {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 16px;
+    padding: 12px 16px;
     border-bottom: 1px solid var(--el-border-color-lighter);
   }
-}
 
-.cd-tabs {
-  :deep(.el-tabs__header) {
-    margin-bottom: 0;
-  }
-
-  :deep(.el-tabs__nav-wrap::after) {
-    display: none;
+  &__title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
   }
 }
 
@@ -824,66 +845,29 @@ onMounted(async () => {
   min-height: 0;
 }
 
+.cd-row-ops {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 100%;
+  line-height: 1;
+
+  :deep(.el-button) {
+    margin: 0;
+    height: auto;
+    padding: 0 4px;
+    vertical-align: middle;
+  }
+
+  :deep(.el-dropdown) {
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
+  }
+}
+
 .cd-pager {
   padding: 10px 0 12px;
-}
-
-.cd-stats-pane {
-  padding: 20px 24px 32px;
-}
-
-.cd-stats-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-  margin-bottom: 28px;
-}
-
-.cd-stats-card {
-  padding: 20px;
-  border-radius: 12px;
-  background: linear-gradient(145deg, #fafbff, #fff);
-  border: 1px solid var(--el-border-color-lighter);
-
-  &__head {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 12px;
-    font-size: 14px;
-    color: var(--el-text-color-secondary);
-  }
-
-  &__num {
-    display: block;
-    font-size: 32px;
-    font-weight: 700;
-    color: var(--el-color-primary);
-  }
-
-  &__hint {
-    margin: 8px 0 0;
-    font-size: 12px;
-    color: var(--el-text-color-placeholder);
-  }
-}
-
-.cd-stats-bar {
-  max-width: 560px;
-
-  &__label {
-    margin-bottom: 8px;
-    font-size: 14px;
-    font-weight: 600;
-  }
-
-  &__meta {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 8px;
-    font-size: 12px;
-    color: var(--el-text-color-secondary);
-  }
 }
 
 .cd-drawer {
@@ -1075,19 +1059,19 @@ onMounted(async () => {
 }
 
 .cd-fnno {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
+  font-family: ui-monospace, monospace;
+  font-weight: 600;
+  color: #1d4ed8;
+  cursor: pointer;
 
-  &__text {
-    font-family: ui-monospace, monospace;
-    color: var(--el-color-primary);
+  &:hover {
+    color: #1e40af;
+    text-decoration: underline;
   }
 }
 
 @media (max-width: 1200px) {
   .cd-hero,
-  .cd-stats-grid,
   .cd-kpi {
     grid-template-columns: repeat(2, 1fr);
   }

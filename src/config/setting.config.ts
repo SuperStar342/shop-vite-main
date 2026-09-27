@@ -105,8 +105,8 @@ export const settingConfig: {
   lockPage: '/lock', // 锁屏页面地址
   /** 登录态保活：检查/续期 token 的间隔（毫秒）；实际检查上限为 2 分钟 */
   tokenTime: 30 * 60 * 1000,
-  /** 无操作超过该时长则退出登录（毫秒），默认 8 小时；操作期间会自动续期 */
-  idleLogoutTime: 8 * 60 * 60 * 1000,
+  /** 无操作超过该时长则退出登录（毫秒）；操作期间会自动续期 access_token */
+  idleLogoutTime: 1 * 60 * 60 * 1000,
   tokenHeader: 'Blade-Auth', // 请求头中携带的token名称
   tokenKey: 'saber3-access-token', // token存储的key(多个系统部署需要修改以免冲突)
   refreshTokenKey: 'saber3-refresh-token', // 刷新token存储的key(多个系统部署需要修改以免冲突)

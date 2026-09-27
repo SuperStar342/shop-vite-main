@@ -3,7 +3,7 @@
     <header class="ds-hero">
       <div>
         <h1>人员派工报工统计</h1>
-        <p>派工 · 报工 · 完成率 · 计件工资，一屏掌握生产效率</p>
+        <p>生产派工 · 报工效率 · 非生产计时/计件结构</p>
       </div>
       <el-button :icon="Refresh" :loading="loading" plain @click="reload">刷新数据</el-button>
     </header>
@@ -41,12 +41,6 @@
           <el-select v-model="queryForm.wsName" clearable placeholder="全部" style="width: 120px">
             <el-option label="全部" value="" />
             <el-option v-for="w in workshopOptions" :key="w" :label="w" :value="w" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="班组">
-          <el-select v-model="queryForm.workGpName" clearable placeholder="全部" style="width: 120px">
-            <el-option label="全部" value="" />
-            <el-option v-for="g in groupOptions" :key="g" :label="g" :value="g" />
           </el-select>
         </el-form-item>
         <el-form-item label="人员">
@@ -107,6 +101,14 @@
     </section>
 
     <div class="ds-main">
+      <section class="ds-nonprod-summary">
+        <strong>非生产工资</strong>
+        <span class="is-hour">计时 ¥{{ formatMoney(payload?.nonProdHourWage) }}（{{ payload?.nonProdHourPercent ?? 0 }}%）</span>
+        <span class="is-piece">计件 ¥{{ formatMoney(payload?.nonProdPieceWage) }}（{{ payload?.nonProdPiecePercent ?? 0 }}%）</span>
+        <span class="is-total">合计 ¥{{ formatMoney(payload?.nonProdWageTotal) }}</span>
+        <em>计时=工时报工(1001)；金额=计划量×单价</em>
+      </section>
+
       <section class="ds-charts">
         <article class="ds-panel ds-panel--trend">
           <header class="ds-panel__head">
@@ -120,7 +122,7 @@
         <article class="ds-panel ds-panel--pie">
           <header class="ds-panel__head">
             <strong>工序报工工时分布</strong>
-            <em>占比</em>
+            <em>扇形占比</em>
           </header>
           <div class="ds-chart-box">
             <vab-chart class="ds-chart" :option="pieOption" />
@@ -128,11 +130,20 @@
         </article>
         <article class="ds-panel ds-panel--wage">
           <header class="ds-panel__head">
-            <strong>计件工资趋势</strong>
+            <strong>生产计件工资趋势</strong>
             <em>日汇总（单价×报工量）</em>
           </header>
           <div class="ds-chart-box">
             <vab-chart class="ds-chart" :option="wageOption" />
+          </div>
+        </article>
+        <article class="ds-panel ds-panel--np-daily">
+          <header class="ds-panel__head">
+            <strong>非生产计时 / 计件</strong>
+            <em>每日金额 · 计时占比</em>
+          </header>
+          <div class="ds-chart-box">
+            <vab-chart class="ds-chart" :option="nonProdDailyOption" />
           </div>
         </article>
       </section>
@@ -143,16 +154,16 @@
           <strong>人员效率 TOP5</strong>
           <el-button link type="primary" @click="openMore('emp')">查看全部</el-button>
         </header>
-        <el-table :data="payload?.empTop || []" class="ds-table" max-height="200" size="small" stripe>
+        <el-table :data="payload?.empTop || []" class="ds-table" max-height="220" size="small" stripe>
           <el-table-column align="center" label="排名" width="56">
             <template #default="{ row }">
               <span class="ds-rank" :class="`is-${row.rank}`">{{ row.rank }}</span>
             </template>
           </el-table-column>
           <el-table-column label="人员" min-width="72" prop="empName" />
-          <el-table-column align="right" label="派工工时" min-width="80" prop="dispatchHours" />
-          <el-table-column align="right" label="报工工时" min-width="80" prop="reportHours" />
-          <el-table-column label="完成率" min-width="120">
+          <el-table-column align="right" label="派工工时" min-width="76" prop="dispatchHours" />
+          <el-table-column align="right" label="报工工时" min-width="76" prop="reportHours" />
+          <el-table-column label="完成率" min-width="100">
             <template #default="{ row }">
               <div class="ds-rate">
                 <el-progress :percentage="Math.min(100, Number(row.rate) || 0)" :stroke-width="8" :show-text="false" />
@@ -160,8 +171,19 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column align="right" label="工资" min-width="80">
-            <template #default="{ row }">¥{{ row.wage }}</template>
+          <el-table-column align="right" label="计时" min-width="72">
+            <template #default="{ row }">¥{{ formatMoney(row.hourWage) }}</template>
+          </el-table-column>
+          <el-table-column align="right" label="计件" min-width="72">
+            <template #default="{ row }">¥{{ formatMoney(row.pieceWage) }}</template>
+          </el-table-column>
+          <el-table-column label="工资构成" min-width="120">
+            <template #default="{ row }">
+              <div class="ds-stack-bar" :title="`计时 ${row.hourPercent || 0}% / 计件 ${row.piecePercent || 0}%`">
+                <i class="is-hour" :style="{ width: `${row.hourPercent || 0}%` }" />
+                <i class="is-piece" :style="{ width: `${row.piecePercent || 0}%` }" />
+              </div>
+            </template>
           </el-table-column>
           <template #empty>
             <el-empty :image-size="48" description="暂无人员数据" />
@@ -230,17 +252,42 @@
       </span>
     </footer>
 
-    <el-drawer v-model="moreVisible" destroy-on-close size="520px" :title="moreTitle">
+    <el-drawer
+      v-model="moreVisible"
+      class="ds-drawer"
+      destroy-on-close
+      :size="drawerWidth"
+      :title="moreTitle"
+      @opened="bindDrawerResize"
+      @closed="unbindDrawerResize"
+    >
+      <div v-if="moreType === 'emp'" class="ds-drawer__resize" title="拖拽调节宽度" @mousedown.prevent="onDrawerResizeStart" />
       <el-table v-if="moreType === 'emp'" :data="payload?.empAll || payload?.empTop || []" height="100%">
-        <el-table-column label="排名" prop="rank" width="60" />
-        <el-table-column label="人员" prop="empName" />
-        <el-table-column align="right" label="派工" prop="dispatchHours" />
-        <el-table-column align="right" label="报工" prop="reportHours" />
-        <el-table-column align="right" label="完成率%">
+        <el-table-column label="排名" prop="rank" width="56" />
+        <el-table-column label="人员" min-width="80" prop="empName" />
+        <el-table-column label="工号" min-width="100" prop="empNo" show-overflow-tooltip />
+        <el-table-column align="right" label="派工工时" min-width="88" prop="dispatchHours" />
+        <el-table-column align="right" label="报工工时" min-width="88" prop="reportHours" />
+        <el-table-column align="right" label="完成率%" min-width="80">
           <template #default="{ row }">{{ row.rate }}</template>
         </el-table-column>
-        <el-table-column align="right" label="工资">
-          <template #default="{ row }">¥{{ row.wage }}</template>
+        <el-table-column align="right" label="计时" min-width="88">
+          <template #default="{ row }">¥{{ formatMoney(row.hourWage) }}</template>
+        </el-table-column>
+        <el-table-column align="right" label="计件" min-width="88">
+          <template #default="{ row }">¥{{ formatMoney(row.pieceWage) }}</template>
+        </el-table-column>
+        <el-table-column align="right" label="合计" min-width="88">
+          <template #default="{ row }">¥{{ formatMoney(row.totalWage) }}</template>
+        </el-table-column>
+        <el-table-column label="工资构成" min-width="180">
+          <template #default="{ row }">
+            <div class="ds-stack-bar is-lg" :title="`计时 ${row.hourPercent || 0}% / 计件 ${row.piecePercent || 0}%`">
+              <i class="is-hour" :style="{ width: `${row.hourPercent || 0}%` }" />
+              <i class="is-piece" :style="{ width: `${row.piecePercent || 0}%` }" />
+              <em class="ds-stack-bar__txt">{{ row.hourPercent || 0 }}% / {{ row.piecePercent || 0 }}%</em>
+            </div>
+          </template>
         </el-table-column>
       </el-table>
       <el-table v-else-if="moreType === 'prc'" :data="payload?.prcAll || payload?.prcTop || []" height="100%">
@@ -401,6 +448,7 @@ const fetchEmpSuggestions = async (query: string, cb: (results: EmpSuggestItem[]
   }
 }
 
+
 const onEmpSuggestSelect = (item: EmpSuggestItem) => {
   queryForm.empKeyword = item?.empName || item?.empNo || queryForm.empKeyword
   reload()
@@ -412,11 +460,43 @@ const onEmpSuggestClear = () => {
 
 const moreVisible = ref(false)
 const moreType = ref<'emp' | 'prc' | 'unreported'>('emp')
+const drawerWidth = ref(760)
+const drawerResizing = ref(false)
+
 const moreTitle = computed(() => {
-  if (moreType.value === 'emp') return '人员效率明细'
+  if (moreType.value === 'emp') {
+    const n = (payload.value?.empAll || payload.value?.empTop || []).length
+    return `全部派工人员（${n}）`
+  }
   if (moreType.value === 'prc') return '工序完成率明细'
   return '未报工明细'
 })
+
+const onDrawerResizeStart = (e: MouseEvent) => {
+  drawerResizing.value = true
+  const startX = e.clientX
+  const startW = drawerWidth.value
+  const onMove = (ev: MouseEvent) => {
+    // 抽屉从右侧打开：向左拖增大宽度
+    const next = startW + (startX - ev.clientX)
+    drawerWidth.value = Math.min(Math.max(next, 480), Math.floor(window.innerWidth * 0.92))
+  }
+  const onUp = () => {
+    drawerResizing.value = false
+    window.removeEventListener('mousemove', onMove)
+    window.removeEventListener('mouseup', onUp)
+  }
+  window.addEventListener('mousemove', onMove)
+  window.addEventListener('mouseup', onUp)
+}
+
+const bindDrawerResize = () => {
+  /* opened hook 预留，宽度由 mousedown 控制 */
+}
+
+const unbindDrawerResize = () => {
+  drawerResizing.value = false
+}
 
 const kpiIcon = (key: string) => {
   const map: Record<string, any> = {
@@ -503,61 +583,65 @@ const trendOption = computed(() => {
 const pieOption = computed(() => {
   const list = payload.value?.processDist || []
   const total = payload.value?.processTotalHours || 0
+  const names = list.map((p) => p.name)
+  const mid = Math.ceil(names.length / 2)
+  const legendBase = {
+    orient: 'vertical' as const,
+    top: 'middle',
+    itemWidth: 14,
+    itemHeight: 14,
+    itemGap: 12,
+    textStyle: { color: '#475569', fontSize: 13, fontWeight: 500 },
+    formatter: (name: string) => (name.length > 8 ? `${name.slice(0, 8)}…` : name),
+  }
   return {
     ...anim,
-    color: ['#3b82f6', '#22c55e', '#f59e0b', '#a855f7', '#ef4444'],
-    tooltip: { trigger: 'item', formatter: '{b}<br/>{c} h（{d}%）' },
-    legend: {
-      orient: 'vertical',
-      right: 8,
-      top: 'middle',
-      textStyle: { color: '#64748b', fontSize: 11 },
+    color: ['#3b82f6', '#22c55e', '#f59e0b', '#a855f7', '#ef4444', '#06b6d4', '#f97316', '#84cc16'],
+    title: {
+      text: total > 0 ? `${total.toLocaleString()} h` : '',
+      subtext: total > 0 ? '报工工时合计' : '',
+      left: '30%',
+      top: 4,
+      textAlign: 'center',
+      textStyle: { color: '#1e293b', fontSize: 16, fontWeight: 700 },
+      subtextStyle: { color: '#94a3b8', fontSize: 12 },
     },
+    tooltip: { trigger: 'item', formatter: '{b}<br/>{c} h（{d}%）' },
+    legend: [
+      { ...legendBase, right: 148, data: names.slice(0, mid) },
+      { ...legendBase, right: 28, data: names.slice(mid) },
+    ],
     series: [
       {
         type: 'pie',
-        radius: ['48%', '70%'],
-        center: ['38%', '52%'],
+        radius: '62%',
+        center: ['32%', '58%'],
         avoidLabelOverlap: true,
-        itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
-        label: { show: false },
+        itemStyle: {
+          borderRadius: 4,
+          borderColor: '#fff',
+          borderWidth: 2,
+        },
+        label: {
+          show: true,
+          formatter: '{d}%',
+          color: '#334155',
+          fontSize: 13,
+          fontWeight: 600,
+        },
+        labelLine: {
+          length: 10,
+          length2: 6,
+        },
         emphasis: {
           scale: true,
-          scaleSize: 6,
-          label: { show: true, fontSize: 12, fontWeight: 600 },
+          scaleSize: 8,
+          itemStyle: {
+            shadowBlur: 12,
+            shadowColor: 'rgba(30, 64, 175, 0.25)',
+          },
         },
         data: list.map((p) => ({ name: p.name, value: p.hours })),
-      },
-    ],
-    graphic: [
-      {
-        type: 'group',
-        left: '30%',
-        top: '44%',
-        children: [
-          {
-            type: 'text',
-            style: {
-              text: `${total.toLocaleString()} h`,
-              fill: '#1e293b',
-              fontSize: 18,
-              fontWeight: 700,
-              textAlign: 'center',
-            },
-            left: 'center',
-          },
-          {
-            type: 'text',
-            top: 24,
-            style: {
-              text: '报工工时',
-              fill: '#94a3b8',
-              fontSize: 12,
-              textAlign: 'center',
-            },
-            left: 'center',
-          },
-        ],
       },
     ],
   }
@@ -613,6 +697,88 @@ const wageOption = computed(() => {
   }
 })
 
+const formatMoney = (v: unknown) => {
+  const n = Number(v)
+  if (!Number.isFinite(n)) return '0'
+  return Math.round(n).toLocaleString('zh-CN')
+}
+
+const nonProdDailyOption = computed(() => {
+  const list = payload.value?.nonProdDaily || []
+  return {
+    ...anim,
+    color: ['#0ea5e9', '#f59e0b', '#64748b'],
+    tooltip: {
+      trigger: 'axis',
+      formatter: (params: any) => {
+        const arr = Array.isArray(params) ? params : [params]
+        const idx = arr[0]?.dataIndex ?? 0
+        const row = list[idx]
+        if (!row) return ''
+        return [
+          row.date,
+          `计时：¥${formatMoney(row.hourWage)}（${row.hourPercent}%）`,
+          `计件：¥${formatMoney(row.pieceWage)}（${row.piecePercent}%）`,
+          `合计：¥${formatMoney(row.totalWage)}`,
+        ].join('<br/>')
+      },
+    },
+    legend: { top: 0, right: 0, textStyle: { color: '#64748b', fontSize: 11 } },
+    grid: { top: 36, right: 48, bottom: 28, left: 52 },
+    xAxis: {
+      type: 'category',
+      data: list.map((d) => d.date),
+      axisLine: { lineStyle: { color: '#e2e8f0' } },
+      axisLabel: { color: '#94a3b8', hideOverlap: true },
+    },
+    yAxis: [
+      {
+        type: 'value',
+        name: '金额',
+        nameTextStyle: { color: '#94a3b8', fontSize: 11 },
+        splitLine: { lineStyle: { color: '#f1f5f9', type: 'dashed' } },
+        axisLabel: { color: '#94a3b8' },
+      },
+      {
+        type: 'value',
+        name: '%',
+        min: 0,
+        max: 100,
+        nameTextStyle: { color: '#94a3b8', fontSize: 11 },
+        splitLine: { show: false },
+        axisLabel: { color: '#94a3b8' },
+      },
+    ],
+    series: [
+      {
+        name: '计时工资',
+        type: 'bar',
+        stack: 'wage',
+        barMaxWidth: 18,
+        data: list.map((d) => d.hourWage),
+        itemStyle: { borderRadius: [0, 0, 0, 0] },
+      },
+      {
+        name: '计件工资',
+        type: 'bar',
+        stack: 'wage',
+        barMaxWidth: 18,
+        data: list.map((d) => d.pieceWage),
+        itemStyle: { borderRadius: [4, 4, 0, 0] },
+      },
+      {
+        name: '计时占比',
+        type: 'line',
+        yAxisIndex: 1,
+        smooth: true,
+        symbolSize: 6,
+        data: list.map((d) => d.hourPercent),
+        lineStyle: { width: 2 },
+      },
+    ],
+  }
+})
+
 const reload = async () => {
   loading.value = true
   try {
@@ -652,6 +818,7 @@ const reload = async () => {
     loading.value = false
   }
 }
+
 
 const resetQuery = () => {
   dateRange.value = defaultDateRange()
@@ -721,7 +888,8 @@ onMounted(() => reload())
   gap: 10px;
   min-height: 0;
   height: 100%;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding-bottom: 4px;
   background: linear-gradient(180deg, #f0f4f8 0%, #f5f7fa 120px, #f5f7fa 100%);
 }
@@ -935,13 +1103,147 @@ onMounted(() => reload())
   gap: 10px;
 }
 
+.ds-nonprod-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  flex-shrink: 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: linear-gradient(90deg, #f0f9ff, #fff);
+  border: 1px solid #cfe8f3;
+
+  strong {
+    font-size: 13px;
+    color: #0c4a6e;
+  }
+
+  em {
+    margin-left: auto;
+    font-style: normal;
+    font-size: 11px;
+    color: #94a3b8;
+  }
+
+  span {
+    height: 26px;
+    padding: 0 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 26px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .is-hour {
+    color: #0369a1;
+    background: #e0f2fe;
+  }
+
+  .is-piece {
+    color: #b45309;
+    background: #ffedd5;
+  }
+
+  .is-total {
+    color: #0f172a;
+    background: #e2e8f0;
+  }
+}
+
 .ds-charts {
   flex: 1 1 auto;
-  min-height: 220px;
+  min-height: 420px;
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
   gap: 10px;
   align-items: stretch;
+}
+.ds-stack-bar {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e2e8f0;
+
+  i {
+    display: block;
+    height: 100%;
+
+    &.is-hour {
+      background: linear-gradient(90deg, #0284c7, #38bdf8);
+    }
+
+    &.is-piece {
+      background: linear-gradient(90deg, #d97706, #fbbf24);
+    }
+  }
+
+  &.is-lg {
+    height: 18px;
+    border: 1px solid #cbd5e1;
+    box-shadow: inset 0 1px 2px rgb(15 23 42 / 6%);
+  }
+
+  &__txt {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-style: normal;
+    font-size: 11px;
+    font-weight: 700;
+    color: #0f172a;
+    text-shadow: 0 0 4px #fff, 0 0 2px #fff;
+    pointer-events: none;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.ds-drawer__resize {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 5;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  background: transparent;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 1px;
+    width: 3px;
+    height: 48px;
+    margin-top: -24px;
+    border-radius: 999px;
+    background: #94a3b8;
+    opacity: 0.55;
+  }
+
+  &:hover::after {
+    opacity: 1;
+    background: #3b82f6;
+  }
+}
+
+:deep(.ds-drawer.el-drawer) {
+  .el-drawer__body {
+    position: relative;
+    overflow: hidden;
+  }
+}
+
+:deep(.ds-drawer.el-drawer.resizing),
+.ds-page.ds-resizing {
+  user-select: none;
+  cursor: col-resize;
 }
 
 .ds-tables {
@@ -969,7 +1271,9 @@ onMounted(() => reload())
 
   &--trend,
   &--pie,
-  &--wage {
+  &--wage,
+  &--np-daily,
+  &--np-emp {
     height: 100%;
     overflow: hidden;
   }
@@ -1109,10 +1413,6 @@ onMounted(() => reload())
   .ds-kpis {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
-
-  .ds-charts {
-    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr);
-  }
 }
 
 @media (max-width: 1100px) {
@@ -1132,26 +1432,34 @@ onMounted(() => reload())
   .ds-charts,
   .ds-tables {
     grid-template-columns: 1fr;
+    grid-template-rows: none;
   }
 
   .ds-charts {
     flex: none;
     min-height: 0;
+    height: auto;
   }
 
   .ds-panel--trend,
   .ds-panel--pie,
-  .ds-panel--wage {
+  .ds-panel--wage,
+  .ds-panel--np-daily {
     height: auto;
   }
 
   .ds-chart-box {
-    height: 260px;
+    height: 240px;
     flex: none;
   }
 
   .ds-chart {
     position: absolute !important;
+  }
+
+  .ds-nonprod-summary em {
+    margin-left: 0;
+    width: 100%;
   }
 }
 

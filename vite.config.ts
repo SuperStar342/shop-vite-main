@@ -4,7 +4,10 @@ import http from 'node:http'
 import { resolve } from 'node:path'
 import type { ConfigEnv, UserConfig } from 'vite'
 import { defineConfig, loadEnv } from 'vite'
-import {
+import { cliConfig } from '/@/config/cli.config'
+import { createVitePlugin, createWatch } from '/@vab/build'
+
+const {
   assetsDir,
   base,
   chunkSizeWarningLimit,
@@ -18,8 +21,21 @@ import {
   outputHash,
   port,
   reportCompressedSize,
-} from '/@/config'
-import { createVitePlugin, createWatch } from '/@vab/build'
+} = cliConfig as {
+  assetsDir: string
+  base: string
+  chunkSizeWarningLimit: number
+  cssCodeSplit: boolean
+  exclude: string[]
+  https: boolean
+  include: string[]
+  minify: boolean | 'terser' | 'esbuild'
+  open: boolean
+  outDir: string
+  outputHash: boolean
+  port: number
+  reportCompressedSize: boolean
+}
 
 const lastBuildTime = dayjs().format('YYYY-MM-DD HH:mm:ss')
 /** 复用到后端的 TCP，降低开发态代理冷连接耗时 */

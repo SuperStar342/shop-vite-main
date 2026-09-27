@@ -1,0 +1,11 @@
+﻿name|typ|max_length|precision|scale
+----|---|----------|---------|-----
+fDate|datetime|8|23|3
+fDeptID|int|4|10|0
+fOWTNo|varchar|50|0|0
+rc|l|d
+--|-|-
+|0|6
+c|p|a|fGoodsID|fUnit|fPlanQty|fPrcUp
+-|-|-|--------|-----|--------|------
+1002|2|1|300056644|PCS|30.000000|3.000000
