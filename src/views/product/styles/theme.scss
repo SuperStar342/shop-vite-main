@@ -67,6 +67,8 @@
   font-weight: 600;
   background: var(--pg-sand);
   color: var(--pg-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
 
   &::before {
     content: '';

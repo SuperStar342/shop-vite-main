@@ -167,6 +167,10 @@
               <div v-if="missingReasons(row).length" class="p-card__miss">
                 {{ missingReasons(row).slice(0, 3).join(' · ') }}
               </div>
+              <div class="p-card__ops" @click.stop>
+                <el-button link type="primary" @click="openDetail(row)">查看</el-button>
+                <el-button link type="primary" @click="open(row)">工作台</el-button>
+              </div>
             </div>
           </article>
           <div v-if="!displayList.length && !loading" class="empty">没有匹配的商品</div>
@@ -177,11 +181,12 @@
           v-else
           v-loading="loading"
           :data="displayList"
+          border
           height="100%"
           @selection-change="onSelect"
         >
           <el-table-column type="selection" width="44" />
-          <el-table-column label="商品信息" min-width="300">
+          <el-table-column label="商品信息" min-width="280">
             <template #default="{ row }">
               <div class="row-goods" @click="open(row)">
                 <el-image class="row-goods__img" :src="row.mainImage || placeholder" fit="cover" />
@@ -215,7 +220,7 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="价格" width="120" align="right">
+          <el-table-column label="价格" min-width="110" align="right">
             <template #default="{ row }">
               <div class="price-cell">
                 <span class="price">¥{{ price(row) }}</span>
@@ -224,16 +229,16 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="类型" width="72" align="center">
+          <el-table-column label="类型" min-width="72" align="center">
             <template #default="{ row }">{{ typeLabel(row.productType) }}</template>
           </el-table-column>
-          <el-table-column label="SKU" width="64" align="center" prop="specCount" />
-          <el-table-column label="库存" width="72" align="center">
+          <el-table-column label="SKU" min-width="64" align="center" prop="specCount" />
+          <el-table-column label="库存" min-width="72" align="center">
             <template #default="{ row }">
               <span :class="{ 'stock-low': Number(row.specStock) < 50 }">{{ row.specStock || 0 }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="素材" width="110" align="center">
+          <el-table-column label="素材" min-width="110" align="center">
             <template #default="{ row }">
               <div class="media-dots">
                 <span :class="{ on: !!row.mainImage }" title="主图">图</span>
@@ -243,33 +248,34 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="完整度" width="100">
+          <el-table-column label="完整度" min-width="160">
             <template #default="{ row }">
-              <el-progress :percentage="row.completeness" :stroke-width="6" color="#0f766e" />
+              <el-progress :percentage="row.completeness" :stroke-width="8" color="#0f766e" />
             </template>
           </el-table-column>
-          <el-table-column label="上架" width="64" align="center">
+          <el-table-column label="上架" min-width="78" align="center">
             <template #default="{ row }">
               <span class="pg-tag" :class="row.isOnShelf === 1 ? 'ok' : 'info'">
                 {{ row.isOnShelf === 1 ? '上架' : '下架' }}
               </span>
             </template>
           </el-table-column>
-          <el-table-column label="状态" width="80" align="center">
+          <el-table-column label="状态" min-width="78" align="center">
             <template #default="{ row }">
               <span class="pg-tag" :class="statusClass(row.productStatus)">{{ statusLabel(row.productStatus) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="审核" width="88" align="center">
+          <el-table-column label="审核" min-width="96" align="center">
             <template #default="{ row }">
               <span class="pg-tag" :class="auditClass(row.auditStatus)">{{ auditLabel(row.auditStatus) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="更新时间" width="110" align="center">
+          <el-table-column label="更新时间" min-width="110" align="center">
             <template #default="{ row }">{{ shortTime(row.updateTime || row.createTime) }}</template>
           </el-table-column>
-          <el-table-column label="操作" width="140" fixed="right">
+          <el-table-column label="操作" width="180" fixed="right">
             <template #default="{ row }">
+              <el-button link type="primary" @click="openDetail(row)">查看</el-button>
               <el-button link type="primary" @click="open(row)">工作台</el-button>
               <el-button v-if="row.auditStatus === 0" link type="warning" @click="openAudit(row)">审核</el-button>
             </template>
@@ -453,6 +459,9 @@ function toggleSelect(row: any) {
 }
 function open(row: any, tab?: string) {
   router.push({ path: '/product/workbench', query: { id: row.id, ...(tab ? { tab } : {}) } })
+}
+function openDetail(row: any) {
+  router.push({ path: '/product/detail', query: { id: row.id } })
 }
 function openAudit(row: any) {
   auditRow.value = row
@@ -758,6 +767,12 @@ watch(
     font-size: 11px;
     color: var(--pg-warm);
     line-height: 1.4;
+  }
+
+  &__ops {
+    margin-top: 10px;
+    display: flex;
+    gap: 4px;
   }
 }
 

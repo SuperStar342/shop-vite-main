@@ -28,9 +28,21 @@ FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM blade_menu WHERE is_deleted=0 AND (id=
 UPDATE blade_menu SET name='商品工作台', path='/product/workbench', component='views/product/workbench', sort=3, remark='隐藏路由'
 WHERE is_deleted=0 AND (id=2083134009698754805 OR code='productWorkbench');
 
+-- 商品详情（隐藏路由，整页只读预览）
+INSERT INTO blade_menu (id, parent_id, code, name, alias, path, source, sort, category, action, is_open, component, remark, is_deleted)
+SELECT 2083134009698754806, 2083134009698754801, 'productDetail', '商品详情', 'menu', '/product/detail', 'file-list-3-line', 4, 1, 0, 1, 'views/product/detail', '商品详情只读页（隐藏）', 0
+FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM blade_menu WHERE is_deleted=0 AND (id=2083134009698754806 OR code='productDetail'));
+
+UPDATE blade_menu SET name='商品详情', path='/product/detail', component='views/product/detail', sort=4, remark='隐藏路由·整页只读'
+WHERE is_deleted=0 AND (id=2083134009698754806 OR code='productDetail');
+
 UPDATE blade_menu SET path='/product/edit', component='views/product/edit', remark='兼容跳转'
 WHERE is_deleted=0 AND code='productEdit';
 
 INSERT INTO blade_role_menu (id, menu_id, role_id)
 SELECT 2083134009698754822, 2083134009698754805, 1123598816738675201 FROM DUAL
 WHERE NOT EXISTS (SELECT 1 FROM blade_role_menu WHERE menu_id=2083134009698754805 AND role_id=1123598816738675201);
+
+INSERT INTO blade_role_menu (id, menu_id, role_id)
+SELECT 2083134009698754823, 2083134009698754806, 1123598816738675201 FROM DUAL
+WHERE NOT EXISTS (SELECT 1 FROM blade_role_menu WHERE menu_id=2083134009698754806 AND role_id=1123598816738675201);

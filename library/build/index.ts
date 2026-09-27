@@ -56,8 +56,12 @@ export const createVitePlugin = (env: Record<string, string>) => {
     createMock(localEnabled, prodEnabled),
     createSvgIcons(),
     createBanner(),
-    // File Viewer：dev/build 自动发布同版本 Worker/WASM 等到 /file-viewer/
-    fileViewerRenderers({ copyAssets: true })
+    // File Viewer：构建时发布 Worker/WASM 等到 /file-viewer/
+    // Windows 下每次 dev 全量拷贝并覆盖 flyfish-viewer-assets.json 易触发 UNKNOWN 锁文件错误，
+    // 资源已落在 public/file-viewer，开发态跳过复制，仅在 build 时同步。
+    fileViewerRenderers({
+      copyAssets: process.platform === 'win32' ? { mode: 'build' } : true,
+    })
     // ,createUnoCSSPlugin() // 如需开启UnoCSS，请取消注释
   )
   if (compress) vitePlugins.push(createCompress(compress))

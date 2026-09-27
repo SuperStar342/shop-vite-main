@@ -16,6 +16,7 @@
         </div>
       </div>
       <div class="wb-hero__actions">
+        <el-button @click="goDetail">预览</el-button>
         <el-button :loading="saving" @click="save(-1)">保存</el-button>
         <el-button v-if="form.auditStatus === 0" type="warning" @click="openAudit">审核</el-button>
         <el-button type="primary" class="pg-btn-primary" :loading="saving" @click="tab = 'audit'">提交审核</el-button>
@@ -702,6 +703,11 @@ async function save(auditStatus: number) {
 
 function openAudit() {
   auditVisible.value = true
+}
+
+function goDetail() {
+  if (!form.id) return
+  router.push({ path: '/product/detail', query: { id: form.id } })
 }
 
 function onMemberPriceChange(v: number | undefined) {

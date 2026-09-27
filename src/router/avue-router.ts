@@ -289,10 +289,12 @@ export const formatPath = (ele: any, first: boolean): void => {
     ele.meta.hidden = true
     ele.meta.activeMenu = '/product/index'
   }
-  // 商品工作台 / 驾驶舱 / 独立新增：隐藏，统一落到商品列表
+  // 商品工作台 / 详情 / 驾驶舱 / 独立新增：隐藏，统一落到商品列表
   if (
     code === 'productWorkbench' ||
     /product\/workbench/i.test(pathStr) ||
+    code === 'productDetail' ||
+    /product\/detail/i.test(pathStr) ||
     code === 'productCockpit' ||
     /product\/cockpit/i.test(pathStr) ||
     code === 'productCreate' ||
