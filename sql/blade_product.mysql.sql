@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS blade_product_spec (
   status              int           DEFAULT 1,
   is_deleted          int           DEFAULT 0,
   PRIMARY KEY (id),
-  UNIQUE KEY uk_product_spec_tenant_code (tenant_id, spec_code, is_deleted),
+  UNIQUE KEY uk_product_spec_tenant_code (tenant_id, spec_code),
   KEY idx_product_spec_product (tenant_id, product_id, is_deleted)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='产品规格表（SKU）';
 

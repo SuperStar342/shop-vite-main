@@ -2,7 +2,6 @@
   <div class="pg plist">
     <header class="plist__head">
       <div>
-        <div class="pg-eyebrow">商品库</div>
         <h1 class="pg-title">商品列表</h1>
       </div>
       <div class="plist__actions">

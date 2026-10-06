@@ -1,0 +1,23 @@
+#服务器端口
+server:
+  port: 8010
+
+#oss默认配置（本地开发默认 MinIO；生产以 blade_oss 表启用项为准）
+oss:
+  #开启oss配置
+  enabled: true
+  #开启oss类型
+  #minio、s3、qiniu、alioss、huaweiobs、tencentcos
+  name: minio
+  #租户模式
+  tenant-mode: true
+  #oss服务地址
+  endpoint: http://127.0.0.1:9000
+  #minio转换服务地址，用于内网上传后将返回地址改为转换的外网地址
+  transform-endpoint: http://127.0.0.1:9000
+  #访问key（请与本地 MinIO 一致，默认 minioadmin）
+  access-key: minioadmin
+  #密钥key
+  secret-key: minioadmin
+  #存储桶
+  bucket-name: bladex

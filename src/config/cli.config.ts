@@ -11,8 +11,8 @@ export const cliConfig: {
   outDir: 'dist',
   // 放置生成的静态资源 (js、css、img、fonts) 的目录。
   assetsDir: 'static',
-  // 开发环境端口号
-  port: 5200,
+  // 开发环境端口号（避开本机已被 BladeX Auth 占用的 5200，Windows 下会报 EACCES）
+  port: 5300,
   // pwa
   pwa: true,
   // pwaDev

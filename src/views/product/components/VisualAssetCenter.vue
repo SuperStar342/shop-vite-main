@@ -6,10 +6,22 @@
     </div>
 
     <div class="vac-grid">
-      <section class="vac-block">
+      <section class="vac-block vac-block--main">
         <header>主图 <small>blade_product.main_image</small></header>
-        <el-upload action="#" :show-file-list="false" :http-request="(o) => up(o, 'main')" accept="image/*" drag>
-          <el-image v-if="model.mainImage" :src="model.mainImage" class="cover" fit="cover" />
+        <el-upload
+          class="main-upload"
+          action="#"
+          :show-file-list="false"
+          :http-request="(o) => up(o, 'main')"
+          accept="image/*"
+          drag
+        >
+          <el-image
+            v-if="model.mainImage"
+            :src="model.mainImage"
+            class="cover"
+            fit="contain"
+          />
           <div v-else class="placeholder">拖入主图</div>
         </el-upload>
       </section>
@@ -140,13 +152,49 @@ function onRemove(file: any) {
 .cover,
 .placeholder {
   width: 100%;
-  height: 180px;
   border-radius: 12px;
+}
+
+.main-upload {
+  width: 100%;
+
+  :deep(.el-upload),
+  :deep(.el-upload-dragger) {
+    width: 100%;
+    height: auto !important;
+    padding: 0;
+    border: 1px dashed #d6d3d1;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #fafaf9;
+  }
+
+  :deep(.el-upload-dragger:hover) {
+    border-color: #0f766e;
+  }
+}
+
+.cover {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 420px;
+  background: #fafaf9;
+
+  :deep(img) {
+    width: 100%;
+    height: auto;
+    max-height: 420px;
+    object-fit: contain;
+    vertical-align: top;
+  }
 }
 
 .placeholder {
   display: grid;
   place-items: center;
+  min-height: 160px;
+  aspect-ratio: 16 / 10;
   background: #f7f5f2;
   color: #78716c;
 }

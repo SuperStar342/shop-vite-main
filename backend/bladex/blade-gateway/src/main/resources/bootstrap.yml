@@ -1,0 +1,23 @@
+server:
+  port: 80
+
+spring:
+  cloud:
+    gateway:
+      server:
+        webflux:
+          discovery:
+            locator:
+              enabled: true
+    loadbalancer:
+      retry:
+        enabled: true
+
+# 兼容性说明：新版gateway配置需要最后启动才能发现服务，否则会出现404的问题
+# 此问题可等spring官方修复，或临时处理方案采用下方旧版配置即可自动发现服务
+#spring:
+#  cloud:
+#    gateway:
+#      discovery:
+#        locator:
+#          enabled: true
